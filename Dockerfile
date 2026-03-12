@@ -32,4 +32,4 @@ RUN playwright install chromium
 
 COPY . .
 
-CMD ["python", "run.py"]
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
