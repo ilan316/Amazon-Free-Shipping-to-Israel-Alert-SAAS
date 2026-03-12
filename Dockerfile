@@ -32,5 +32,4 @@ RUN playwright install chromium
 
 COPY . .
 
-RUN chmod +x start.sh
-CMD ["./start.sh"]
+CMD ["python", "run.py"]
