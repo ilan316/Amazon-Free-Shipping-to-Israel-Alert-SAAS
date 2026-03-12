@@ -1,5 +1,5 @@
 [build]
-buildCommand = "pip install -r requirements.txt && playwright install chromium --with-deps"
+buildCommand = "pip install -r requirements.txt && PLAYWRIGHT_BROWSERS_PATH=/app/ms-playwright playwright install chromium --with-deps"
 
 [deploy]
 startCommand = "uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers 1"
