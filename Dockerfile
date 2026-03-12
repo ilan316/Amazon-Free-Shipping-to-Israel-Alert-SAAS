@@ -32,4 +32,4 @@ RUN playwright install chromium
 
 COPY . .
 
-CMD uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers 1
+CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers 1"]
