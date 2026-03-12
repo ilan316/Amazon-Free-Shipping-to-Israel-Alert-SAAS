@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>פאנל מנהל · Amazon Israel Alert</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    .admin-page { max-width: 1100px; margin: 0 auto; padding: 32px 16px; }
+    .stats-row { display: flex; gap: 16px; margin-bottom: 32px; flex-wrap: wrap; }
+    .stat-card {
+      flex: 1; min-width: 160px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+    .stat-value { font-size: 2.2rem; font-weight: 700; color: var(--brand-dark); }
+    .stat-label { font-size: 0.82rem; color: var(--text-muted); margin-top: 4px; }
+    .section { margin-bottom: 36px; }
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px; flex-wrap: wrap; gap: 10px;
+    }
+    .section-header h2 { font-size: 1.1rem; }
+    .admin-table {
+      width: 100%; border-collapse: collapse;
+      background: var(--surface); border-radius: var(--radius);
+      overflow: hidden; box-shadow: var(--shadow);
+      font-size: 0.875rem;
+    }
+    .admin-table th {
+      background: #fdf3e1; padding: 10px 14px; text-align: right;
+      font-weight: 600; color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+    .admin-table td {
+      padding: 10px 14px; border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    .admin-table tr:last-child td { border-bottom: none; }
+    .admin-table tr:hover td { background: var(--bg); }
+    .action-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .btn-sm {
+      padding: 4px 10px; border-radius: 6px;
+      font-size: 0.78rem; font-weight: 600; cursor: pointer;
+      border: 1px solid var(--border); background: none;
+      font-family: inherit; transition: all 0.15s;
+    }
+    .btn-sm:hover { border-color: var(--brand); color: var(--brand-dark); }
+    .btn-sm.danger:hover { border-color: var(--error); color: var(--error); }
+    .btn-sm.active-toggle { color: var(--success); border-color: var(--success); }
+    .btn-sm.active-toggle:hover { background: var(--success); color: #fff; }
+    .btn-sm.inactive-toggle { color: var(--warning); border-color: var(--warning); }
+    .btn-sm.inactive-toggle:hover { background: var(--warning); color: #fff; }
+    .tag-admin {
+      display: inline-block; padding: 2px 8px;
+      background: #fff3cd; color: #856404;
+      border-radius: 12px; font-size: 0.72rem; font-weight: 700;
+    }
+    .tag-inactive {
+      display: inline-block; padding: 2px 8px;
+      background: #f8d7da; color: var(--error);
+      border-radius: 12px; font-size: 0.72rem; font-weight: 700;
+    }
+    .btn-run-check {
+      padding: 9px 20px; background: var(--brand);
+      color: #111; border: none; border-radius: 8px;
+      font-size: 0.9rem; font-weight: 700; cursor: pointer;
+      font-family: inherit; transition: background 0.15s;
+    }
+    .btn-run-check:hover { background: var(--brand-dark); color: #fff; }
+    .btn-run-check:disabled { opacity: 0.6; cursor: not-allowed; }
+    #check-msg { font-size: 0.85rem; color: var(--success); margin-right: 12px; }
+    .ltr { direction: ltr; text-align: left; }
+    .truncate { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="navbar-logo">
+      <span>🛒 Amazon Israel Alert · מנהל</span>
+    </div>
+    <div class="navbar-links">
+      <a href="/dashboard">לוח הבקרה</a>
+      <a href="/settings">הגדרות</a>
+      <button class="btn-logout" onclick="logout()">יציאה</button>
+    </div>
+  </nav>
+
+  <div class="admin-page">
+
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:12px;">
+      <h1 style="font-size:1.4rem;">פאנל ניהול</h1>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span id="check-msg"></span>
+        <button class="btn-run-check" id="run-check-btn" onclick="triggerCheck()">▶ הרץ בדיקה עכשיו</button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-users">—</div>
+        <div class="stat-label">משתמשים</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-products">—</div>
+        <div class="stat-label">מוצרים</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-notifs">—</div>
+        <div class="stat-label">התראות (24 שעות)</div>
+      </div>
+    </div>
+
+    <!-- Users -->
+    <div class="section">
+      <div class="section-header">
+        <h2>משתמשים</h2>
+      </div>
+      <div id="users-alert" class="alert"></div>
+      <div style="overflow-x:auto;">
+        <table class="admin-table" id="users-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>אימייל</th>
+              <th>אימייל התראה</th>
+              <th>מוצרים</th>
+              <th>נרשם</th>
+              <th>סטטוס</th>
+              <th>פעולות</th>
+            </tr>
+          </thead>
+          <tbody id="users-body">
+            <tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:24px;">טוען...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Products -->
+    <div class="section">
+      <div class="section-header">
+        <h2>מוצרים במעקב</h2>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="admin-table" id="products-table">
+          <thead>
+            <tr>
+              <th>ASIN</th>
+              <th>שם</th>
+              <th>סטטוס</th>
+              <th>עוקבים</th>
+              <th>בדיקה אחרונה</th>
+              <th>שגיאות</th>
+            </tr>
+          </thead>
+          <tbody id="products-body">
+            <tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:24px;">טוען...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script src="/static/admin.js"></script>
+  <script>
+    requireAuth();
+    loadAdminData();
+  </script>
+</body>
+</html>

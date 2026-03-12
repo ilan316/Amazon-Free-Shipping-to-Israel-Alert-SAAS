@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from backend.database import create_tables
-from backend.routes import auth, products, settings
+from backend.routes import auth, products, settings, admin as admin_routes
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -61,21 +61,13 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(products.router)
 app.include_router(settings.router)
+app.include_router(admin_routes.router)
 
 
 @app.get("/health")
 async def health():
     return {"status": "ok", "scheduler_running": scheduler.running}
 
-
-@app.post("/admin/trigger-check")
-async def trigger_check(token: str = ""):
-    if not ADMIN_TOKEN or token != ADMIN_TOKEN:
-        raise HTTPException(status_code=403, detail="Forbidden")
-    from backend.scheduler import run_global_check_cycle
-    import asyncio
-    asyncio.create_task(run_global_check_cycle())
-    return {"message": "Check cycle triggered"}
 
 
 # ── Serve frontend static files ───────────────────────────────────────────────
@@ -94,3 +86,7 @@ if os.path.isdir(frontend_dir):
     @app.get("/settings", include_in_schema=False)
     async def serve_settings():
         return FileResponse(os.path.join(frontend_dir, "settings.html"))
+
+    @app.get("/admin", include_in_schema=False)
+    async def serve_admin():
+        return FileResponse(os.path.join(frontend_dir, "admin.html"))
