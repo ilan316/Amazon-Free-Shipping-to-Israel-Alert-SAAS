@@ -1,0 +1,67 @@
+from datetime import datetime
+from pydantic import BaseModel, EmailStr
+
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+    notify_email: EmailStr
+    language: str = "he"
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+# ── User ──────────────────────────────────────────────────────────────────────
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    notify_email: str
+    language: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class UpdateSettingsRequest(BaseModel):
+    notify_email: EmailStr | None = None
+    language: str | None = None
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str
+
+
+# ── Products ──────────────────────────────────────────────────────────────────
+
+class AddProductRequest(BaseModel):
+    url_or_asin: str
+    custom_name: str | None = None
+
+
+class ProductResponse(BaseModel):
+    asin: str
+    name: str
+    custom_name: str | None
+    url: str
+    last_status: str
+    last_checked: datetime | None
+    found_in_aod: bool
+    last_notified: datetime | None
+    added_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class MessageResponse(BaseModel):
+    message: str

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Amazon Free Shipping to Israel Alert</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    .features { display: flex; gap: 20px; max-width: 860px; margin: 32px auto 0; padding: 0 16px; flex-wrap: wrap; }
+    .feature-card { flex: 1; min-width: 200px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-align: center; }
+    .feature-card .icon { font-size: 2rem; margin-bottom: 8px; }
+    .feature-card h3 { font-size: 0.95rem; margin-bottom: 6px; }
+    .feature-card p { font-size: 0.82rem; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="navbar-logo">
+      <span>🛒 Amazon Israel Alert</span>
+    </div>
+    <div class="navbar-links">
+      <a href="https://amzfreeil.com" target="_blank">אתר ראשי</a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <div class="auth-hero">
+    <h1>התראות משלוח חינם לישראל 🚚</h1>
+    <p>הוסף מוצרים, ואנחנו נעדכן אותך ברגע שיהיה משלוח חינם</p>
+  </div>
+
+  <!-- Auth card -->
+  <div class="auth-card">
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login" onclick="showTab('login')">כניסה</button>
+      <button class="auth-tab" id="tab-register" onclick="showTab('register')">הרשמה</button>
+    </div>
+
+    <!-- Login panel -->
+    <div class="auth-panel active" id="panel-login">
+      <div id="login-alert" class="alert"></div>
+      <form id="login-form" onsubmit="doLogin(event)">
+        <div class="form-group">
+          <label>אימייל</label>
+          <input type="email" id="login-email" required placeholder="your@email.com">
+        </div>
+        <div class="form-group">
+          <label>סיסמה</label>
+          <input type="password" id="login-password" required placeholder="••••••••">
+        </div>
+        <button type="submit" class="btn-primary" id="login-btn">כניסה</button>
+      </form>
+    </div>
+
+    <!-- Register panel -->
+    <div class="auth-panel" id="panel-register">
+      <div id="register-alert" class="alert"></div>
+      <form id="register-form" onsubmit="doRegister(event)">
+        <div class="form-group">
+          <label>אימייל להתחברות</label>
+          <input type="email" id="reg-email" required placeholder="your@email.com">
+        </div>
+        <div class="form-group">
+          <label>סיסמה</label>
+          <input type="password" id="reg-password" required placeholder="לפחות 6 תווים" minlength="6">
+        </div>
+        <div class="form-group">
+          <label>אימייל לקבלת התראות</label>
+          <input type="email" id="reg-notify-email" required placeholder="your@email.com">
+        </div>
+        <div class="form-group">
+          <label>שפת התראות</label>
+          <select id="reg-language">
+            <option value="he" selected>עברית</option>
+            <option value="en">English</option>
+          </select>
+        </div>
+        <button type="submit" class="btn-primary" id="register-btn">הרשמה</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Features -->
+  <div class="features">
+    <div class="feature-card">
+      <div class="icon">📦</div>
+      <h3>עקוב אחרי מוצרים</h3>
+      <p>הוסף כל מוצר מאמזון לפי URL או ASIN</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🔔</div>
+      <h3>התראות אימייל</h3>
+      <p>קבל מייל מיידי ברגע שיש משלוח חינם</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🕐</div>
+      <h3>בדיקה אוטומטית</h3>
+      <p>הסיסטם בודק כל שעתיים, 24/7</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🌐</div>
+      <h3>מכל מקום</h3>
+      <p>אין צורך בהורדת תוכנה</p>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script>
+    // Redirect to dashboard if already logged in
+    if (getToken()) window.location = "/dashboard";
+
+    function showTab(name) {
+      document.querySelectorAll(".auth-tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".auth-panel").forEach(p => p.classList.remove("active"));
+      document.getElementById("tab-" + name).classList.add("active");
+      document.getElementById("panel-" + name).classList.add("active");
+    }
+
+    async function doLogin(e) {
+      e.preventDefault();
+      const btn = document.getElementById("login-btn");
+      const alert = document.getElementById("login-alert");
+      hideAlert(alert);
+      btn.disabled = true;
+      btn.textContent = "מתחבר...";
+
+      const res = await apiFetch("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: document.getElementById("login-email").value,
+          password: document.getElementById("login-password").value,
+        }),
+      });
+
+      if (!res) return;
+
+      if (res.ok) {
+        const data = await res.json();
+        setToken(data.access_token);
+        window.location = "/dashboard";
+      } else {
+        const err = await res.json();
+        showAlert(alert, err.detail || "שגיאה בכניסה");
+        btn.disabled = false;
+        btn.textContent = "כניסה";
+      }
+    }
+
+    async function doRegister(e) {
+      e.preventDefault();
+      const btn = document.getElementById("register-btn");
+      const alert = document.getElementById("register-alert");
+      hideAlert(alert);
+      btn.disabled = true;
+      btn.textContent = "נרשם...";
+
+      const res = await apiFetch("/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
+          email: document.getElementById("reg-email").value,
+          password: document.getElementById("reg-password").value,
+          notify_email: document.getElementById("reg-notify-email").value,
+          language: document.getElementById("reg-language").value,
+        }),
+      });
+
+      if (!res) return;
+
+      if (res.ok) {
+        const data = await res.json();
+        setToken(data.access_token);
+        window.location = "/dashboard";
+      } else {
+        const err = await res.json();
+        showAlert(alert, err.detail || "שגיאה בהרשמה");
+        btn.disabled = false;
+        btn.textContent = "הרשמה";
+      }
+    }
+  </script>
+</body>
+</html>

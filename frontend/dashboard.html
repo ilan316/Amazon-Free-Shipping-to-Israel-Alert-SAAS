@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>לוח הבקרה · Amazon Israel Alert</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="navbar-logo">
+      <span>🛒 Amazon Israel Alert</span>
+    </div>
+    <div class="navbar-links">
+      <a href="/settings">הגדרות</a>
+      <button class="btn-logout" onclick="logout()">יציאה</button>
+    </div>
+  </nav>
+
+  <div class="page">
+
+    <div class="dashboard-header">
+      <h1>המוצרים שלי</h1>
+      <span id="user-email" style="font-size:0.85rem; color:var(--text-muted);"></span>
+    </div>
+
+    <!-- Add product -->
+    <div class="add-product-card">
+      <h2>הוסף מוצר לעקיבה</h2>
+      <div id="add-alert" class="alert"></div>
+      <div class="add-product-row">
+        <input
+          type="text"
+          id="add-input"
+          placeholder="הדבק URL של מוצר אמזון או ASIN (לדוגמה: B08N5WRWNW)"
+          dir="ltr"
+        >
+        <button class="btn-add" id="add-btn" onclick="addProduct()">הוסף מוצר</button>
+      </div>
+      <p style="font-size:0.78rem; color:var(--text-muted); margin-top:8px;">
+        הבדיקה הבאה תתבצע אוטומטית · הסיסטם בודק כל 2 שעות
+      </p>
+    </div>
+
+    <!-- Product list -->
+    <div id="products-list" class="products-list"></div>
+
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script src="/static/dashboard.js"></script>
+  <script>
+    requireAuth();
+
+    // Load user email for display
+    apiFetch("/me").then(async res => {
+      if (res && res.ok) {
+        const user = await res.json();
+        document.getElementById("user-email").textContent = user.email;
+      }
+    });
+
+    loadProducts();
+  </script>
+</body>
+</html>
