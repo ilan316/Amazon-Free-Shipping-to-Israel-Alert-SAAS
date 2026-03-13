@@ -89,6 +89,7 @@ async def _notify_subscribed_users(db: AsyncSession, product: Product, result: C
 
 async def run_global_check_cycle():
     logger.info("=== Check cycle started ===")
+    await browser_manager.refresh_location()
     async with AsyncSessionLocal() as db:
         # Load all unique products being tracked by at least one user
         result = await db.execute(

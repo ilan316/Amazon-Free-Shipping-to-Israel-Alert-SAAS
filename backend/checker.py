@@ -329,6 +329,25 @@ class BrowserManager:
         except Exception as e:
             logger.warning(f"Browser shutdown error (ignored): {e}")
 
+    async def refresh_location(self):
+        """Re-set delivery location to Israel. Called at the start of each check cycle."""
+        page = await self._context.new_page()
+        try:
+            await page.goto("https://www.amazon.com", wait_until="domcontentloaded", timeout=20000)
+            await _pause(2.0, 3.5)
+            if not await _is_captcha(page):
+                success = await _set_location_on_page(page, "IL")
+                if success:
+                    logger.info("Location refreshed to Israel.")
+                else:
+                    logger.warning("Location refresh failed — checks may return UNKNOWN.")
+            else:
+                logger.warning("CAPTCHA during location refresh — skipping.")
+        except Exception as e:
+            logger.warning(f"Location refresh error (ignored): {e}")
+        finally:
+            await page.close()
+
     async def check(self, asin: str, url: str) -> CheckResult:
         """Check a single product. Serialized via lock to avoid CAPTCHA triggers."""
         async with self._lock:

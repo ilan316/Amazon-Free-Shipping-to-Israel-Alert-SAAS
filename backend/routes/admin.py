@@ -143,6 +143,7 @@ async def list_products(
             "last_checked": p.last_checked.isoformat() if p.last_checked else None,
             "consecutive_errors": p.consecutive_errors,
             "watchers": watchers,
+            "raw_text": p.raw_text[:200] if p.raw_text else "",
         })
     return out
 
