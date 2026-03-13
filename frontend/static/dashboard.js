@@ -156,32 +156,44 @@ function renderProducts() {
         ${p.is_paused ? '▶ המשך' : '⏸ השהה'}
       </button>`;
 
+    const badgeHtml = p.is_paused
+      ? '<span class="status-badge badge-paused">⏸ מושהה</span>'
+      : isChecking
+        ? '<span class="status-badge badge-UNKNOWN">⏳ בודק...</span>'
+        : `<span class="status-badge badge-${p.last_status}" title="${tooltip}">${statusLabel(p.last_status)}</span>`;
+
     return `
       <div class="product-card status-${badgeStatus} ${p.is_paused ? 'card-paused' : ''}" id="card-${p.asin}">
-        <div class="product-info">
-          <div class="product-name" id="name-${p.asin}">
-            <a href="${linkUrl}" target="_blank" rel="noopener">${escHtml(displayName)}</a>
+
+        <!-- שורה 1: ✏️ ערוך שם (ימין) | שם מוצר LTR (שמאל) -->
+        <div class="card-row-name" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:5px;overflow:hidden;">
+          <div class="card-name-right" style="flex-shrink:0;display:flex;align-items:center;gap:4px;">
+            <div id="name-${p.asin}" class="card-name-edit-wrap">
+              <button class="btn-edit-name" onclick="editName('${p.asin}')">✏️ ערוך שם</button>
+            </div>
             ${aodNote}
-            <button class="btn-edit-name" onclick="editName('${p.asin}')" title="ערוך שם">✏️ ערוך</button>
           </div>
-          <div class="product-meta">
-            <span>ASIN: ${p.asin}</span>
-            <span>${checkedStr}</span>
-            ${notifiedStr ? `<span>${notifiedStr}</span>` : ""}
-          </div>
-          ${unknownNote}
+          <a href="${linkUrl}" target="_blank" rel="noopener" class="card-product-link" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;direction:ltr;text-align:left;">${escHtml(displayName)}</a>
         </div>
-        ${p.is_paused
-          ? '<span class="status-badge badge-paused">⏸ מושהה</span>'
-          : isChecking
-            ? '<span class="status-badge badge-UNKNOWN">⏳ בודק...</span>'
-            : `<span class="status-badge badge-${p.last_status}" title="${tooltip}">${statusLabel(p.last_status)}</span>`
-        }
-        ${pauseBtn}
-        ${!p.is_paused && !isChecking
-          ? `<button class="btn-check-now" onclick="checkNow('${p.asin}')" title="בדוק סטטוס עכשיו">🔄 בדוק</button>`
-          : ''}
-        <button class="btn-remove" onclick="removeProduct('${p.asin}')">הסר</button>
+
+        <!-- שורה 2: בדיקה אחרונה (ימין) | ASIN LTR (שמאל) -->
+        <div class="card-row-meta">
+          <span class="card-meta-checked">${checkedStr}${notifiedStr ? ' · ' + notifiedStr : ''}</span>
+          <span class="card-meta-asin" dir="ltr">ASIN: ${p.asin}</span>
+        </div>
+
+        ${unknownNote}
+
+        <!-- שורה 3: סטטוס | השהה | בדוק | הסר -->
+        <div class="card-row-actions">
+          ${badgeHtml}
+          ${pauseBtn}
+          ${!p.is_paused && !isChecking
+            ? `<button class="btn-check-now" onclick="checkNow('${p.asin}')" title="בדוק סטטוס עכשיו">🔄 בדוק</button>`
+            : ''}
+          <button class="btn-remove" onclick="removeProduct('${p.asin}')">הסר</button>
+        </div>
+
       </div>`;
   }).join("");
 }
@@ -200,10 +212,14 @@ function setFilter(filter, btn) {
 function editName(asin) {
   const p = products.find(x => x.asin === asin);
   if (!p) return;
-  const nameEl = document.getElementById(`name-${asin}`);
-  if (!nameEl) return;
+  // Replace the product link with an inline edit input
+  const linkEl = document.querySelector(`#card-${asin} .card-product-link`);
+  const wrapEl = document.getElementById(`name-${asin}`);
+  if (!linkEl || !wrapEl) return;
   const current = p.custom_name || p.name || p.asin;
-  nameEl.innerHTML = `
+  // Hide the link, show input in the wrap
+  linkEl.style.display = 'none';
+  wrapEl.innerHTML = `
     <input class="name-edit-input" id="name-input-${asin}" value="${escHtml(current)}" dir="auto">
     <button class="btn-save-name" onclick="saveName('${asin}')">שמור</button>
     <button class="btn-cancel-name" onclick="renderProducts()">ביטול</button>
