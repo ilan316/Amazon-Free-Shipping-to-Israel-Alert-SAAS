@@ -384,6 +384,21 @@ a:hover { text-decoration: underline; }
 }
 .btn-pause.is-paused:hover { background: #f57f17; color: #fff; }
 
+/* ── Check-now button ─────────────────────────────────────────────────────── */
+.btn-check-now {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-family: inherit;
+  margin-left: 6px;
+}
+.btn-check-now:hover { border-color: var(--brand); color: var(--brand-dark); }
+
 /* ── Paused card ──────────────────────────────────────────────────────────── */
 .product-card.card-paused {
   opacity: 0.65;

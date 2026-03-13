@@ -176,6 +176,28 @@ async def _check_product_soon(asin: str, url: str):
         logging.getLogger(__name__).error(f"Immediate check failed for {asin}: {e}")
 
 
+
+@router.post("/{asin}/check-now", response_model=MessageResponse)
+async def check_now(
+    asin: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    asin = asin.upper().strip()
+    result = await db.execute(
+        select(UserProduct)
+        .join(Product, UserProduct.product_id == Product.id)
+        .where(UserProduct.user_id == current_user.id, Product.asin == asin)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Product not found in your list")
+    product_result = await db.execute(select(Product).where(Product.asin == asin))
+    product = product_result.scalar_one()
+    import asyncio
+    asyncio.create_task(_check_product_soon(product.asin, product.url))
+    return MessageResponse(message="בדיקה הופעלה")
+
+
 @router.patch("/{asin}/toggle-pause", response_model=MessageResponse)
 async def toggle_pause(
     asin: str,

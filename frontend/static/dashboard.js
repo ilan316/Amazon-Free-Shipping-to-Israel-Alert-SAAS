@@ -72,6 +72,9 @@ function renderProducts() {
             : `<span class="status-badge badge-${p.last_status}">${statusLabel(p.last_status)}</span>`
         }
         ${pauseBtn}
+        ${!p.is_paused && !isChecking
+          ? `<button class="btn-check-now" onclick="checkNow('${p.asin}')" title="בדוק סטטוס עכשיו">🔄 בדוק</button>`
+          : ''}
         <button class="btn-remove" onclick="removeProduct('${p.asin}')">הסר</button>
       </div>`;
   }).join("");
@@ -199,6 +202,43 @@ async function removeProduct(asin) {
     const err = await res.json();
     alert(err.detail || "שגיאה בהסרת המוצר");
   }
+}
+
+async function checkNow(asin) {
+  checkingAsins.add(asin);
+  renderProducts();
+
+  const res = await apiFetch(`/me/products/${asin}/check-now`, { method: "POST" });
+  if (!res || !res.ok) {
+    checkingAsins.delete(asin);
+    renderProducts();
+    return;
+  }
+
+  // Poll every 6s up to 5 times for updated status
+  let attempts = 0;
+  const poll = setInterval(async () => {
+    attempts++;
+    const refreshRes = await apiFetch("/me/products");
+    if (refreshRes && refreshRes.ok) {
+      const updated = await refreshRes.json();
+      const found = updated.find(p => p.asin === asin);
+      // Consider updated when last_checked has advanced
+      const prev = products.find(p => p.asin === asin);
+      if (found && found.last_checked && found.last_checked !== (prev && prev.last_checked)) {
+        products = updated;
+        checkingAsins.delete(asin);
+        renderProducts();
+        clearInterval(poll);
+        return;
+      }
+    }
+    if (attempts >= 5) {
+      checkingAsins.delete(asin);
+      renderProducts();
+      clearInterval(poll);
+    }
+  }, 6000);
 }
 
 // Enter key in add input
