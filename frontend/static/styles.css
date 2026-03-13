@@ -270,8 +270,8 @@ a:hover { text-decoration: underline; }
   border-radius: 8px;
   font-size: 0.9rem;
   font-family: inherit;
-  direction: ltr;
-  text-align: left;
+  direction: rtl;
+  text-align: right;
   background: var(--bg);
 }
 
