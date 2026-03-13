@@ -321,8 +321,7 @@ a:hover { text-decoration: underline; }
 /* Row 1: edit button (RIGHT) | product name link (LEFT, LTR) */
 .card-row-name {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: flex-start;
   gap: 10px;
   margin-bottom: 5px;
 }
@@ -335,7 +334,7 @@ a:hover { text-decoration: underline; }
 .card-product-link {
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--text);
+  color: var(--brand-dark);
   text-decoration: none;
   direction: ltr;
   text-align: left;
@@ -345,7 +344,7 @@ a:hover { text-decoration: underline; }
   flex: 1;
   min-width: 0;
 }
-.card-product-link:hover { color: var(--brand-dark); }
+.card-product-link:hover { color: var(--brand); }
 
 /* Row 2: last-checked (RIGHT) | ASIN (LEFT, LTR) */
 .card-row-meta {
