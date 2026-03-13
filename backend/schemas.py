@@ -61,6 +61,7 @@ class ProductResponse(BaseModel):
     last_notified: datetime | None
     added_at: datetime
     is_paused: bool = False
+    raw_text: str = ""
 
     model_config = {"from_attributes": True}
 

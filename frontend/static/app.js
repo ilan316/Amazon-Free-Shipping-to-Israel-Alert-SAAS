@@ -31,8 +31,8 @@ function requireAuth() {
 function statusLabel(status) {
   const map = {
     "FREE":    "משלוח חינם ✅",
-    "PAID":    "בתשלום 💳",
-    "NO_SHIP": "לא נשלח ❌",
+    "PAID":    "משלוח בתשלום 💳",
+    "NO_SHIP": "משלוח בתשלום 💳",
     "UNKNOWN": "לא ידוע ❓",
     "ERROR":   "שגיאה ⚠️",
   };

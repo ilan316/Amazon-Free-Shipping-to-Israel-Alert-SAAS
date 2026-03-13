@@ -106,6 +106,7 @@ async def list_products(
             last_notified=last_notified,
             added_at=up.added_at,
             is_paused=up.is_paused,
+            raw_text=p.raw_text or "",
         ))
     return items
 

@@ -548,13 +548,26 @@ a:hover { text-decoration: underline; }
   font-size: 0.72rem;
   color: var(--text-muted);
   padding: 0 3px;
-  opacity: 0;
+  opacity: 0.45;
   transition: opacity 0.15s;
   vertical-align: middle;
 }
 
-.product-name:hover .btn-edit-name { opacity: 0.7; }
-.btn-edit-name:hover { opacity: 1 !important; color: var(--brand-dark); }
+.btn-edit-name:hover { opacity: 1; color: var(--brand-dark); }
+
+/* ── Unknown reason note ──────────────────────────────────────────────────── */
+.unknown-reason {
+  font-size: 0.74rem;
+  color: #888;
+  margin-top: 5px;
+  font-style: italic;
+  direction: ltr;
+  text-align: left;
+  max-width: 420px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .name-edit-input {
   padding: 3px 8px;

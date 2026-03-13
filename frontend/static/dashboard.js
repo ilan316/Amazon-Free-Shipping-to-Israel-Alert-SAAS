@@ -7,8 +7,8 @@ let currentFilter = 'ALL';
 const STATUS_TOOLTIP = {
   FREE:    "משלוח חינם לישראל זמין",
   PAID:    "משלוח לישראל בתשלום",
-  NO_SHIP: "לא ניתן לשלוח לישראל",
-  UNKNOWN: "ASIN שגוי או לינק לא תקין",
+  NO_SHIP: "ניתן לקנות אך לא במשלוח חינם",
+  UNKNOWN: "לא ניתן לקבוע סטטוס — ראה פרטים",
   ERROR:   "שגיאה בבדיקה (קפצ'ה או תקלה)",
 };
 
@@ -93,6 +93,13 @@ function renderProducts() {
     const aodNote     = p.found_in_aod ? '<span title="נמצא בכל אפשרויות הקנייה">⚠️</span>' : "";
     const badgeStatus = p.is_paused ? 'UNKNOWN' : (isChecking ? 'UNKNOWN' : p.last_status);
     const tooltip     = STATUS_TOOLTIP[p.last_status] || "";
+    const unknownNote = (!p.is_paused && !isChecking && (p.last_status === 'UNKNOWN' || p.last_status === 'ERROR'))
+      ? `<div class="unknown-reason">${
+          p.raw_text
+            ? `טקסט שנמצא: "${p.raw_text.substring(0, 120)}${p.raw_text.length > 120 ? '…' : ''}"`
+            : "לא נמצא טקסט משלוח — בדוק אם ה-ASIN תקין"
+        }</div>`
+      : "";
 
     const pauseBtn = `
       <button
@@ -115,6 +122,7 @@ function renderProducts() {
             <span>${checkedStr}</span>
             ${notifiedStr ? `<span>${notifiedStr}</span>` : ""}
           </div>
+          ${unknownNote}
         </div>
         ${p.is_paused
           ? '<span class="status-badge badge-paused">⏸ מושהה</span>'
