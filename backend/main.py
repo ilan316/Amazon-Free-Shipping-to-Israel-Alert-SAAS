@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 scheduler = AsyncIOScheduler(timezone="UTC")
 CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL_MINUTES", "120"))
-ADMIN_TOKEN = os.environ.get("ADMIN_SECRET_TOKEN", "")
 
 
 @asynccontextmanager
@@ -67,21 +66,6 @@ app.include_router(admin_routes.router)
 @app.get("/health")
 async def health():
     return {"status": "ok", "scheduler_running": scheduler.running}
-
-
-@app.post("/bootstrap-admin")
-async def bootstrap_admin(email: str, token: str, db=Depends(__import__("backend.database", fromlist=["get_db"]).get_db)):
-    if not ADMIN_TOKEN or token != ADMIN_TOKEN:
-        raise HTTPException(status_code=403, detail="Forbidden")
-    from sqlalchemy import select
-    from backend.models import User
-    result = await db.execute(select(User).where(User.email == email))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    user.is_admin = True
-    await db.commit()
-    return {"message": f"{email} is now admin"}
 
 
 

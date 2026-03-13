@@ -146,9 +146,10 @@ async def add_product(
     await db.commit()
     await db.refresh(up)
 
-    # Trigger immediate first check in background (only for newly created products)
-    import asyncio
-    asyncio.create_task(_check_product_soon(product.asin, product.url))
+    # Trigger immediate first check in background (only if product has never been checked)
+    if product.last_checked is None:
+        import asyncio
+        asyncio.create_task(_check_product_soon(product.asin, product.url))
 
     return ProductResponse(
         asin=product.asin,

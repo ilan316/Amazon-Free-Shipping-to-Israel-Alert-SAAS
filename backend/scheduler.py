@@ -148,3 +148,8 @@ async def check_single_product(asin: str, url: str):
                 await _notify_subscribed_users(db, product, check_result)
         except Exception as e:
             logger.error(f"[{asin}] Immediate check error: {e}")
+            # Still mark as checked so UI doesn't stay stuck on "טרם נבדק"
+            product.last_checked = datetime.now(timezone.utc)
+            product.last_status = ShippingStatus.ERROR.value
+            product.consecutive_errors += 1
+            await db.commit()

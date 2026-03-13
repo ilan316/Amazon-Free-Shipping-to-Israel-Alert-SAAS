@@ -103,7 +103,7 @@ async function deleteUser(userId) {
   if (!confirm("למחוק משתמש זה לצמיתות?")) return;
   const res = await apiFetch(`/admin/users/${userId}`, { method: "DELETE" });
   if (!res || !res.ok) {
-    const err = await res.json().catch(() => ({}));
+    const err = res ? await res.json().catch(() => ({})) : {};
     alert(err.detail || "שגיאה במחיקה");
     return;
   }
