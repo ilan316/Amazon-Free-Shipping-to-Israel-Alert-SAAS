@@ -327,9 +327,18 @@ a:hover { text-decoration: underline; }
   font-size: 0.95rem;
   font-weight: 600;
   margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.product-name a {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
 }
 
 .product-name a { color: var(--text); }
@@ -572,11 +581,10 @@ a:hover { text-decoration: underline; }
   font-size: 0.72rem;
   color: var(--text-muted);
   padding: 2px 7px;
-  margin-right: 6px;
   transition: all 0.15s;
-  vertical-align: middle;
   font-family: inherit;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .btn-edit-name:hover { border-color: var(--brand); color: var(--brand-dark); background: #fff8ee; }
