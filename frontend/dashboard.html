@@ -34,22 +34,18 @@
       </div>
     </div>
 
-    <!-- Notification email bar -->
-    <div id="notify-email-bar" class="notify-email-bar" style="display:none;">
-      <span>התראות נשלחות אל: <strong id="notify-email-display"></strong></span>
-      <a href="/settings">שנה</a>
-    </div>
+    <div id="notify-email-bar" style="display:none;"><span id="notify-email-display"></span></div>
 
     <!-- Add product -->
     <div class="add-product-card">
-      <h2>הוסף מוצר לעקיבה</h2>
+      <h2>הוסף מוצר למעקב</h2>
       <div id="add-alert" class="alert"></div>
       <div class="add-product-row">
         <input
           type="text"
           id="add-input"
           placeholder="הדבק URL / ASIN — ניתן להדביק מספר ASINs מופרדים בפסיק"
-          dir="ltr"
+          dir="rtl"
         >
         <button class="btn-add" id="add-btn" onclick="addProduct()">הוסף מוצר</button>
       </div>

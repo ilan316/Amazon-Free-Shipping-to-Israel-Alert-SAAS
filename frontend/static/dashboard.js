@@ -20,12 +20,7 @@ function updateNextCheckDisplay(nextCheckAt) {
   const diff = new Date(nextCheckAt) - new Date();
   if (diff <= 0) { el.textContent = "בדיקה בקרוב..."; return; }
   const mins = Math.round(diff / 60000);
-  if (mins < 60) {
-    el.textContent = `בדיקה הבאה בעוד ~${mins} דקות`;
-  } else {
-    const h = Math.floor(mins / 60), m = mins % 60;
-    el.textContent = `בדיקה הבאה בעוד ${h}ש' ${m > 0 ? m + 'ד' : ''}`;
-  }
+  el.textContent = `בדיקה הבאה בעוד ${mins} דקות`;
 }
 
 // ── Load / Render ─────────────────────────────────────────────────────────────
