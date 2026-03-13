@@ -46,6 +46,7 @@ class UserProduct(Base):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     product_id: Mapped[int] = mapped_column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
     custom_name: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    is_paused: Mapped[bool] = mapped_column(Boolean, default=False)
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
     user: Mapped["User"] = relationship(back_populates="user_products")

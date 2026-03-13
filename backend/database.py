@@ -34,3 +34,8 @@ async def create_tables():
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE"
             )
         )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE user_products ADD COLUMN IF NOT EXISTS is_paused BOOLEAN DEFAULT FALSE"
+            )
+        )

@@ -60,6 +60,7 @@ class ProductResponse(BaseModel):
     found_in_aod: bool
     last_notified: datetime | None
     added_at: datetime
+    is_paused: bool = False
 
     model_config = {"from_attributes": True}
 

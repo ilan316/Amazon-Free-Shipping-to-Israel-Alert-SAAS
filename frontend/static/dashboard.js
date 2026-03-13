@@ -33,12 +33,13 @@ function renderProducts() {
 
   list.innerHTML = products.map(p => {
     const displayName = p.custom_name || p.name || p.asin;
-    const checkedStr = p.last_checked ? `נבדק: ${formatDate(p.last_checked)}` : "טרם נבדק";
-    const notifiedStr = p.last_notified ? `התראה אחרונה: ${formatDate(p.last_notified)}` : "";
+    const checkedStr = p.last_checked ? `בדיקה אחרונה: ${formatDate(p.last_checked)}` : "טרם נבדק";
+    const notifiedStr = p.last_notified ? `התראה: ${formatDate(p.last_notified)}` : "";
     const aodNote = p.found_in_aod ? '<span title="נמצא בכל אפשרויות הקנייה">⚠️</span>' : "";
+    const badgeStatus = p.is_paused ? 'UNKNOWN' : p.last_status;
 
     return `
-      <div class="product-card status-${p.last_status}" id="card-${p.asin}">
+      <div class="product-card status-${badgeStatus}" id="card-${p.asin}" style="${p.is_paused ? 'opacity:0.6;' : ''}">
         <div class="product-info">
           <div class="product-name">
             <a href="${p.url}" target="_blank" rel="noopener">${escHtml(displayName)}</a>
@@ -50,7 +51,8 @@ function renderProducts() {
             ${notifiedStr ? `<span>${notifiedStr}</span>` : ""}
           </div>
         </div>
-        <span class="status-badge badge-${p.last_status}">${statusLabel(p.last_status)}</span>
+        <span class="status-badge badge-${badgeStatus}">${p.is_paused ? '⏸ מושהה' : statusLabel(p.last_status)}</span>
+        <button class="btn-remove" onclick="togglePause('${p.asin}')" title="${p.is_paused ? 'המשך מעקב' : 'השהה מעקב'}" style="margin-left:6px;">${p.is_paused ? '▶' : '⏸'}</button>
         <button class="btn-remove" onclick="removeProduct('${p.asin}')">הסר</button>
       </div>`;
   }).join("");
@@ -95,6 +97,13 @@ async function addProduct() {
   } else {
     const err = await res.json();
     showAlert(alert, err.detail || "שגיאה בהוספת המוצר");
+  }
+}
+
+async function togglePause(asin) {
+  const res = await apiFetch(`/me/products/${asin}/toggle-pause`, { method: "PATCH" });
+  if (res && res.ok) {
+    await loadProducts();
   }
 }
 

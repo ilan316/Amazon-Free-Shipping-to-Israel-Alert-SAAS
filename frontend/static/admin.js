@@ -1,3 +1,10 @@
+function switchTab(name, btn) {
+  document.querySelectorAll(".admin-tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+  document.getElementById("tab-" + name).classList.add("active");
+  btn.classList.add("active");
+}
+
 async function loadAdminData() {
   const meRes = await apiFetch("/me");
   if (!meRes || !meRes.ok) return;

@@ -64,6 +64,7 @@ async def _notify_subscribed_users(db: AsyncSession, product: Product, result: C
         .where(
             UserProduct.product_id == product.id,
             User.is_active == True,
+            UserProduct.is_paused == False,
             User.id.not_in(recently_notified),
         )
     )
@@ -129,3 +130,21 @@ async def run_global_check_cycle():
                 await asyncio.sleep(random.uniform(5.0, 12.0))
 
     logger.info("=== Check cycle complete ===")
+
+
+async def check_single_product(asin: str, url: str):
+    """Check a single product immediately (used after a user adds it)."""
+    logger.info(f"[{asin}] Immediate first check triggered")
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Product).where(Product.asin == asin))
+        product = result.scalar_one_or_none()
+        if not product:
+            return
+        try:
+            check_result = await browser_manager.check(product.asin, product.url)
+            await _update_product(db, product, check_result)
+            logger.info(f"[{asin}] Immediate check → {check_result.status.value}")
+            if check_result.status == ShippingStatus.FREE:
+                await _notify_subscribed_users(db, product, check_result)
+        except Exception as e:
+            logger.error(f"[{asin}] Immediate check error: {e}")

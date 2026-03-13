@@ -100,6 +100,7 @@ async def list_products(
             found_in_aod=p.found_in_aod,
             last_notified=last_notified,
             added_at=up.added_at,
+            is_paused=up.is_paused,
         ))
     return items
 
@@ -145,6 +146,10 @@ async def add_product(
     await db.commit()
     await db.refresh(up)
 
+    # Trigger immediate first check in background (only for newly created products)
+    import asyncio
+    asyncio.create_task(_check_product_soon(product.asin, product.url))
+
     return ProductResponse(
         asin=product.asin,
         name=product.name,
@@ -155,7 +160,40 @@ async def add_product(
         found_in_aod=product.found_in_aod,
         last_notified=None,
         added_at=up.added_at,
+        is_paused=False,
     )
+
+
+async def _check_product_soon(asin: str, url: str):
+    """Run a single-product check shortly after it's added."""
+    await __import__("asyncio").sleep(2)
+    try:
+        from backend.scheduler import check_single_product
+        await check_single_product(asin, url)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Immediate check failed for {asin}: {e}")
+
+
+@router.patch("/{asin}/toggle-pause", response_model=MessageResponse)
+async def toggle_pause(
+    asin: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    asin = asin.upper().strip()
+    result = await db.execute(
+        select(UserProduct)
+        .join(Product, UserProduct.product_id == Product.id)
+        .where(UserProduct.user_id == current_user.id, Product.asin == asin)
+    )
+    up = result.scalar_one_or_none()
+    if not up:
+        raise HTTPException(status_code=404, detail="Product not found in your list")
+    up.is_paused = not up.is_paused
+    await db.commit()
+    state = "מושהה" if up.is_paused else "פעיל"
+    return MessageResponse(message=f"Product {asin} is now {state}")
 
 
 @router.delete("/{asin}", response_model=MessageResponse)
