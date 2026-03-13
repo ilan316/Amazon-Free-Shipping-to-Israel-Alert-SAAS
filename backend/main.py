@@ -69,6 +69,21 @@ async def health():
     return {"status": "ok", "scheduler_running": scheduler.running}
 
 
+@app.post("/bootstrap-admin")
+async def bootstrap_admin(email: str, token: str, db=Depends(__import__("backend.database", fromlist=["get_db"]).get_db)):
+    if not ADMIN_TOKEN or token != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from sqlalchemy import select
+    from backend.models import User
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.is_admin = True
+    await db.commit()
+    return {"message": f"{email} is now admin"}
+
+
 
 # ── Serve frontend static files ───────────────────────────────────────────────
 frontend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
