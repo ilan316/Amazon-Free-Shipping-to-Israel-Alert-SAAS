@@ -3,6 +3,7 @@ import urllib.request
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
@@ -11,6 +12,10 @@ from backend.database import get_db
 from backend.models import User, Product, UserProduct, NotificationLog
 from backend.auth import get_current_user
 from backend.schemas import AddProductRequest, ProductResponse, MessageResponse
+
+
+class RenameRequest(BaseModel):
+    custom_name: str
 
 router = APIRouter(prefix="/me/products", tags=["products"])
 
@@ -217,6 +222,27 @@ async def toggle_pause(
     await db.commit()
     state = "מושהה" if up.is_paused else "פעיל"
     return MessageResponse(message=f"Product {asin} is now {state}")
+
+
+@router.patch("/{asin}/name", response_model=MessageResponse)
+async def rename_product(
+    asin: str,
+    body: RenameRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    asin = asin.upper().strip()
+    result = await db.execute(
+        select(UserProduct)
+        .join(Product, UserProduct.product_id == Product.id)
+        .where(UserProduct.user_id == current_user.id, Product.asin == asin)
+    )
+    up = result.scalar_one_or_none()
+    if not up:
+        raise HTTPException(status_code=404, detail="Product not found in your list")
+    up.custom_name = body.custom_name.strip() or None
+    await db.commit()
+    return MessageResponse(message="שם עודכן")
 
 
 @router.delete("/{asin}", response_model=MessageResponse)

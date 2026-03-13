@@ -487,3 +487,107 @@ a:hover { text-decoration: underline; }
   .product-card { flex-wrap: wrap; }
   .add-product-row { flex-direction: column; }
 }
+
+/* ── Products counter ─────────────────────────────────────────────────────── */
+.products-counter {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+/* ── Notification email bar ───────────────────────────────────────────────── */
+.notify-email-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  margin-bottom: 16px;
+}
+
+.notify-email-bar strong { color: var(--text); }
+
+/* ── Filter bar ───────────────────────────────────────────────────────────── */
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.filter-btn {
+  padding: 5px 14px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.filter-btn:hover { border-color: var(--brand); color: var(--brand-dark); }
+
+.filter-btn.active {
+  background: var(--brand);
+  color: #111;
+  border-color: var(--brand);
+  font-weight: 600;
+}
+
+/* ── Inline name editing ──────────────────────────────────────────────────── */
+.btn-edit-name {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  padding: 0 3px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  vertical-align: middle;
+}
+
+.product-name:hover .btn-edit-name { opacity: 0.7; }
+.btn-edit-name:hover { opacity: 1 !important; color: var(--brand-dark); }
+
+.name-edit-input {
+  padding: 3px 8px;
+  border: 1px solid var(--brand);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  background: #fff;
+  min-width: 160px;
+  max-width: 320px;
+}
+
+.btn-save-name {
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  font-family: inherit;
+  margin-right: 4px;
+  background: var(--brand);
+  color: #111;
+  border: none;
+  font-weight: 600;
+}
+
+.btn-cancel-name {
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  font-family: inherit;
+  margin-right: 4px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}

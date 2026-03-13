@@ -24,8 +24,17 @@
   <div class="page">
 
     <div class="dashboard-header">
-      <h1>המוצרים שלי</h1>
+      <div>
+        <h1>המוצרים שלי</h1>
+        <div id="products-counter" class="products-counter"></div>
+      </div>
       <span id="user-email" style="font-size:0.85rem; color:var(--text-muted);"></span>
+    </div>
+
+    <!-- Notification email bar -->
+    <div id="notify-email-bar" class="notify-email-bar" style="display:none;">
+      <span>התראות נשלחות אל: <strong id="notify-email-display"></strong></span>
+      <a href="/settings">שנה</a>
     </div>
 
     <!-- Add product -->
@@ -36,7 +45,7 @@
         <input
           type="text"
           id="add-input"
-          placeholder="הדבק URL של מוצר אמזון או ASIN (לדוגמה: B08N5WRWNW)"
+          placeholder="הדבק URL / ASIN — ניתן להדביק מספר ASINs מופרדים בפסיק"
           dir="ltr"
         >
         <button class="btn-add" id="add-btn" onclick="addProduct()">הוסף מוצר</button>
@@ -44,6 +53,15 @@
       <p style="font-size:0.78rem; color:var(--text-muted); margin-top:8px;">
         הבדיקה הבאה תתבצע אוטומטית · הסיסטם בודק כל 2 שעות
       </p>
+    </div>
+
+    <!-- Filter bar -->
+    <div id="filter-bar" class="filter-bar" style="display:none;">
+      <button class="filter-btn active" onclick="setFilter('ALL', this)">הכל</button>
+      <button class="filter-btn" onclick="setFilter('FREE', this)">✅ חינם</button>
+      <button class="filter-btn" onclick="setFilter('PAID', this)">💰 בתשלום</button>
+      <button class="filter-btn" onclick="setFilter('NO_SHIP', this)">🚫 לא נשלח</button>
+      <button class="filter-btn" onclick="setFilter('UNKNOWN', this)">❓ לא ידוע</button>
     </div>
 
     <!-- Product list -->
@@ -56,11 +74,16 @@
   <script>
     requireAuth();
 
-    // Load user email for display
     apiFetch("/me").then(async res => {
       if (res && res.ok) {
         const user = await res.json();
         document.getElementById("user-email").textContent = user.email;
+        const bar = document.getElementById("notify-email-bar");
+        const display = document.getElementById("notify-email-display");
+        if (bar && display && user.notify_email) {
+          display.textContent = user.notify_email;
+          bar.style.display = "flex";
+        }
       }
     });
 

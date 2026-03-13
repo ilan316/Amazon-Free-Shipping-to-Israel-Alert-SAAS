@@ -1,7 +1,16 @@
 // Dashboard page logic
 
 let products = [];
-let checkingAsins = new Set(); // ASINs currently being checked
+let checkingAsins = new Set();
+let currentFilter = 'ALL';
+
+const STATUS_TOOLTIP = {
+  FREE:    "משלוח חינם לישראל זמין",
+  PAID:    "משלוח לישראל בתשלום",
+  NO_SHIP: "לא ניתן לשלוח לישראל",
+  UNKNOWN: "ASIN שגוי או לינק לא תקין",
+  ERROR:   "שגיאה בבדיקה (קפצ'ה או תקלה)",
+};
 
 async function loadProducts(silent = false) {
   const list = document.getElementById("products-list");
@@ -24,6 +33,28 @@ async function loadProducts(silent = false) {
 function renderProducts() {
   const list = document.getElementById("products-list");
 
+  // Show/hide filter bar
+  const filterBar = document.getElementById("filter-bar");
+  if (filterBar) filterBar.style.display = products.length > 0 ? "flex" : "none";
+
+  // Update counter
+  const counterEl = document.getElementById("products-counter");
+  if (counterEl) {
+    const total = products.length;
+    const free    = products.filter(p => !p.is_paused && p.last_status === 'FREE').length;
+    const noShip  = products.filter(p => !p.is_paused && p.last_status === 'NO_SHIP').length;
+    const unknown = products.filter(p => !p.is_paused && (p.last_status === 'UNKNOWN' || p.last_status === 'ERROR')).length;
+    if (total > 0) {
+      const parts = [`${total} מוצרים במעקב`];
+      if (free > 0)    parts.push(`${free} חינם`);
+      if (noShip > 0)  parts.push(`${noShip} לא נשלח`);
+      if (unknown > 0) parts.push(`${unknown} לא ידוע`);
+      counterEl.textContent = parts.join(' · ');
+    } else {
+      counterEl.textContent = '';
+    }
+  }
+
   if (products.length === 0) {
     list.innerHTML = `
       <div class="empty-state">
@@ -34,15 +65,34 @@ function renderProducts() {
     return;
   }
 
-  list.innerHTML = products.map(p => {
+  // Filter
+  let filtered = [...products];
+  if (currentFilter !== 'ALL') {
+    filtered = filtered.filter(p => !p.is_paused && p.last_status === currentFilter);
+  }
+
+  // Sort: FREE first, paused last
+  const STATUS_ORDER = { FREE: 0, PAID: 1, NO_SHIP: 2, UNKNOWN: 3, ERROR: 4 };
+  filtered.sort((a, b) => {
+    if (a.is_paused !== b.is_paused) return a.is_paused ? 1 : -1;
+    return (STATUS_ORDER[a.last_status] ?? 5) - (STATUS_ORDER[b.last_status] ?? 5);
+  });
+
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="empty-state"><p>אין מוצרים בסטטוס זה</p></div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(p => {
     const displayName = p.custom_name || p.name || p.asin;
-    const isChecking = checkingAsins.has(p.asin);
-    const checkedStr = isChecking
+    const isChecking  = checkingAsins.has(p.asin);
+    const checkedStr  = isChecking
       ? '<span style="color:var(--brand-dark)">⏳ בודק עכשיו...</span>'
       : (p.last_checked ? `בדיקה אחרונה: ${formatDate(p.last_checked)}` : "טרם נבדק");
     const notifiedStr = p.last_notified ? `התראה: ${formatDate(p.last_notified)}` : "";
-    const aodNote = p.found_in_aod ? '<span title="נמצא בכל אפשרויות הקנייה">⚠️</span>' : "";
+    const aodNote     = p.found_in_aod ? '<span title="נמצא בכל אפשרויות הקנייה">⚠️</span>' : "";
     const badgeStatus = p.is_paused ? 'UNKNOWN' : (isChecking ? 'UNKNOWN' : p.last_status);
+    const tooltip     = STATUS_TOOLTIP[p.last_status] || "";
 
     const pauseBtn = `
       <button
@@ -55,9 +105,10 @@ function renderProducts() {
     return `
       <div class="product-card status-${badgeStatus} ${p.is_paused ? 'card-paused' : ''}" id="card-${p.asin}">
         <div class="product-info">
-          <div class="product-name">
+          <div class="product-name" id="name-${p.asin}">
             <a href="${p.url}" target="_blank" rel="noopener">${escHtml(displayName)}</a>
             ${aodNote}
+            <button class="btn-edit-name" onclick="editName('${p.asin}')" title="ערוך שם">✏️</button>
           </div>
           <div class="product-meta">
             <span>ASIN: ${p.asin}</span>
@@ -69,7 +120,7 @@ function renderProducts() {
           ? '<span class="status-badge badge-paused">⏸ מושהה</span>'
           : isChecking
             ? '<span class="status-badge badge-UNKNOWN">⏳ בודק...</span>'
-            : `<span class="status-badge badge-${p.last_status}">${statusLabel(p.last_status)}</span>`
+            : `<span class="status-badge badge-${p.last_status}" title="${tooltip}">${statusLabel(p.last_status)}</span>`
         }
         ${pauseBtn}
         ${!p.is_paused && !isChecking
@@ -78,6 +129,49 @@ function renderProducts() {
         <button class="btn-remove" onclick="removeProduct('${p.asin}')">הסר</button>
       </div>`;
   }).join("");
+}
+
+function setFilter(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderProducts();
+}
+
+function editName(asin) {
+  const p = products.find(x => x.asin === asin);
+  if (!p) return;
+  const nameEl = document.getElementById(`name-${asin}`);
+  if (!nameEl) return;
+  const current = p.custom_name || p.name || p.asin;
+  nameEl.innerHTML = `
+    <input class="name-edit-input" id="name-input-${asin}" value="${escHtml(current)}" dir="auto">
+    <button class="btn-save-name" onclick="saveName('${asin}')">שמור</button>
+    <button class="btn-cancel-name" onclick="renderProducts()">ביטול</button>
+  `;
+  const inp = document.getElementById(`name-input-${asin}`);
+  if (inp) {
+    inp.focus();
+    inp.select();
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') saveName(asin);
+      if (e.key === 'Escape') renderProducts();
+    });
+  }
+}
+
+async function saveName(asin) {
+  const inp = document.getElementById(`name-input-${asin}`);
+  if (!inp) return;
+  const newName = inp.value.trim();
+  const res = await apiFetch(`/me/products/${asin}/name`, {
+    method: "PATCH",
+    body: JSON.stringify({ custom_name: newName }),
+  });
+  if (res && res.ok) {
+    products = products.map(p => p.asin === asin ? { ...p, custom_name: newName || null } : p);
+  }
+  renderProducts();
 }
 
 function escHtml(str) {
@@ -89,13 +183,21 @@ function escHtml(str) {
 }
 
 async function addProduct() {
-  const input = document.getElementById("add-input");
-  const btn = document.getElementById("add-btn");
+  const input   = document.getElementById("add-input");
+  const btn     = document.getElementById("add-btn");
   const alertEl = document.getElementById("add-alert");
-  const val = input.value.trim();
+  const val     = input.value.trim();
 
   if (!val) return;
   hideAlert(alertEl);
+
+  // Bulk detect: commas or newlines
+  const parts = val.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+  if (parts.length > 1) {
+    await addProductsBulk(parts, input, btn, alertEl);
+    return;
+  }
+
   btn.disabled = true;
   btn.textContent = "מוסיף...";
 
@@ -105,20 +207,18 @@ async function addProduct() {
   });
 
   btn.disabled = false;
-  btn.textContent = "הוסף";
+  btn.textContent = "הוסף מוצר";
 
   if (!res) return;
 
   if (res.ok) {
     const newProduct = await res.json();
     input.value = "";
-    // Mark as checking and add to list
     checkingAsins.add(newProduct.asin);
     products.unshift(newProduct);
     renderProducts();
     showAlert(alertEl, `✅ מוצר ${newProduct.asin} נוסף — בודק סטטוס...`, "success");
 
-    // Poll for updated status every 6 seconds, up to 5 times (30s)
     let attempts = 0;
     const poll = setInterval(async () => {
       attempts++;
@@ -150,9 +250,46 @@ async function addProduct() {
   }
 }
 
+async function addProductsBulk(items, input, btn, alertEl) {
+  btn.disabled = true;
+  let added = 0;
+  const errors = [];
+
+  for (let i = 0; i < items.length; i++) {
+    btn.textContent = `מוסיף ${i + 1}/${items.length}...`;
+    const res = await apiFetch("/me/products", {
+      method: "POST",
+      body: JSON.stringify({ url_or_asin: items[i] }),
+    });
+    if (res && res.ok) {
+      const newProduct = await res.json();
+      added++;
+      checkingAsins.add(newProduct.asin);
+      products.unshift(newProduct);
+    } else if (res) {
+      const err = await res.json().catch(() => ({}));
+      errors.push(`${items[i]}: ${err.detail || 'שגיאה'}`);
+    }
+  }
+
+  btn.disabled = false;
+  btn.textContent = "הוסף מוצר";
+  input.value = "";
+  renderProducts();
+
+  if (errors.length === 0) {
+    showAlert(alertEl, `✅ נוספו ${added} מוצרים בהצלחה`, "success");
+  } else {
+    const detail = errors.join(' | ');
+    showAlert(alertEl,
+      `נוספו ${added} מוצרים${errors.length ? `. שגיאות: ${detail}` : ''}`,
+      added === 0 ? "error" : "success"
+    );
+  }
+}
+
 async function togglePause(asin, btn) {
   const wasPaused = btn.classList.contains("is-paused");
-  // Optimistic UI update
   const card = document.getElementById(`card-${asin}`);
   if (card) {
     card.classList.toggle("card-paused");
@@ -176,10 +313,8 @@ async function togglePause(asin, btn) {
 
   const res = await apiFetch(`/me/products/${asin}/toggle-pause`, { method: "PATCH" });
   if (res && res.ok) {
-    // Update local state silently
     products = products.map(p => p.asin === asin ? { ...p, is_paused: !wasPaused } : p);
   } else {
-    // Revert on error
     await loadProducts(true);
   }
 }
@@ -215,7 +350,6 @@ async function checkNow(asin) {
     return;
   }
 
-  // Poll every 6s up to 15 times (90s) — Playwright checks can take ~60s
   const prevChecked = (products.find(p => p.asin === asin) || {}).last_checked;
   let attempts = 0;
   const poll = setInterval(async () => {
@@ -240,7 +374,6 @@ async function checkNow(asin) {
   }, 6000);
 }
 
-// Enter key in add input
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("add-input").addEventListener("keydown", e => {
     if (e.key === "Enter") addProduct();
