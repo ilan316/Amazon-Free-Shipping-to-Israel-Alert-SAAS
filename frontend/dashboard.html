@@ -28,7 +28,10 @@
         <h1>המוצרים שלי</h1>
         <div id="products-counter" class="products-counter"></div>
       </div>
-      <span id="user-email" style="font-size:0.85rem; color:var(--text-muted);"></span>
+      <div style="text-align:left;">
+        <div id="user-email" style="font-size:0.85rem; color:var(--text-muted);"></div>
+        <div id="next-check-display" class="next-check-display"></div>
+      </div>
     </div>
 
     <!-- Notification email bar -->
@@ -55,8 +58,16 @@
       </p>
     </div>
 
-    <!-- Filter bar -->
+    <!-- Search + Filter bar -->
     <div id="filter-bar" class="filter-bar" style="display:none;">
+      <input
+        type="text"
+        id="search-input"
+        class="search-input"
+        placeholder="חיפוש לפי שם / ASIN..."
+        oninput="renderProducts()"
+        dir="auto"
+      >
       <button class="filter-btn active" onclick="setFilter('ALL', this)">הכל</button>
       <button class="filter-btn" onclick="setFilter('FREE', this)">✅ משלוח חינם</button>
       <button class="filter-btn" onclick="setFilter('NO_SHIP', this)">💳 משלוח בתשלום</button>
@@ -85,6 +96,13 @@
         }
       }
     });
+
+    // Load next check time
+    fetch("/health").then(r => r.json()).then(data => {
+      if (data.next_check_at) {
+        updateNextCheckDisplay(data.next_check_at);
+      }
+    }).catch(() => {});
 
     loadProducts();
   </script>

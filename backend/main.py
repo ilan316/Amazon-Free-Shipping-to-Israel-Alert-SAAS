@@ -65,7 +65,14 @@ app.include_router(admin_routes.router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "scheduler_running": scheduler.running}
+    job = scheduler.get_job("global_check")
+    next_run = job.next_run_time.isoformat() if job and job.next_run_time else None
+    return {
+        "status": "ok",
+        "scheduler_running": scheduler.running,
+        "next_check_at": next_run,
+        "check_interval_minutes": CHECK_INTERVAL,
+    }
 
 
 

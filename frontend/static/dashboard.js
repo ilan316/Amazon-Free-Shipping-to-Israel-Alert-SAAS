@@ -12,6 +12,24 @@ const STATUS_TOOLTIP = {
   ERROR:   "שגיאה בבדיקה (קפצ'ה או תקלה)",
 };
 
+// ── Next check time ───────────────────────────────────────────────────────────
+
+function updateNextCheckDisplay(nextCheckAt) {
+  const el = document.getElementById("next-check-display");
+  if (!el) return;
+  const diff = new Date(nextCheckAt) - new Date();
+  if (diff <= 0) { el.textContent = "בדיקה בקרוב..."; return; }
+  const mins = Math.round(diff / 60000);
+  if (mins < 60) {
+    el.textContent = `בדיקה הבאה בעוד ~${mins} דקות`;
+  } else {
+    const h = Math.floor(mins / 60), m = mins % 60;
+    el.textContent = `בדיקה הבאה בעוד ${h}ש' ${m > 0 ? m + 'ד' : ''}`;
+  }
+}
+
+// ── Load / Render ─────────────────────────────────────────────────────────────
+
 async function loadProducts(silent = false) {
   const list = document.getElementById("products-list");
   if (!silent) {
@@ -32,23 +50,40 @@ async function loadProducts(silent = false) {
 
 function renderProducts() {
   const list = document.getElementById("products-list");
+  const searchVal = (document.getElementById("search-input")?.value || "").trim().toLowerCase();
 
   // Show/hide filter bar
   const filterBar = document.getElementById("filter-bar");
   if (filterBar) filterBar.style.display = products.length > 0 ? "flex" : "none";
 
+  // Counts for filter buttons
+  const counts = { FREE: 0, NO_SHIP: 0, UNKNOWN: 0 };
+  products.forEach(p => {
+    if (p.is_paused) return;
+    if (p.last_status === 'FREE')    counts.FREE++;
+    if (p.last_status === 'NO_SHIP' || p.last_status === 'PAID') counts.NO_SHIP++;
+    if (p.last_status === 'UNKNOWN' || p.last_status === 'ERROR') counts.UNKNOWN++;
+  });
+  // Update filter button labels
+  const lblMap = {
+    FREE:    `✅ משלוח חינם${counts.FREE > 0 ? ` (${counts.FREE})` : ''}`,
+    NO_SHIP: `💳 משלוח בתשלום${counts.NO_SHIP > 0 ? ` (${counts.NO_SHIP})` : ''}`,
+    UNKNOWN: `❓ לא ידוע${counts.UNKNOWN > 0 ? ` (${counts.UNKNOWN})` : ''}`,
+  };
+  document.querySelectorAll('.filter-btn[onclick]').forEach(btn => {
+    const m = btn.getAttribute('onclick').match(/setFilter\('(\w+)'/);
+    if (m && lblMap[m[1]]) btn.textContent = lblMap[m[1]];
+  });
+
   // Update counter
   const counterEl = document.getElementById("products-counter");
   if (counterEl) {
     const total = products.length;
-    const free    = products.filter(p => !p.is_paused && p.last_status === 'FREE').length;
-    const noShip  = products.filter(p => !p.is_paused && p.last_status === 'NO_SHIP').length;
-    const unknown = products.filter(p => !p.is_paused && (p.last_status === 'UNKNOWN' || p.last_status === 'ERROR')).length;
     if (total > 0) {
       const parts = [`${total} מוצרים במעקב`];
-      if (free > 0)    parts.push(`${free} חינם`);
-      if (noShip > 0)  parts.push(`${noShip} לא נשלח`);
-      if (unknown > 0) parts.push(`${unknown} לא ידוע`);
+      if (counts.FREE > 0)    parts.push(`${counts.FREE} חינם`);
+      if (counts.NO_SHIP > 0) parts.push(`${counts.NO_SHIP} בתשלום`);
+      if (counts.UNKNOWN > 0) parts.push(`${counts.UNKNOWN} לא ידוע`);
       counterEl.textContent = parts.join(' · ');
     } else {
       counterEl.textContent = '';
@@ -65,21 +100,31 @@ function renderProducts() {
     return;
   }
 
-  // Filter
+  // Filter by status
   let filtered = [...products];
-  if (currentFilter !== 'ALL') {
+  if (currentFilter === 'NO_SHIP') {
+    filtered = filtered.filter(p => !p.is_paused && (p.last_status === 'NO_SHIP' || p.last_status === 'PAID'));
+  } else if (currentFilter !== 'ALL') {
     filtered = filtered.filter(p => !p.is_paused && p.last_status === currentFilter);
   }
 
+  // Filter by search
+  if (searchVal) {
+    filtered = filtered.filter(p => {
+      const name = (p.custom_name || p.name || "").toLowerCase();
+      return name.includes(searchVal) || p.asin.toLowerCase().includes(searchVal);
+    });
+  }
+
   // Sort: FREE first, paused last
-  const STATUS_ORDER = { FREE: 0, PAID: 1, NO_SHIP: 2, UNKNOWN: 3, ERROR: 4 };
+  const STATUS_ORDER = { FREE: 0, PAID: 1, NO_SHIP: 1, UNKNOWN: 2, ERROR: 3 };
   filtered.sort((a, b) => {
     if (a.is_paused !== b.is_paused) return a.is_paused ? 1 : -1;
-    return (STATUS_ORDER[a.last_status] ?? 5) - (STATUS_ORDER[b.last_status] ?? 5);
+    return (STATUS_ORDER[a.last_status] ?? 4) - (STATUS_ORDER[b.last_status] ?? 4);
   });
 
   if (filtered.length === 0) {
-    list.innerHTML = `<div class="empty-state"><p>אין מוצרים בסטטוס זה</p></div>`;
+    list.innerHTML = `<div class="empty-state"><p>אין מוצרים התואמים לחיפוש</p></div>`;
     return;
   }
 
@@ -93,6 +138,8 @@ function renderProducts() {
     const aodNote     = p.found_in_aod ? '<span title="נמצא בכל אפשרויות הקנייה">⚠️</span>' : "";
     const badgeStatus = p.is_paused ? 'UNKNOWN' : (isChecking ? 'UNKNOWN' : p.last_status);
     const tooltip     = STATUS_TOOLTIP[p.last_status] || "";
+    const linkUrl     = p.affiliate_url || p.url;
+
     const unknownNote = (!p.is_paused && !isChecking && (p.last_status === 'UNKNOWN' || p.last_status === 'ERROR'))
       ? `<div class="unknown-reason">${
           p.raw_text
@@ -113,9 +160,9 @@ function renderProducts() {
       <div class="product-card status-${badgeStatus} ${p.is_paused ? 'card-paused' : ''}" id="card-${p.asin}">
         <div class="product-info">
           <div class="product-name" id="name-${p.asin}">
-            <a href="${p.url}" target="_blank" rel="noopener">${escHtml(displayName)}</a>
+            <a href="${linkUrl}" target="_blank" rel="noopener">${escHtml(displayName)}</a>
             ${aodNote}
-            <button class="btn-edit-name" onclick="editName('${p.asin}')" title="ערוך שם">✏️</button>
+            <button class="btn-edit-name" onclick="editName('${p.asin}')" title="ערוך שם">✏️ ערוך</button>
           </div>
           <div class="product-meta">
             <span>ASIN: ${p.asin}</span>
@@ -139,12 +186,16 @@ function renderProducts() {
   }).join("");
 }
 
+// ── Filter / Search ───────────────────────────────────────────────────────────
+
 function setFilter(filter, btn) {
   currentFilter = filter;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderProducts();
 }
+
+// ── Inline name edit ──────────────────────────────────────────────────────────
 
 function editName(asin) {
   const p = products.find(x => x.asin === asin);
@@ -182,6 +233,8 @@ async function saveName(asin) {
   renderProducts();
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function escHtml(str) {
   return String(str)
     .replace(/&/g, "&amp;")
@@ -189,6 +242,8 @@ function escHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
+
+// ── Add product (single + bulk) ───────────────────────────────────────────────
 
 async function addProduct() {
   const input   = document.getElementById("add-input");
@@ -199,7 +254,6 @@ async function addProduct() {
   if (!val) return;
   hideAlert(alertEl);
 
-  // Bulk detect: commas or newlines
   const parts = val.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
   if (parts.length > 1) {
     await addProductsBulk(parts, input, btn, alertEl);
@@ -288,13 +342,14 @@ async function addProductsBulk(items, input, btn, alertEl) {
   if (errors.length === 0) {
     showAlert(alertEl, `✅ נוספו ${added} מוצרים בהצלחה`, "success");
   } else {
-    const detail = errors.join(' | ');
     showAlert(alertEl,
-      `נוספו ${added} מוצרים${errors.length ? `. שגיאות: ${detail}` : ''}`,
+      `נוספו ${added} מוצרים${errors.length ? `. שגיאות: ${errors.join(' | ')}` : ''}`,
       added === 0 ? "error" : "success"
     );
   }
 }
+
+// ── Toggle pause ──────────────────────────────────────────────────────────────
 
 async function togglePause(asin, btn) {
   const wasPaused = btn.classList.contains("is-paused");
@@ -327,6 +382,8 @@ async function togglePause(asin, btn) {
   }
 }
 
+// ── Remove ────────────────────────────────────────────────────────────────────
+
 async function removeProduct(asin) {
   if (!confirm(`להסיר את המוצר ${asin}?`)) return;
 
@@ -346,6 +403,8 @@ async function removeProduct(asin) {
     alert(err.detail || "שגיאה בהסרת המוצר");
   }
 }
+
+// ── Check now ─────────────────────────────────────────────────────────────────
 
 async function checkNow(asin) {
   checkingAsins.add(asin);
@@ -382,6 +441,8 @@ async function checkNow(asin) {
   }, 6000);
 }
 
+// ── Init ──────────────────────────────────────────────────────────────────────
+
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("add-input").addEventListener("keydown", e => {
     if (e.key === "Enter") addProduct();
@@ -389,4 +450,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Auto-refresh every 5 minutes
   setInterval(() => loadProducts(true), 5 * 60 * 1000);
+
+  // Update next-check countdown every minute
+  setInterval(() => {
+    fetch("/health").then(r => r.json()).then(data => {
+      if (data.next_check_at) updateNextCheckDisplay(data.next_check_at);
+    }).catch(() => {});
+  }, 60 * 1000);
 });

@@ -511,13 +511,36 @@ a:hover { text-decoration: underline; }
 
 .notify-email-bar strong { color: var(--text); }
 
+/* ── Next check display ───────────────────────────────────────────────────── */
+.next-check-display {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+  text-align: left;
+}
+
 /* ── Filter bar ───────────────────────────────────────────────────────────── */
 .filter-bar {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  align-items: center;
   margin-bottom: 16px;
 }
+
+/* ── Search input (inside filter bar) ────────────────────────────────────── */
+.search-input {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--text);
+  min-width: 160px;
+  transition: border-color 0.15s;
+}
+.search-input:focus { outline: none; border-color: var(--brand); background: #fff; }
 
 .filter-btn {
   padding: 5px 14px;
@@ -543,17 +566,20 @@ a:hover { text-decoration: underline; }
 /* ── Inline name editing ──────────────────────────────────────────────────── */
 .btn-edit-name {
   background: none;
-  border: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
   cursor: pointer;
   font-size: 0.72rem;
   color: var(--text-muted);
-  padding: 0 3px;
-  opacity: 0.45;
-  transition: opacity 0.15s;
+  padding: 2px 7px;
+  margin-right: 6px;
+  transition: all 0.15s;
   vertical-align: middle;
+  font-family: inherit;
+  white-space: nowrap;
 }
 
-.btn-edit-name:hover { opacity: 1; color: var(--brand-dark); }
+.btn-edit-name:hover { border-color: var(--brand); color: var(--brand-dark); background: #fff8ee; }
 
 /* ── Unknown reason note ──────────────────────────────────────────────────── */
 .unknown-reason {

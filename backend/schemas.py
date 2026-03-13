@@ -62,6 +62,7 @@ class ProductResponse(BaseModel):
     added_at: datetime
     is_paused: bool = False
     raw_text: str = ""
+    affiliate_url: str = ""
 
     model_config = {"from_attributes": True}
 

@@ -80,6 +80,9 @@ async def list_products(
     user_products = result.scalars().all()
 
     items = []
+    import os as _os
+    _affiliate_tag = _os.environ.get("AMAZON_AFFILIATE_TAG", "").strip()
+
     for up in user_products:
         p = up.product
         # Get last notification time for this user+product
@@ -95,6 +98,7 @@ async def list_products(
         )
         last_notified = notif_result.scalar_one_or_none()
 
+        _aff_url = f"{p.url}?tag={_affiliate_tag}" if _affiliate_tag else p.url
         items.append(ProductResponse(
             asin=p.asin,
             name=p.name,
@@ -107,6 +111,7 @@ async def list_products(
             added_at=up.added_at,
             is_paused=up.is_paused,
             raw_text=p.raw_text or "",
+            affiliate_url=_aff_url,
         ))
     return items
 
