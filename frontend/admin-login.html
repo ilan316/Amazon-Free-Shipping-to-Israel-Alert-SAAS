@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>כניסת מנהל · Amazon Israel Alert</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .admin-login-card {
+      background: var(--surface);
+      border: 2px solid var(--brand);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      width: 100%;
+      max-width: 380px;
+      padding: 36px 28px;
+    }
+    .admin-login-card h1 {
+      font-size: 1.3rem;
+      color: var(--brand-dark);
+      margin-bottom: 6px;
+      text-align: center;
+    }
+    .admin-login-card p {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      text-align: center;
+      margin-bottom: 28px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="admin-login-card">
+    <h1>🔐 כניסת מנהל</h1>
+    <p>גישה מוגבלת — מנהלים בלבד</p>
+
+    <div id="alert" class="alert"></div>
+
+    <div class="form-group">
+      <label>אימייל</label>
+      <input type="email" id="email" placeholder="admin@example.com" dir="ltr">
+    </div>
+    <div class="form-group">
+      <label>סיסמה</label>
+      <input type="password" id="password" placeholder="••••••••" dir="ltr"
+             onkeydown="if(event.key==='Enter') doLogin()">
+    </div>
+
+    <button class="btn-primary" id="login-btn" onclick="doLogin()">כניסה לפאנל</button>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script>
+    // If already logged in as admin, go straight to panel
+    if (getToken()) {
+      apiFetch("/me").then(async res => {
+        if (res && res.ok) {
+          const me = await res.json();
+          if (me.is_admin) window.location = "/admin";
+        }
+      });
+    }
+
+    async function doLogin() {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      const alertEl = document.getElementById("alert");
+      const btn = document.getElementById("login-btn");
+
+      hideAlert(alertEl);
+      if (!email || !password) {
+        showAlert(alertEl, "יש למלא אימייל וסיסמה");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "מתחבר...";
+
+      const res = await fetch("/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      btn.disabled = false;
+      btn.textContent = "כניסה לפאנל";
+
+      if (!res.ok) {
+        showAlert(alertEl, "אימייל או סיסמה שגויים");
+        return;
+      }
+
+      const data = await res.json();
+      setToken(data.access_token);
+
+      // Verify admin status
+      const meRes = await apiFetch("/me");
+      if (meRes && meRes.ok) {
+        const me = await meRes.json();
+        if (me.is_admin) {
+          window.location = "/admin";
+        } else {
+          clearToken();
+          showAlert(alertEl, "⛔ אין הרשאת מנהל לחשבון זה");
+        }
+      }
+    }
+  </script>
+</body>
+</html>

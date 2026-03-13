@@ -90,3 +90,7 @@ if os.path.isdir(frontend_dir):
     @app.get("/admin", include_in_schema=False)
     async def serve_admin():
         return FileResponse(os.path.join(frontend_dir, "admin.html"))
+
+    @app.get("/admin/login", include_in_schema=False)
+    async def serve_admin_login():
+        return FileResponse(os.path.join(frontend_dir, "admin-login.html"))
