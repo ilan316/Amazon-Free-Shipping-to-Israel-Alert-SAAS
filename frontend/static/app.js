@@ -33,7 +33,7 @@ function statusLabel(status) {
     "FREE":    "משלוח חינם ✅",
     "PAID":    "משלוח בתשלום 💳",
     "NO_SHIP": "משלוח בתשלום 💳",
-    "UNKNOWN": "לא ידוע ❓",
+    "UNKNOWN": "שגיאה ⚠️",
     "ERROR":   "שגיאה ⚠️",
   };
   return map[status] || status;

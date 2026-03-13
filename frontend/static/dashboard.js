@@ -63,7 +63,7 @@ function renderProducts() {
   const lblMap = {
     FREE:    `✅ משלוח חינם${counts.FREE > 0 ? ` (${counts.FREE})` : ''}`,
     NO_SHIP: `💳 משלוח בתשלום${counts.NO_SHIP > 0 ? ` (${counts.NO_SHIP})` : ''}`,
-    UNKNOWN: `❓ לא ידוע${counts.UNKNOWN > 0 ? ` (${counts.UNKNOWN})` : ''}`,
+    UNKNOWN: `⚠️ שגיאה${counts.UNKNOWN > 0 ? ` (${counts.UNKNOWN})` : ''}`,
   };
   document.querySelectorAll('.filter-btn[onclick]').forEach(btn => {
     const m = btn.getAttribute('onclick').match(/setFilter\('(\w+)'/);
@@ -78,7 +78,7 @@ function renderProducts() {
       const parts = [`${total} מוצרים במעקב`];
       if (counts.FREE > 0)    parts.push(`${counts.FREE} חינם`);
       if (counts.NO_SHIP > 0) parts.push(`${counts.NO_SHIP} בתשלום`);
-      if (counts.UNKNOWN > 0) parts.push(`${counts.UNKNOWN} לא ידוע`);
+      if (counts.UNKNOWN > 0) parts.push(`${counts.UNKNOWN} שגיאה`);
       counterEl.textContent = parts.join(' · ');
     } else {
       counterEl.textContent = '';

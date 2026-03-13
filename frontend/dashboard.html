@@ -43,7 +43,7 @@
         <input
           type="text"
           id="add-input"
-          placeholder="הדבק קישור או ASIN — ניתן להדביק מספר מופרדים בפסיק"
+          placeholder="הדבק קישור או ASIN — ניתן להוסיף מספר ASINs מופרדים בפסיק"
           dir="rtl"
         >
         <button class="btn-add" id="add-btn" onclick="addProduct()">הוסף מוצר</button>
@@ -66,7 +66,7 @@
       <button class="filter-btn active" onclick="setFilter('ALL', this)">הכל</button>
       <button class="filter-btn" onclick="setFilter('FREE', this)">✅ משלוח חינם</button>
       <button class="filter-btn" onclick="setFilter('NO_SHIP', this)">💳 משלוח בתשלום</button>
-      <button class="filter-btn" onclick="setFilter('UNKNOWN', this)">❓ לא ידוע</button>
+      <button class="filter-btn" onclick="setFilter('UNKNOWN', this)">⚠️ שגיאה</button>
     </div>
 
     <!-- Product list -->
