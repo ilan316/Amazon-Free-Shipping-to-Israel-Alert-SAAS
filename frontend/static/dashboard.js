@@ -215,7 +215,8 @@ async function checkNow(asin) {
     return;
   }
 
-  // Poll every 6s up to 5 times for updated status
+  // Poll every 6s up to 15 times (90s) — Playwright checks can take ~60s
+  const prevChecked = (products.find(p => p.asin === asin) || {}).last_checked;
   let attempts = 0;
   const poll = setInterval(async () => {
     attempts++;
@@ -223,9 +224,7 @@ async function checkNow(asin) {
     if (refreshRes && refreshRes.ok) {
       const updated = await refreshRes.json();
       const found = updated.find(p => p.asin === asin);
-      // Consider updated when last_checked has advanced
-      const prev = products.find(p => p.asin === asin);
-      if (found && found.last_checked && found.last_checked !== (prev && prev.last_checked)) {
+      if (found && found.last_checked && found.last_checked !== prevChecked) {
         products = updated;
         checkingAsins.delete(asin);
         renderProducts();
@@ -233,7 +232,7 @@ async function checkNow(asin) {
         return;
       }
     }
-    if (attempts >= 5) {
+    if (attempts >= 15) {
       checkingAsins.delete(asin);
       renderProducts();
       clearInterval(poll);
