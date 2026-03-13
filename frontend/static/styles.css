@@ -319,21 +319,21 @@ a:hover { text-decoration: underline; }
 .product-card.status-UNKNOWN { border-right: 4px solid #9e9e9e; }
 .product-card.status-ERROR   { border-right: 4px solid #9c27b0; }
 
-/* Row 1: name (LTR, truncated) + absolute edit button (top-right) */
+/* Row 1: flex — button (right, shrink:0) | name (left, flex:1, truncated) */
 .card-row-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   margin-bottom: 5px;
-  padding-right: 85px;
 }
 .card-name-right {
-  position: absolute;
-  top: 14px;
-  right: 18px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 4px;
 }
 .card-product-link {
-  display: block;
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--text);
@@ -343,8 +343,10 @@ a:hover { text-decoration: underline; }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
 }
-.card-product-link:hover { color: var(--brand-dark); text-decoration: underline; }
+.card-product-link:hover { color: var(--brand-dark); }
 
 /* Row 2: last-checked (RIGHT) | ASIN (LEFT, LTR) */
 .card-row-meta {
