@@ -1,10 +1,13 @@
 // Dashboard page logic
 
 let products = [];
+let checkingAsins = new Set(); // ASINs currently being checked
 
-async function loadProducts() {
+async function loadProducts(silent = false) {
   const list = document.getElementById("products-list");
-  list.innerHTML = '<div class="skeleton"></div><div class="skeleton" style="margin-top:10px;"></div>';
+  if (!silent) {
+    list.innerHTML = '<div class="skeleton"></div><div class="skeleton" style="margin-top:10px;"></div>';
+  }
 
   const res = await apiFetch("/me/products");
   if (!res) return;
@@ -33,13 +36,24 @@ function renderProducts() {
 
   list.innerHTML = products.map(p => {
     const displayName = p.custom_name || p.name || p.asin;
-    const checkedStr = p.last_checked ? `בדיקה אחרונה: ${formatDate(p.last_checked)}` : "טרם נבדק";
+    const isChecking = checkingAsins.has(p.asin);
+    const checkedStr = isChecking
+      ? '<span style="color:var(--brand-dark)">⏳ בודק עכשיו...</span>'
+      : (p.last_checked ? `בדיקה אחרונה: ${formatDate(p.last_checked)}` : "טרם נבדק");
     const notifiedStr = p.last_notified ? `התראה: ${formatDate(p.last_notified)}` : "";
     const aodNote = p.found_in_aod ? '<span title="נמצא בכל אפשרויות הקנייה">⚠️</span>' : "";
-    const badgeStatus = p.is_paused ? 'UNKNOWN' : p.last_status;
+    const badgeStatus = p.is_paused ? 'UNKNOWN' : (isChecking ? 'UNKNOWN' : p.last_status);
+
+    const pauseBtn = `
+      <button
+        class="btn-pause ${p.is_paused ? 'is-paused' : ''}"
+        onclick="togglePause('${p.asin}', this)"
+        title="${p.is_paused ? 'המשך מעקב' : 'השהה מעקב'}">
+        ${p.is_paused ? '▶ המשך' : '⏸ השהה'}
+      </button>`;
 
     return `
-      <div class="product-card status-${badgeStatus}" id="card-${p.asin}" style="${p.is_paused ? 'opacity:0.6;' : ''}">
+      <div class="product-card status-${badgeStatus} ${p.is_paused ? 'card-paused' : ''}" id="card-${p.asin}">
         <div class="product-info">
           <div class="product-name">
             <a href="${p.url}" target="_blank" rel="noopener">${escHtml(displayName)}</a>
@@ -51,8 +65,13 @@ function renderProducts() {
             ${notifiedStr ? `<span>${notifiedStr}</span>` : ""}
           </div>
         </div>
-        <span class="status-badge badge-${badgeStatus}">${p.is_paused ? '⏸ מושהה' : statusLabel(p.last_status)}</span>
-        <button class="btn-remove" onclick="togglePause('${p.asin}')" title="${p.is_paused ? 'המשך מעקב' : 'השהה מעקב'}" style="margin-left:6px;">${p.is_paused ? '▶' : '⏸'}</button>
+        ${p.is_paused
+          ? '<span class="status-badge badge-paused">⏸ מושהה</span>'
+          : isChecking
+            ? '<span class="status-badge badge-UNKNOWN">⏳ בודק...</span>'
+            : `<span class="status-badge badge-${p.last_status}">${statusLabel(p.last_status)}</span>`
+        }
+        ${pauseBtn}
         <button class="btn-remove" onclick="removeProduct('${p.asin}')">הסר</button>
       </div>`;
   }).join("");
@@ -69,11 +88,11 @@ function escHtml(str) {
 async function addProduct() {
   const input = document.getElementById("add-input");
   const btn = document.getElementById("add-btn");
-  const alert = document.getElementById("add-alert");
+  const alertEl = document.getElementById("add-alert");
   const val = input.value.trim();
 
   if (!val) return;
-  hideAlert(alert);
+  hideAlert(alertEl);
   btn.disabled = true;
   btn.textContent = "מוסיף...";
 
@@ -89,21 +108,76 @@ async function addProduct() {
 
   if (res.ok) {
     const newProduct = await res.json();
-    products.unshift(newProduct);
     input.value = "";
+    // Mark as checking and add to list
+    checkingAsins.add(newProduct.asin);
+    products.unshift(newProduct);
     renderProducts();
-    showAlert(alert, `מוצר ${newProduct.asin} נוסף בהצלחה`, "success");
-    setTimeout(() => hideAlert(alert), 3000);
+    showAlert(alertEl, `✅ מוצר ${newProduct.asin} נוסף — בודק סטטוס...`, "success");
+
+    // Poll for updated status every 6 seconds, up to 5 times (30s)
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      const refreshRes = await apiFetch("/me/products");
+      if (refreshRes && refreshRes.ok) {
+        const updated = await refreshRes.json();
+        const found = updated.find(p => p.asin === newProduct.asin);
+        if (found && found.last_checked) {
+          products = updated;
+          checkingAsins.delete(newProduct.asin);
+          renderProducts();
+          hideAlert(alertEl);
+          clearInterval(poll);
+          return;
+        }
+      }
+      if (attempts >= 5) {
+        checkingAsins.delete(newProduct.asin);
+        products = products.map(p => p.asin === newProduct.asin ? { ...p } : p);
+        renderProducts();
+        hideAlert(alertEl);
+        clearInterval(poll);
+      }
+    }, 6000);
+
   } else {
     const err = await res.json();
-    showAlert(alert, err.detail || "שגיאה בהוספת המוצר");
+    showAlert(alertEl, err.detail || "שגיאה בהוספת המוצר");
   }
 }
 
-async function togglePause(asin) {
+async function togglePause(asin, btn) {
+  const wasPaused = btn.classList.contains("is-paused");
+  // Optimistic UI update
+  const card = document.getElementById(`card-${asin}`);
+  if (card) {
+    card.classList.toggle("card-paused");
+    btn.classList.toggle("is-paused");
+    btn.textContent = wasPaused ? '⏸ השהה' : '▶ המשך';
+    btn.title = wasPaused ? 'השהה מעקב' : 'המשך מעקב';
+    const badge = card.querySelector(".status-badge");
+    if (badge) {
+      if (!wasPaused) {
+        badge.className = "status-badge badge-paused";
+        badge.textContent = "⏸ מושהה";
+      } else {
+        const p = products.find(x => x.asin === asin);
+        if (p) {
+          badge.className = `status-badge badge-${p.last_status}`;
+          badge.textContent = statusLabel(p.last_status);
+        }
+      }
+    }
+  }
+
   const res = await apiFetch(`/me/products/${asin}/toggle-pause`, { method: "PATCH" });
   if (res && res.ok) {
-    await loadProducts();
+    // Update local state silently
+    products = products.map(p => p.asin === asin ? { ...p, is_paused: !wasPaused } : p);
+  } else {
+    // Revert on error
+    await loadProducts(true);
   }
 }
 
@@ -134,5 +208,5 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Auto-refresh every 5 minutes
-  setInterval(loadProducts, 5 * 60 * 1000);
+  setInterval(() => loadProducts(true), 5 * 60 * 1000);
 });

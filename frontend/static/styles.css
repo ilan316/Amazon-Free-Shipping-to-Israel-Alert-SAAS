@@ -359,6 +359,37 @@ a:hover { text-decoration: underline; }
 .badge-NO_SHIP { background: #fce8e8; color: var(--error); }
 .badge-UNKNOWN { background: #f5f5f5; color: #757575; }
 .badge-ERROR   { background: #f3e5f5; color: #6a1b9a; }
+.badge-paused  { background: #fff8e1; color: #f57f17; border: 1px dashed #f57f17; }
+
+/* ── Pause button ─────────────────────────────────────────────────────────── */
+.btn-pause {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  font-family: inherit;
+  margin-left: 6px;
+}
+.btn-pause:hover { border-color: #f57f17; color: #f57f17; }
+.btn-pause.is-paused {
+  background: #fff8e1;
+  border-color: #f57f17;
+  color: #f57f17;
+  font-weight: 600;
+}
+.btn-pause.is-paused:hover { background: #f57f17; color: #fff; }
+
+/* ── Paused card ──────────────────────────────────────────────────────────── */
+.product-card.card-paused {
+  opacity: 0.65;
+  border-right-color: #f57f17 !important;
+  background: #fffdf5;
+}
 
 /* ── Remove button ────────────────────────────────────────────────────────── */
 .btn-remove {
