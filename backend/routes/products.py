@@ -146,7 +146,7 @@ async def add_product(
         )
     )
     if existing.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="Product already in your list")
+        raise HTTPException(status_code=409, detail="המוצר כבר קיים ברשימה שלך")
 
     up = UserProduct(
         user_id=current_user.id,
