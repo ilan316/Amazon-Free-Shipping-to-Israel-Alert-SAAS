@@ -1,5 +1,4 @@
 async function loadAdminData() {
-  // Verify admin access
   const meRes = await apiFetch("/me");
   if (!meRes || !meRes.ok) return;
   const me = await meRes.json();
@@ -8,7 +7,6 @@ async function loadAdminData() {
       '<div style="text-align:center;padding:80px;color:var(--error);font-size:1.2rem;">⛔ גישה אסורה — אין הרשאת מנהל</div>';
     return;
   }
-
   await Promise.all([loadStats(), loadUsers(), loadProducts()]);
 }
 
@@ -17,6 +15,7 @@ async function loadStats() {
   if (!res || !res.ok) return;
   const data = await res.json();
   document.getElementById("stat-users").textContent = data.total_users;
+  document.getElementById("stat-admins").textContent = data.total_admins;
   document.getElementById("stat-products").textContent = data.total_products;
   document.getElementById("stat-notifs").textContent = data.notifications_24h;
 }
@@ -47,10 +46,10 @@ async function loadUsers() {
       <td>
         <div class="action-btns">
           <button class="btn-sm ${u.is_active ? 'active-toggle' : 'inactive-toggle'}"
-            onclick="toggleActive(${u.id}, this)">
+            onclick="toggleActive(${u.id})">
             ${u.is_active ? 'השהה' : 'הפעל'}
           </button>
-          <button class="btn-sm" onclick="toggleAdmin(${u.id}, this)">
+          <button class="btn-sm" onclick="toggleAdmin(${u.id})">
             ${u.is_admin ? 'הסר מנהל' : 'הפוך למנהל'}
           </button>
           <button class="btn-sm danger" onclick="deleteUser(${u.id})">מחק</button>
@@ -76,25 +75,21 @@ async function loadProducts() {
       <td><span class="status-badge badge-${p.last_status}">${statusLabel(p.last_status)}</span></td>
       <td style="text-align:center;">${p.watchers}</td>
       <td class="ltr">${p.last_checked ? formatDate(p.last_checked) : "—"}</td>
-      <td style="text-align:center; color:${p.consecutive_errors > 0 ? 'var(--error)' : 'var(--text-muted)'}">
+      <td style="text-align:center;color:${p.consecutive_errors > 0 ? 'var(--error)' : 'var(--text-muted)'}">
         ${p.consecutive_errors}
       </td>
     </tr>
   `).join("");
 }
 
-async function toggleActive(userId, btn) {
-  const res = await apiFetch(`/admin/users/${userId}/toggle-active`, { method: "PATCH" });
-  if (!res || !res.ok) return;
-  const data = await res.json();
-  await loadUsers();
-  await loadStats();
+async function toggleActive(userId) {
+  await apiFetch(`/admin/users/${userId}/toggle-active`, { method: "PATCH" });
+  await loadUsers(); await loadStats();
 }
 
-async function toggleAdmin(userId, btn) {
-  const res = await apiFetch(`/admin/users/${userId}/toggle-admin`, { method: "PATCH" });
-  if (!res || !res.ok) return;
-  await loadUsers();
+async function toggleAdmin(userId) {
+  await apiFetch(`/admin/users/${userId}/toggle-admin`, { method: "PATCH" });
+  await loadUsers(); await loadStats();
 }
 
 async function deleteUser(userId) {
@@ -105,20 +100,75 @@ async function deleteUser(userId) {
     alert(err.detail || "שגיאה במחיקה");
     return;
   }
-  await loadUsers();
-  await loadStats();
+  await loadUsers(); await loadStats();
+}
+
+async function cleanOrphans() {
+  if (!confirm("למחוק את כל המוצרים ללא עוקבים?")) return;
+  const res = await apiFetch("/admin/products-orphans", { method: "DELETE" });
+  if (res && res.ok) {
+    const data = await res.json();
+    alert(`נמחקו ${data.count} מוצרים`);
+    await loadProducts(); await loadStats();
+  }
 }
 
 async function triggerCheck() {
   const btn = document.getElementById("run-check-btn");
   const msg = document.getElementById("check-msg");
-  btn.disabled = true;
-  btn.textContent = "מריץ...";
+  btn.disabled = true; btn.textContent = "מריץ...";
   const res = await apiFetch("/admin/trigger-check", { method: "POST" });
-  btn.disabled = false;
-  btn.textContent = "▶ הרץ בדיקה עכשיו";
+  btn.disabled = false; btn.textContent = "▶ הרץ בדיקה עכשיו";
   if (res && res.ok) {
     msg.textContent = "✅ בדיקה הופעלה!";
     setTimeout(() => { msg.textContent = ""; }, 4000);
+  }
+}
+
+async function changePassword() {
+  const current = document.getElementById("pw-current").value;
+  const newPw = document.getElementById("pw-new").value;
+  const msgEl = document.getElementById("pw-msg");
+  msgEl.textContent = ""; msgEl.className = "profile-msg";
+
+  if (!current || !newPw) { msgEl.textContent = "יש למלא את כל השדות"; msgEl.className = "profile-msg err"; return; }
+
+  const res = await apiFetch("/admin/profile/password", {
+    method: "PATCH",
+    body: JSON.stringify({ current_password: current, new_password: newPw }),
+  });
+  if (!res) return;
+  const data = await res.json();
+  if (res.ok) {
+    msgEl.textContent = "✅ " + data.message;
+    msgEl.className = "profile-msg ok";
+    document.getElementById("pw-current").value = "";
+    document.getElementById("pw-new").value = "";
+  } else {
+    msgEl.textContent = "❌ " + (data.detail || "שגיאה");
+    msgEl.className = "profile-msg err";
+  }
+}
+
+async function requestEmailChange() {
+  const newEmail = document.getElementById("email-new").value.trim();
+  const pw = document.getElementById("email-pw").value;
+  const msgEl = document.getElementById("email-msg");
+  msgEl.textContent = ""; msgEl.className = "profile-msg";
+
+  if (!newEmail || !pw) { msgEl.textContent = "יש למלא את כל השדות"; msgEl.className = "profile-msg err"; return; }
+
+  const res = await apiFetch("/admin/profile/request-email-change", {
+    method: "POST",
+    body: JSON.stringify({ new_email: newEmail, current_password: pw }),
+  });
+  if (!res) return;
+  const data = await res.json();
+  if (res.ok) {
+    msgEl.textContent = "✅ " + data.message;
+    msgEl.className = "profile-msg ok";
+  } else {
+    msgEl.textContent = "❌ " + (data.detail || "שגיאה");
+    msgEl.className = "profile-msg err";
   }
 }

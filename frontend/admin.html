@@ -11,13 +11,10 @@
     .admin-page { max-width: 1100px; margin: 0 auto; padding: 32px 16px; }
     .stats-row { display: flex; gap: 16px; margin-bottom: 32px; flex-wrap: wrap; }
     .stat-card {
-      flex: 1; min-width: 160px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px;
-      text-align: center;
-      box-shadow: var(--shadow);
+      flex: 1; min-width: 140px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px;
+      text-align: center; box-shadow: var(--shadow);
     }
     .stat-value { font-size: 2.2rem; font-weight: 700; color: var(--brand-dark); }
     .stat-label { font-size: 0.82rem; color: var(--text-muted); margin-top: 4px; }
@@ -30,25 +27,21 @@
     .admin-table {
       width: 100%; border-collapse: collapse;
       background: var(--surface); border-radius: var(--radius);
-      overflow: hidden; box-shadow: var(--shadow);
-      font-size: 0.875rem;
+      overflow: hidden; box-shadow: var(--shadow); font-size: 0.875rem;
     }
     .admin-table th {
       background: #fdf3e1; padding: 10px 14px; text-align: right;
-      font-weight: 600; color: var(--text-muted);
-      border-bottom: 1px solid var(--border);
+      font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border);
     }
     .admin-table td {
-      padding: 10px 14px; border-bottom: 1px solid var(--border);
-      vertical-align: middle;
+      padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle;
     }
     .admin-table tr:last-child td { border-bottom: none; }
     .admin-table tr:hover td { background: var(--bg); }
     .action-btns { display: flex; gap: 6px; flex-wrap: wrap; }
     .btn-sm {
-      padding: 4px 10px; border-radius: 6px;
-      font-size: 0.78rem; font-weight: 600; cursor: pointer;
-      border: 1px solid var(--border); background: none;
+      padding: 4px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 600;
+      cursor: pointer; border: 1px solid var(--border); background: none;
       font-family: inherit; transition: all 0.15s;
     }
     .btn-sm:hover { border-color: var(--brand); color: var(--brand-dark); }
@@ -58,37 +51,47 @@
     .btn-sm.inactive-toggle { color: var(--warning); border-color: var(--warning); }
     .btn-sm.inactive-toggle:hover { background: var(--warning); color: #fff; }
     .tag-admin {
-      display: inline-block; padding: 2px 8px;
-      background: #fff3cd; color: #856404;
+      display: inline-block; padding: 2px 8px; background: #fff3cd; color: #856404;
       border-radius: 12px; font-size: 0.72rem; font-weight: 700;
     }
     .tag-inactive {
-      display: inline-block; padding: 2px 8px;
-      background: #f8d7da; color: var(--error);
+      display: inline-block; padding: 2px 8px; background: #f8d7da; color: var(--error);
       border-radius: 12px; font-size: 0.72rem; font-weight: 700;
     }
     .btn-run-check {
-      padding: 9px 20px; background: var(--brand);
-      color: #111; border: none; border-radius: 8px;
-      font-size: 0.9rem; font-weight: 700; cursor: pointer;
+      padding: 9px 20px; background: var(--brand); color: #111; border: none;
+      border-radius: 8px; font-size: 0.9rem; font-weight: 700; cursor: pointer;
       font-family: inherit; transition: background 0.15s;
     }
     .btn-run-check:hover { background: var(--brand-dark); color: #fff; }
     .btn-run-check:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-outline {
+      padding: 7px 16px; border: 1px solid var(--border); background: none;
+      border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+      font-family: inherit; transition: all 0.15s;
+    }
+    .btn-outline:hover { border-color: var(--brand); color: var(--brand-dark); }
     #check-msg { font-size: 0.85rem; color: var(--success); margin-right: 12px; }
     .ltr { direction: ltr; text-align: left; }
     .truncate { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* Profile card */
+    .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 700px) { .profile-grid { grid-template-columns: 1fr; } }
+    .profile-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow);
+    }
+    .profile-card h3 { font-size: 1rem; margin-bottom: 16px; }
+    .profile-msg { font-size: 0.85rem; margin-top: 10px; min-height: 20px; }
+    .profile-msg.ok { color: var(--success); }
+    .profile-msg.err { color: var(--error); }
   </style>
 </head>
 <body>
 
   <nav class="navbar">
-    <div class="navbar-logo">
-      <span>🛒 Amazon Israel Alert · מנהל</span>
-    </div>
+    <div class="navbar-logo"><span>🛒 Amazon Israel Alert · מנהל</span></div>
     <div class="navbar-links">
-      <a href="/dashboard">לוח הבקרה</a>
-      <a href="/settings">הגדרות</a>
       <button class="btn-logout" onclick="logout()">יציאה</button>
     </div>
   </nav>
@@ -110,8 +113,12 @@
         <div class="stat-label">משתמשים</div>
       </div>
       <div class="stat-card">
+        <div class="stat-value" id="stat-admins">—</div>
+        <div class="stat-label">מנהלים</div>
+      </div>
+      <div class="stat-card">
         <div class="stat-value" id="stat-products">—</div>
-        <div class="stat-label">מוצרים</div>
+        <div class="stat-label">מוצרים במעקב</div>
       </div>
       <div class="stat-card">
         <div class="stat-value" id="stat-notifs">—</div>
@@ -121,25 +128,18 @@
 
     <!-- Users -->
     <div class="section">
-      <div class="section-header">
-        <h2>משתמשים</h2>
-      </div>
+      <div class="section-header"><h2>משתמשים</h2></div>
       <div id="users-alert" class="alert"></div>
       <div style="overflow-x:auto;">
-        <table class="admin-table" id="users-table">
+        <table class="admin-table">
           <thead>
             <tr>
-              <th>#</th>
-              <th>אימייל</th>
-              <th>אימייל התראה</th>
-              <th>מוצרים</th>
-              <th>נרשם</th>
-              <th>סטטוס</th>
-              <th>פעולות</th>
+              <th>#</th><th>אימייל</th><th>אימייל התראה</th>
+              <th>מוצרים</th><th>נרשם</th><th>סטטוס</th><th>פעולות</th>
             </tr>
           </thead>
           <tbody id="users-body">
-            <tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:24px;">טוען...</td></tr>
+            <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">טוען...</td></tr>
           </tbody>
         </table>
       </div>
@@ -149,23 +149,61 @@
     <div class="section">
       <div class="section-header">
         <h2>מוצרים במעקב</h2>
+        <button class="btn-outline" onclick="cleanOrphans()">🗑 נקה מוצרים ללא עוקבים</button>
       </div>
       <div style="overflow-x:auto;">
-        <table class="admin-table" id="products-table">
+        <table class="admin-table">
           <thead>
             <tr>
-              <th>ASIN</th>
-              <th>שם</th>
-              <th>סטטוס</th>
-              <th>עוקבים</th>
-              <th>בדיקה אחרונה</th>
-              <th>שגיאות</th>
+              <th>ASIN</th><th>שם</th><th>סטטוס</th>
+              <th>עוקבים</th><th>בדיקה אחרונה</th><th>שגיאות</th>
             </tr>
           </thead>
           <tbody id="products-body">
-            <tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:24px;">טוען...</td></tr>
+            <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">טוען...</td></tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Profile Settings -->
+    <div class="section">
+      <div class="section-header"><h2>הגדרות חשבון מנהל</h2></div>
+      <div class="profile-grid">
+
+        <!-- Change Password -->
+        <div class="profile-card">
+          <h3>🔑 שינוי סיסמה</h3>
+          <div class="form-group">
+            <label>סיסמה נוכחית</label>
+            <input type="password" id="pw-current" dir="ltr">
+          </div>
+          <div class="form-group">
+            <label>סיסמה חדשה</label>
+            <input type="password" id="pw-new" dir="ltr">
+          </div>
+          <button class="btn-primary" onclick="changePassword()" style="margin-top:4px;">עדכן סיסמה</button>
+          <div id="pw-msg" class="profile-msg"></div>
+        </div>
+
+        <!-- Change Email -->
+        <div class="profile-card">
+          <h3>📧 שינוי אימייל</h3>
+          <div class="form-group">
+            <label>אימייל חדש</label>
+            <input type="email" id="email-new" dir="ltr">
+          </div>
+          <div class="form-group">
+            <label>סיסמה לאימות</label>
+            <input type="password" id="email-pw" dir="ltr">
+          </div>
+          <button class="btn-primary" onclick="requestEmailChange()" style="margin-top:4px;">שלח קישור אימות</button>
+          <div id="email-msg" class="profile-msg"></div>
+          <p style="font-size:0.78rem;color:var(--text-muted);margin-top:8px;">
+            קישור אימות יישלח לאימייל החדש · תקף לשעה
+          </p>
+        </div>
+
       </div>
     </div>
 

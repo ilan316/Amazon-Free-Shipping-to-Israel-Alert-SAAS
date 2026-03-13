@@ -106,6 +106,35 @@ def _cta_btn(url: str, label: str, align: str = "left") -> str:
         </table>"""
 
 
+def send_simple_email(to: str, subject: str, body_html: str) -> bool:
+    """Send a simple transactional email (not a product alert)."""
+    import os, smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    sender = os.environ.get("GMAIL_SENDER", "")
+    app_password = os.environ.get("GMAIL_APP_PASSWORD", "").replace(" ", "")
+    smtp_host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+    if not sender or not app_password:
+        logger.error("GMAIL_SENDER or GMAIL_APP_PASSWORD not set")
+        return False
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = sender
+    msg["To"] = to
+    msg.attach(MIMEText(body_html, "html", "utf-8"))
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as server:
+            server.ehlo(); server.starttls(); server.ehlo()
+            server.login(sender, app_password)
+            server.sendmail(sender, [to], msg.as_string())
+        logger.info(f"Simple email sent → {to}: {subject}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send simple email: {e}")
+        return False
+
+
 def send_user_alert(user, product, result) -> bool:
     """
     Send a free-shipping alert email to a single user.
