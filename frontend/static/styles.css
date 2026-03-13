@@ -305,51 +305,82 @@ a:hover { text-decoration: underline; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px 20px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
+  padding: 14px 18px;
   box-shadow: var(--shadow);
   transition: box-shadow 0.15s;
 }
 
 .product-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
 
-.product-card.status-FREE { border-right: 4px solid #4caf50; }
-.product-card.status-PAID { border-right: 4px solid #ff9800; }
+.product-card.status-FREE    { border-right: 4px solid #4caf50; }
+.product-card.status-PAID    { border-right: 4px solid #ff9800; }
 .product-card.status-NO_SHIP { border-right: 4px solid #f44336; }
 .product-card.status-UNKNOWN { border-right: 4px solid #9e9e9e; }
-.product-card.status-ERROR { border-right: 4px solid #9c27b0; }
+.product-card.status-ERROR   { border-right: 4px solid #9c27b0; }
 
-.product-info { flex: 1; min-width: 0; }
-
-.product-name {
-  font-size: 0.95rem;
-  font-weight: 600;
-  margin-bottom: 4px;
+/* Row 1: edit button (RIGHT) | product name link (LEFT, LTR) */
+.card-row-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 5px;
+}
+.card-name-right {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 6px;
-  min-width: 0;
 }
-
-.product-name a {
+.card-product-link {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  direction: ltr;
+  text-align: left;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 0;
   flex: 1;
+  min-width: 0;
 }
+.card-product-link:hover { color: var(--brand-dark); }
 
-.product-name a { color: var(--text); }
-.product-name a:hover { color: var(--brand-dark); text-decoration: none; }
-
-.product-meta {
+/* Row 2: last-checked (RIGHT) | ASIN (LEFT, LTR) */
+.card-row-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-size: 0.78rem;
   color: var(--text-muted);
+  margin-bottom: 10px;
+  gap: 10px;
+}
+.card-meta-asin {
+  direction: ltr;
+  text-align: left;
+}
+
+/* Row 3: status | pause | check | remove */
+.card-row-actions {
   display: flex;
-  gap: 14px;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
+}
+
+/* Unknown reason */
+.unknown-reason {
+  font-size: 0.74rem;
+  color: #888;
+  font-style: italic;
+  direction: rtl;
+  text-align: right;
+  margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Status badge ─────────────────────────────────────────────────────────── */
@@ -382,7 +413,6 @@ a:hover { text-decoration: underline; }
   transition: all 0.15s;
   white-space: nowrap;
   font-family: inherit;
-  margin-left: 6px;
 }
 .btn-pause:hover { border-color: #f57f17; color: #f57f17; }
 .btn-pause.is-paused {
@@ -404,7 +434,6 @@ a:hover { text-decoration: underline; }
   cursor: pointer;
   color: var(--text-muted);
   font-family: inherit;
-  margin-left: 6px;
 }
 .btn-check-now:hover { border-color: var(--brand); color: var(--brand-dark); }
 
@@ -589,19 +618,6 @@ a:hover { text-decoration: underline; }
 
 .btn-edit-name:hover { border-color: var(--brand); color: var(--brand-dark); background: #fff8ee; }
 
-/* ── Unknown reason note ──────────────────────────────────────────────────── */
-.unknown-reason {
-  font-size: 0.74rem;
-  color: #888;
-  margin-top: 5px;
-  font-style: italic;
-  direction: ltr;
-  text-align: left;
-  max-width: 420px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
 .name-edit-input {
   padding: 3px 8px;
