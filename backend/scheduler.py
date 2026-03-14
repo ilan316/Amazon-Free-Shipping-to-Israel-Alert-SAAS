@@ -32,20 +32,28 @@ logger = logging.getLogger(__name__)
 MAX_CONSECUTIVE_ERRORS = 5
 
 
-async def _update_product(db: AsyncSession, product: Product, result: CheckResult):
-    product.last_status = result.status.value
+async def _update_product(db: AsyncSession, product: Product, result: CheckResult) -> bool:
+    """Update product in DB. Returns True if this is the product's first error (notify admin)."""
     product.last_checked = datetime.now(timezone.utc)
-    product.raw_text = result.raw_text or ""
-    product.found_in_aod = result.found_in_aod
 
-    if result.status == ShippingStatus.ERROR:
-        product.consecutive_errors += 1
-    else:
+    if result.status in (ShippingStatus.FREE, ShippingStatus.PAID, ShippingStatus.NO_SHIP):
+        # Definitive result — update visible status
+        product.last_status = result.status.value
+        product.raw_text = result.raw_text or ""
+        product.found_in_aod = result.found_in_aod
         product.consecutive_errors = 0
         if result.product_name:
             product.name = result.product_name
-
-    await db.commit()
+        await db.commit()
+        return False
+    else:
+        # ERROR or UNKNOWN — keep existing last_status (customers see previous result)
+        prev_errors = product.consecutive_errors
+        product.consecutive_errors += 1
+        if result.raw_text:
+            product.raw_text = result.raw_text  # save for admin debugging
+        await db.commit()
+        return prev_errors == 0  # True only on first failure
 
 
 async def run_global_check_cycle():
@@ -65,6 +73,7 @@ async def run_global_check_cycle():
             return
 
         logger.info(f"Checking {len(products)} product(s)...")
+        newly_failed = []
 
         for i, product in enumerate(products):
             if product.consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
@@ -73,15 +82,23 @@ async def run_global_check_cycle():
 
             try:
                 check_result = await browser_manager.check(product.asin, product.url)
-                await _update_product(db, product, check_result)
+                is_first_error = await _update_product(db, product, check_result)
+                if is_first_error:
+                    newly_failed.append((product, check_result))
                 logger.info(f"[{i+1}/{len(products)}] [{product.asin}] → {check_result.status.value}")
             except Exception as e:
                 logger.error(f"[{product.asin}] Unexpected error: {e}")
+                if product.consecutive_errors == 0:
+                    from backend.checker import CheckResult
+                    newly_failed.append((product, CheckResult(product.asin, ShippingStatus.ERROR, error_message=str(e))))
                 product.consecutive_errors += 1
                 await db.commit()
 
             if i < len(products) - 1:
                 await asyncio.sleep(random.uniform(5.0, 12.0))
+
+    if newly_failed:
+        await _notify_admin_of_errors(newly_failed)
 
     logger.info("=== Check cycle complete ===")
 
@@ -129,6 +146,18 @@ async def run_daily_summary():
                 logger.info(f"[user {user.id}] Summary sent — {len(free_products)} free product(s).")
 
     logger.info(f"=== Daily summary complete — {sent} email(s) sent ===")
+
+
+async def _notify_admin_of_errors(failed_items: list):
+    """Send a single error-report email to all admin users."""
+    from backend.notifier import send_admin_error_report
+    async with AsyncSessionLocal() as db:
+        admins = (await db.execute(
+            select(User).where(User.is_admin == True, User.is_active == True)
+        )).scalars().all()
+    for admin in admins:
+        send_admin_error_report(admin.email, failed_items)
+        logger.info(f"Admin error report sent to {admin.email} ({len(failed_items)} product(s))")
 
 
 async def check_single_product(asin: str, url: str):

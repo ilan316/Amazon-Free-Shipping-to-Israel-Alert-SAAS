@@ -144,6 +144,60 @@ def send_simple_email(to: str, subject: str, body_html: str) -> bool:
     return _send_via_resend(to, subject, body_html, "")
 
 
+# ── Admin error report ───────────────────────────────────────────────────────
+
+def send_admin_error_report(admin_email: str, failed_items: list) -> bool:
+    """
+    Send error report to admin when products fail for the first time.
+    failed_items: list of (Product, CheckResult)
+    """
+    rows = ""
+    for product, result in failed_items:
+        error_msg = (result.error_message or result.status.value)[:120]
+        rows += f"""<tr>
+          <td style="padding:8px 12px;border-bottom:1px solid #eee;font-family:monospace;font-size:13px;">{product.asin}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:13px;">{product.name or "—"}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#856404;font-size:13px;">{result.status.value}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#721c24;font-size:12px;">{error_msg}</td>
+        </tr>"""
+
+    n = len(failed_items)
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:720px;margin:auto;padding:24px;direction:ltr;">
+      <h2 style="color:#dc3545;margin-top:0;">⚠️ Amazon Israel Alert — Product Check Errors</h2>
+      <p style="color:#555;">{n} product(s) failed their check for the first time.<br>
+      <strong>Customer-visible status is unchanged</strong> — customers still see the previous result.</p>
+      <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #dee2e6;border-radius:8px;overflow:hidden;margin-bottom:20px;">
+        <thead>
+          <tr style="background:#f8d7da;color:#721c24;">
+            <th style="padding:10px 12px;text-align:left;">ASIN</th>
+            <th style="padding:10px 12px;text-align:left;">Name</th>
+            <th style="padding:10px 12px;text-align:left;">Status</th>
+            <th style="padding:10px 12px;text-align:left;">Error</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+      <p style="color:#888;font-size:12px;">
+        View in admin panel:
+        <a href="https://app.amzfreeil.com/admin" style="color:#0066cc;">app.amzfreeil.com/admin</a>
+      </p>
+    </div>"""
+
+    plain = (
+        f"Amazon Israel Alert — {n} product(s) failed check:\n\n"
+        + "\n".join(f"- {p.asin} ({p.name or 'unnamed'}): {r.error_message or r.status.value}" for p, r in failed_items)
+        + "\n\nAdmin panel: https://app.amzfreeil.com/admin"
+    )
+
+    return _send_via_resend(
+        admin_email,
+        f"⚠️ [{n} error{'s' if n != 1 else ''}] Amazon Israel Alert — Check Failed",
+        html,
+        plain,
+    )
+
+
 # ── Single product alert ──────────────────────────────────────────────────────
 
 def send_user_alert(user, product, result) -> bool:
