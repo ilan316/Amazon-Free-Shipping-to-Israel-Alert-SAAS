@@ -134,6 +134,7 @@ async def run_daily_summary():
 async def check_single_product(asin: str, url: str):
     """Check a single product immediately (used after a user adds it)."""
     logger.info(f"[{asin}] Immediate first check triggered")
+    await browser_manager.refresh_location()
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Product).where(Product.asin == asin))
         product = result.scalar_one_or_none()

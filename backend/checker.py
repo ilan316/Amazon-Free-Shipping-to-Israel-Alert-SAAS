@@ -61,6 +61,14 @@ COUNTRY_DROPDOWN_SELECTORS = [
     "select.a-native-dropdown[name='countryCode']",
 ]
 
+APPLY_BTN_SELECTORS = [
+    "#GLUXConfirmClose",
+    "input[name='glowDoneButton']",
+    ".a-popover-footer .a-button-primary input",
+    "#GLUXZipUpdate",
+    "span#GLUXConfirmClose-announce",
+]
+
 DELIVERY_BLOCK_SELECTORS = [
     "#mir-layout-DELIVERY_BLOCK",
     "#ddmDeliveryMessage",
@@ -142,6 +150,14 @@ async def _set_location_on_page(page: Page, country_code: str = "IL") -> bool:
     if dropdown:
         try:
             await dropdown.select_option(value=country_code)
+            await _pause(1.0, 1.5)
+            # Click Apply/Done button to confirm the selection
+            apply_btn = await _first(page, APPLY_BTN_SELECTORS, timeout=4000)
+            if apply_btn:
+                await apply_btn.click()
+                logger.info(f"Apply button clicked for {country_code}.")
+            else:
+                logger.debug(f"No Apply button found — assuming auto-applied for {country_code}.")
             await _pause(2.0, 3.0)
             logger.info(f"Location set to {country_code}.")
             return True
@@ -152,12 +168,31 @@ async def _set_location_on_page(page: Page, country_code: str = "IL") -> bool:
     return False
 
 
+async def _verify_location(page: Page) -> bool:
+    """Check that Amazon's Deliver To button shows Israel."""
+    try:
+        for sel in DELIVER_TO_SELECTORS:
+            el = await page.query_selector(sel)
+            if el:
+                text = (await el.inner_text()).lower()
+                if "israel" in text:
+                    return True
+    except Exception:
+        pass
+    return False
+
+
 # ── Classification ────────────────────────────────────────────────────────────
 
 def _classify(text: str) -> ShippingStatus:
     t = text.lower()
 
-    if "free delivery" in t and "to israel" in t and "eligible orders" in t:
+    # Explicit: Amazon clearly states free delivery to Israel
+    if "free delivery" in t and "to israel" in t:
+        return ShippingStatus.FREE
+
+    # Fallback: When IL is the active delivery location, Amazon shows generic eligible text
+    if "free delivery" in t and any(p in t for p in ("eligible orders", "eligible international", "eligible items")):
         return ShippingStatus.FREE
 
     no_ship = [
@@ -333,16 +368,26 @@ class BrowserManager:
         """Re-set delivery location to Israel. Called at the start of each check cycle."""
         page = await self._context.new_page()
         try:
-            await page.goto("https://www.amazon.com", wait_until="domcontentloaded", timeout=20000)
-            await _pause(2.0, 3.5)
-            if not await _is_captcha(page):
+            for attempt in range(3):
+                await page.goto("https://www.amazon.com", wait_until="domcontentloaded", timeout=20000)
+                await _pause(2.0, 3.5)
+                if await _is_captcha(page):
+                    logger.warning("CAPTCHA during location refresh — skipping.")
+                    return
                 success = await _set_location_on_page(page, "IL")
                 if success:
-                    logger.info("Location refreshed to Israel.")
+                    # Reload to confirm the location was saved
+                    await page.reload(wait_until="domcontentloaded", timeout=15000)
+                    await _pause(1.5, 2.0)
+                    if await _verify_location(page):
+                        logger.info("Location verified: Israel ✓")
+                        return
+                    logger.warning(f"Location verify failed (attempt {attempt + 1}/3) — retrying...")
+                    await _pause(2.0, 3.0)
                 else:
-                    logger.warning("Location refresh failed — checks may return UNKNOWN.")
-            else:
-                logger.warning("CAPTCHA during location refresh — skipping.")
+                    logger.warning(f"Location set failed (attempt {attempt + 1}/3) — retrying...")
+                    await _pause(2.0, 3.0)
+            logger.error("Failed to set Israel location after 3 attempts — checks may return UNKNOWN.")
         except Exception as e:
             logger.warning(f"Location refresh error (ignored): {e}")
         finally:
