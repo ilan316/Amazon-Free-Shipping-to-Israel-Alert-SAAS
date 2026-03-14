@@ -39,6 +39,11 @@ class UpdateSettingsRequest(BaseModel):
     language: str | None = None
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
 class DeleteAccountRequest(BaseModel):
     password: str
 

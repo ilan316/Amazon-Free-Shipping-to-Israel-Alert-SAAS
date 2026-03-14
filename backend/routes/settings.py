@@ -5,8 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
 from backend.models import User
-from backend.auth import get_current_user, verify_password
-from backend.schemas import UserResponse, UpdateSettingsRequest, DeleteAccountRequest, MessageResponse
+from backend.auth import get_current_user, verify_password, hash_password
+from backend.schemas import UserResponse, UpdateSettingsRequest, ChangePasswordRequest, DeleteAccountRequest, MessageResponse
 
 router = APIRouter(prefix="/me", tags=["settings"])
 
@@ -31,6 +31,21 @@ async def update_settings(
     await db.commit()
     await db.refresh(current_user)
     return current_user
+
+
+@router.patch("/password", response_model=MessageResponse)
+async def change_password(
+    body: ChangePasswordRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    if not verify_password(body.current_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="סיסמה נוכחית שגויה")
+    if len(body.new_password) < 6:
+        raise HTTPException(status_code=400, detail="סיסמה חדשה חייבת להכיל לפחות 6 תווים")
+    current_user.password_hash = hash_password(body.new_password)
+    await db.commit()
+    return MessageResponse(message="הסיסמה שונתה בהצלחה")
 
 
 @router.delete("", response_model=MessageResponse)
