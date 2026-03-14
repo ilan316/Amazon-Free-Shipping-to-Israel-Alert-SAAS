@@ -152,7 +152,7 @@ function renderProducts() {
     const badgeHtml = p.is_paused
       ? '<span class="status-badge badge-paused">⏸ מושהה</span>'
       : (isChecking || p.last_status === 'UNKNOWN' || p.last_status === 'ERROR')
-        ? '<span class="status-badge badge-UNKNOWN">⏳ בודק...</span>'
+        ? '<span class="status-badge badge-UNKNOWN">טרם נבדק</span>'
         : `<span class="status-badge badge-${p.last_status}" title="${tooltip}">${statusLabel(p.last_status)}</span>`;
 
     return `
