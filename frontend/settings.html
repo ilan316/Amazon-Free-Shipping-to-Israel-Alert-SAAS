@@ -32,6 +32,10 @@
 
       <form id="settings-form" onsubmit="saveSettings(event)">
         <div class="form-group">
+          <label>אימייל כניסה</label>
+          <input type="email" id="login-email" disabled style="background:var(--bg); color:var(--text-muted); cursor:default;">
+        </div>
+        <div class="form-group">
           <label>אימייל לקבלת התראות</label>
           <input type="email" id="notify-email" required placeholder="your@email.com">
         </div>
@@ -66,6 +70,14 @@
         </form>
       </div>
 
+      <!-- Notification history -->
+      <div style="margin-top:24px;">
+        <h3>היסטוריית התראות</h3>
+        <div id="notifications-list" style="margin-top:12px;">
+          <p style="color:var(--text-muted); font-size:0.85rem;">טוען...</p>
+        </div>
+      </div>
+
       <!-- Danger zone -->
       <div class="danger-zone">
         <h3>מחיקת חשבון</h3>
@@ -98,9 +110,24 @@
     apiFetch("/me").then(async res => {
       if (res && res.ok) {
         const user = await res.json();
+        document.getElementById("login-email").value = user.email;
         document.getElementById("notify-email").value = user.notify_email;
         document.getElementById("language").value = user.language;
       }
+    });
+
+    // Load notification history
+    apiFetch("/me/notifications").then(async res => {
+      const el = document.getElementById("notifications-list");
+      if (!res || !res.ok) { el.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">לא ניתן לטעון היסטוריה</p>'; return; }
+      const logs = await res.json();
+      if (!logs.length) { el.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">טרם נשלחו התראות</p>'; return; }
+      el.innerHTML = logs.map(l => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:0.85rem;">
+          <span style="color:var(--text);">${l.product_name}</span>
+          <span style="color:var(--text-muted); white-space:nowrap; margin-right:12px;">${new Date(l.sent_at).toLocaleString("he-IL")}</span>
+        </div>
+      `).join("");
     });
 
     async function saveSettings(e) {

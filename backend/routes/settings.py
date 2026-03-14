@@ -4,7 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
-from backend.models import User
+from sqlalchemy import select
+
+from backend.models import User, Product, NotificationLog
 from backend.auth import get_current_user, verify_password, hash_password
 from backend.schemas import UserResponse, UpdateSettingsRequest, ChangePasswordRequest, DeleteAccountRequest, MessageResponse
 
@@ -46,6 +48,31 @@ async def change_password(
     current_user.password_hash = hash_password(body.new_password)
     await db.commit()
     return MessageResponse(message="הסיסמה שונתה בהצלחה")
+
+
+@router.get("/notifications")
+async def get_notifications(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+    limit: int = 20,
+):
+    result = await db.execute(
+        select(NotificationLog, Product.name, Product.asin)
+        .join(Product, NotificationLog.product_id == Product.id)
+        .where(NotificationLog.user_id == current_user.id, NotificationLog.success == True)
+        .order_by(NotificationLog.sent_at.desc())
+        .limit(limit)
+    )
+    rows = result.all()
+    return [
+        {
+            "sent_at": log.sent_at.isoformat(),
+            "product_name": name or asin,
+            "asin": asin,
+            "status": log.status,
+        }
+        for log, name, asin in rows
+    ]
 
 
 @router.delete("", response_model=MessageResponse)
