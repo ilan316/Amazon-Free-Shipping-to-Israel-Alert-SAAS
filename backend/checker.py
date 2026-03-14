@@ -59,6 +59,8 @@ DELIVER_TO_SELECTORS = [
 COUNTRY_DROPDOWN_SELECTORS = [
     "#GLUXCountryList",
     "select.a-native-dropdown[name='countryCode']",
+    "#GLUXCountryList_0",
+    "select[name='countryCode']",
 ]
 
 APPLY_BTN_SELECTORS = [
@@ -163,6 +165,17 @@ async def _set_location_on_page(page: Page, country_code: str = "IL") -> bool:
             return True
         except Exception as e:
             logger.debug(f"Country dropdown failed: {e}")
+    else:
+        # Debug: log popup HTML so we can identify the correct selectors
+        try:
+            for popup_sel in [".a-popover-content", "#GLUXPopoverContent", "#nav-flyout-delivery"]:
+                el = await page.query_selector(popup_sel)
+                if el:
+                    html = await el.inner_html()
+                    logger.warning(f"Popup HTML (no dropdown found): {html[:800]}")
+                    break
+        except Exception:
+            pass
 
     logger.warning("Could not set delivery location automatically.")
     return False
@@ -377,6 +390,9 @@ class BrowserManager:
                 await _pause(2.0, 3.5)
                 if await _is_captcha(page):
                     logger.warning("CAPTCHA during location refresh — skipping.")
+                    return
+                if await _verify_location(page):
+                    logger.info("Location already Israel ✓ — no change needed.")
                     return
                 success = await _set_location_on_page(page, "IL")
                 if success:
