@@ -133,7 +133,26 @@ async def _is_captcha(page: Page) -> bool:
 
 # ── Location setup ────────────────────────────────────────────────────────────
 
+async def _dismiss_redirect_modal(page: Page):
+    """Dismiss the Amazon geo-redirect modal (e.g. 'Go to Amazon.sg?') if present."""
+    try:
+        modal = await page.query_selector("#redir-modal")
+        if modal:
+            await modal.click(timeout=3000)
+            await _pause(0.5, 1.0)
+            logger.debug("Redirect modal dismissed.")
+            return
+    except Exception:
+        pass
+    try:
+        await page.keyboard.press("Escape")
+        await _pause(0.3, 0.6)
+    except Exception:
+        pass
+
+
 async def _set_location_on_page(page: Page, country_code: str = "IL") -> bool:
+    await _dismiss_redirect_modal(page)
     deliver_btn = await _first(page, DELIVER_TO_SELECTORS, timeout=8000)
     if not deliver_btn:
         logger.warning("Could not find 'Deliver to' button.")
@@ -391,6 +410,7 @@ class BrowserManager:
                 if await _is_captcha(page):
                     logger.warning("CAPTCHA during location refresh — skipping.")
                     return
+                await _dismiss_redirect_modal(page)
                 if await _verify_location(page):
                     logger.info("Location already Israel ✓ — no change needed.")
                     return
