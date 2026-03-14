@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
 
     # Import here to avoid circular imports at module level
     from backend.checker import browser_manager
-    from backend.scheduler import run_global_check_cycle
+    from backend.scheduler import run_global_check_cycle, run_daily_summary
 
     await browser_manager.startup()
 
@@ -37,8 +37,21 @@ async def lifespan(app: FastAPI):
         misfire_grace_time=300,
         replace_existing=True,
     )
+
+    daily_hour = int(os.environ.get("DAILY_SUMMARY_HOUR", "8"))
+    scheduler.add_job(
+        run_daily_summary,
+        trigger="cron",
+        hour=daily_hour,
+        minute=0,
+        timezone="Asia/Jerusalem",
+        id="daily_summary",
+        misfire_grace_time=600,
+        replace_existing=True,
+    )
+
     scheduler.start()
-    logger.info(f"Scheduler started — check interval: {CHECK_INTERVAL} minutes")
+    logger.info(f"Scheduler started — check interval: {CHECK_INTERVAL} minutes, daily summary at {daily_hour:02d}:00 Israel time")
 
     yield
 
@@ -66,12 +79,15 @@ app.include_router(admin_routes.router)
 @app.get("/health")
 async def health():
     job = scheduler.get_job("global_check")
+    summary_job = scheduler.get_job("daily_summary")
     next_run = job.next_run_time.isoformat() if job and job.next_run_time else None
+    next_summary = summary_job.next_run_time.isoformat() if summary_job and summary_job.next_run_time else None
     return {
         "status": "ok",
         "scheduler_running": scheduler.running,
         "next_check_at": next_run,
         "check_interval_minutes": CHECK_INTERVAL,
+        "next_summary_at": next_summary,
     }
 
 
