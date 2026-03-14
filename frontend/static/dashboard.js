@@ -16,11 +16,17 @@ const STATUS_TOOLTIP = {
 
 function updateNextCheckDisplay(nextCheckAt) {
   const el = document.getElementById("next-check-display");
-  if (!el) return;
+  const el2 = document.getElementById("add-card-next-check");
   const diff = new Date(nextCheckAt) - new Date();
-  if (diff <= 0) { el.textContent = "בדיקה בקרוב..."; return; }
+  if (diff <= 0) {
+    if (el) el.textContent = "בדיקה בקרוב...";
+    if (el2) el2.textContent = "בדיקה בקרוב";
+    return;
+  }
   const mins = Math.round(diff / 60000);
-  el.textContent = `בדיקה הבאה בעוד ${mins} דקות`;
+  const timeStr = new Date(nextCheckAt).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+  if (el) el.textContent = `בדיקה הבאה בעוד ${mins} דקות (${timeStr})`;
+  if (el2) el2.textContent = `בדיקה הבאה בשעה ${timeStr}`;
 }
 
 // ── Load / Render ─────────────────────────────────────────────────────────────
