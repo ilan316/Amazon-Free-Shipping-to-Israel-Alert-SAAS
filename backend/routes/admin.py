@@ -148,6 +148,18 @@ async def list_products(
     return out
 
 
+@router.post("/trigger-summary")
+async def trigger_summary(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Trigger daily summary immediately (for testing)."""
+    from backend.scheduler import run_daily_summary
+    import asyncio
+    asyncio.create_task(run_daily_summary())
+    return {"message": "Daily summary triggered"}
+
+
 @router.post("/trigger-check")
 async def trigger_check(
     admin: Annotated[User, Depends(get_current_admin)],

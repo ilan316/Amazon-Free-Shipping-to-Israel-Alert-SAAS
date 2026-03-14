@@ -138,6 +138,12 @@ def _send_via_resend(to: str, subject: str, html: str, text: str) -> bool:
         return False
 
 
+# ── Simple transactional email (admin use) ───────────────────────────────────
+
+def send_simple_email(to: str, subject: str, body_html: str) -> bool:
+    return _send_via_resend(to, subject, body_html, "")
+
+
 # ── Single product alert ──────────────────────────────────────────────────────
 
 def send_user_alert(user, product, result) -> bool:
