@@ -187,14 +187,8 @@ async def _verify_location(page: Page) -> bool:
 def _classify(text: str) -> ShippingStatus:
     t = text.lower()
 
-    # Explicit: Amazon clearly states free delivery to Israel
-    if "free delivery" in t and "to israel" in t:
-        return ShippingStatus.FREE
-
-    # Fallback: When IL is the active delivery location, Amazon shows generic eligible text
-    if "free delivery" in t and any(p in t for p in ("eligible orders", "eligible international", "eligible items")):
-        return ShippingStatus.FREE
-
+    # NO_SHIP must be checked FIRST — "cannot be shipped" always wins over any "free delivery" text
+    # that may appear elsewhere on the page (recommendations, AOD panel, etc.)
     no_ship = [
         "doesn't ship to israel",
         "does not ship to israel",
@@ -203,9 +197,19 @@ def _classify(text: str) -> ShippingStatus:
         "this item does not ship to your selected location",
         "item can't be shipped to your selected delivery location",
         "this item cannot be shipped to your selected delivery location",
+        "cannot be shipped to your selected delivery location",
+        "item cannot be shipped to your selected delivery location",
     ]
     if any(p in t for p in no_ship):
         return ShippingStatus.NO_SHIP
+
+    # Explicit: Amazon clearly states free delivery to Israel
+    if "free delivery" in t and "to israel" in t:
+        return ShippingStatus.FREE
+
+    # Fallback: When IL is the active delivery location, Amazon shows generic eligible text
+    if "free delivery" in t and any(p in t for p in ("eligible orders", "eligible international", "eligible items")):
+        return ShippingStatus.FREE
 
     paid_pat = re.compile(
         r'\$[\d]+\.[\d]{2}.{0,40}israel|israel.{0,40}\$[\d]+\.[\d]{2}',
