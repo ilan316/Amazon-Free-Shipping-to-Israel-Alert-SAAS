@@ -39,3 +39,8 @@ async def create_tables():
                 "ALTER TABLE user_products ADD COLUMN IF NOT EXISTS is_paused BOOLEAN DEFAULT FALSE"
             )
         )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "CREATE TABLE IF NOT EXISTS system_settings (key VARCHAR(100) PRIMARY KEY, value TEXT NOT NULL DEFAULT '')"
+            )
+        )

@@ -76,6 +76,16 @@ app.include_router(settings.router)
 app.include_router(admin_routes.router)
 
 
+@app.get("/system-message")
+async def public_system_message():
+    from backend.database import AsyncSessionLocal
+    from backend.models import SystemSetting
+    from sqlalchemy import select
+    async with AsyncSessionLocal() as db:
+        row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "system_message"))).scalar_one_or_none()
+        return {"message": row.value if row else ""}
+
+
 @app.get("/health")
 async def health():
     job = scheduler.get_job("global_check")

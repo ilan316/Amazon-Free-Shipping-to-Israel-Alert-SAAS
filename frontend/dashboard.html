@@ -21,6 +21,8 @@
     </div>
   </nav>
 
+  <div id="system-banner" style="display:none; background:#fff3cd; border-bottom:1px solid #ffc107; padding:10px 20px; text-align:center; font-size:0.9rem; color:#856404; direction:rtl;"></div>
+
   <div class="page">
 
     <div class="dashboard-header">
@@ -91,6 +93,15 @@
         }
       }
     });
+
+    // Load system banner
+    fetch("/system-message").then(r => r.json()).then(data => {
+      if (data.message) {
+        const banner = document.getElementById("system-banner");
+        banner.textContent = data.message;
+        banner.style.display = "block";
+      }
+    }).catch(() => {});
 
     // Load next check time
     fetch("/health").then(r => r.json()).then(data => {

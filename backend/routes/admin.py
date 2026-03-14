@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete
 
 from backend.database import get_db
-from backend.models import User, Product, UserProduct, NotificationLog
+from sqlalchemy import cast, Date
+from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting
 from backend.auth import get_current_admin, hash_password, verify_password, SECRET_KEY, ALGORITHM
 
 
@@ -146,6 +147,70 @@ async def list_products(
             "raw_text": p.raw_text[:200] if p.raw_text else "",
         })
     return out
+
+
+@router.get("/registrations-chart")
+async def registrations_chart(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    result = await db.execute(
+        select(cast(User.created_at, Date).label("date"), func.count().label("count"))
+        .where(User.is_admin == False)
+        .group_by(cast(User.created_at, Date))
+        .order_by(cast(User.created_at, Date).asc())
+        .limit(30)
+    )
+    return [{"date": str(row.date), "count": row.count} for row in result.all()]
+
+
+@router.get("/notifications-log")
+async def notifications_log(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = 50,
+):
+    result = await db.execute(
+        select(NotificationLog, User.email, Product.name, Product.asin)
+        .join(User, NotificationLog.user_id == User.id)
+        .join(Product, NotificationLog.product_id == Product.id)
+        .order_by(NotificationLog.sent_at.desc())
+        .limit(limit)
+    )
+    return [
+        {
+            "sent_at": log.sent_at.isoformat(),
+            "user_email": email,
+            "product_name": name or asin,
+            "asin": asin,
+            "status": log.status,
+            "success": log.success,
+            "error_msg": log.error_msg,
+        }
+        for log, email, name, asin in result.all()
+    ]
+
+
+@router.get("/system-message")
+async def get_system_message(db: Annotated[AsyncSession, Depends(get_db)]):
+    row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "system_message"))).scalar_one_or_none()
+    return {"message": row.value if row else ""}
+
+
+@router.post("/system-message")
+async def set_system_message(
+    body: dict,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    msg = str(body.get("message", "")).strip()
+    row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "system_message"))).scalar_one_or_none()
+    if row:
+        row.value = msg
+    else:
+        db.add(SystemSetting(key="system_message", value=msg))
+    await db.commit()
+    return {"message": msg}
 
 
 @router.post("/trigger-summary")

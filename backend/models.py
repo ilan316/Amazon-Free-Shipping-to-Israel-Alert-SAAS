@@ -67,3 +67,10 @@ class NotificationLog(Base):
 
     user: Mapped["User"] = relationship(back_populates="notifications")
     product: Mapped["Product"] = relationship(back_populates="notifications")
+
+
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, nullable=False, default="")

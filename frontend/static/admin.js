@@ -5,6 +5,8 @@ function switchTab(name, btn) {
   btn.classList.add("active");
 }
 
+let _allUsers = [];
+
 async function loadAdminData() {
   const meRes = await apiFetch("/me");
   if (!meRes || !meRes.ok) return;
@@ -14,7 +16,15 @@ async function loadAdminData() {
       '<div style="text-align:center;padding:80px;color:var(--error);font-size:1.2rem;">⛔ גישה אסורה — אין הרשאת מנהל</div>';
     return;
   }
-  await Promise.all([loadStats(), loadUsers(), loadProducts()]);
+  await Promise.all([
+    loadStats(),
+    loadSchedulerStatus(),
+    loadRegistrationsChart(),
+    loadUsers(),
+    loadProducts(),
+    loadNotificationsLog(),
+    loadSystemMessageAdmin(),
+  ]);
 }
 
 async function loadStats() {
@@ -27,10 +37,110 @@ async function loadStats() {
   document.getElementById("stat-notifs").textContent = data.notifications_24h;
 }
 
+async function loadSchedulerStatus() {
+  const res = await fetch("/health");
+  if (!res.ok) return;
+  const data = await res.json();
+  const fmt = iso => iso ? new Date(iso).toLocaleString("he-IL", { hour:"2-digit", minute:"2-digit", day:"2-digit", month:"2-digit" }) : "—";
+  const el1 = document.getElementById("sched-next-check");
+  const el2 = document.getElementById("sched-next-summary");
+  if (el1) el1.textContent = fmt(data.next_check_at);
+  if (el2) el2.textContent = fmt(data.next_summary_at);
+}
+
+async function loadRegistrationsChart() {
+  const res = await apiFetch("/admin/registrations-chart");
+  if (!res || !res.ok) return;
+  const data = await res.json();
+  const canvas = document.getElementById("registrations-chart");
+  if (!canvas || !data.length) return;
+  new Chart(canvas, {
+    type: "line",
+    data: {
+      labels: data.map(d => d.date),
+      datasets: [{
+        label: "משתמשים חדשים",
+        data: data.map(d => d.count),
+        borderColor: "#e47911",
+        backgroundColor: "rgba(228,121,17,0.1)",
+        tension: 0.3,
+        fill: true,
+        pointRadius: 4,
+        pointBackgroundColor: "#e47911",
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { stepSize: 1 } },
+        x: { ticks: { maxTicksLimit: 10 } }
+      }
+    }
+  });
+}
+
+async function loadNotificationsLog() {
+  const res = await apiFetch("/admin/notifications-log");
+  if (!res || !res.ok) return;
+  const logs = await res.json();
+  const tbody = document.getElementById("notifications-body");
+  if (!logs.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">אין התראות עדיין</td></tr>';
+    return;
+  }
+  tbody.innerHTML = logs.map(l => `
+    <tr>
+      <td class="ltr">${new Date(l.sent_at).toLocaleString("he-IL")}</td>
+      <td class="ltr truncate">${l.user_email}</td>
+      <td class="truncate">${l.product_name}</td>
+      <td><span class="status-badge badge-${l.status}">${statusLabel(l.status)}</span></td>
+      <td style="color:${l.success ? 'var(--success)' : 'var(--error)'}">
+        ${l.success ? '✅ נשלח' : '❌ נכשל'}
+      </td>
+    </tr>
+  `).join("");
+}
+
+async function loadSystemMessageAdmin() {
+  const res = await fetch("/system-message");
+  if (!res.ok) return;
+  const data = await res.json();
+  const el = document.getElementById("system-msg-input");
+  if (el) el.value = data.message || "";
+}
+
+async function saveSystemMessage() {
+  const msg = document.getElementById("system-msg-input").value;
+  const statusEl = document.getElementById("system-msg-status");
+  const res = await apiFetch("/admin/system-message", {
+    method: "POST",
+    body: JSON.stringify({ message: msg }),
+  });
+  if (res && res.ok) {
+    statusEl.textContent = "✅ נשמר בהצלחה";
+    statusEl.style.color = "var(--success)";
+  } else {
+    statusEl.textContent = "❌ שגיאה בשמירה";
+    statusEl.style.color = "var(--error)";
+  }
+  setTimeout(() => { statusEl.textContent = ""; }, 3000);
+}
+
+function filterUsers(query) {
+  const q = query.trim().toLowerCase();
+  const rows = document.querySelectorAll("#users-body tr[id^='user-row-']");
+  rows.forEach(row => {
+    const text = row.textContent.toLowerCase();
+    row.style.display = (!q || text.includes(q)) ? "" : "none";
+  });
+}
+
 async function loadUsers() {
   const res = await apiFetch("/admin/users");
   if (!res || !res.ok) return;
   const users = await res.json();
+  _allUsers = users;
   const tbody = document.getElementById("users-body");
   if (!users.length) {
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">אין משתמשים</td></tr>';
@@ -132,6 +242,18 @@ async function triggerCheck() {
   btn.disabled = false; btn.textContent = "▶ הרץ בדיקה עכשיו";
   if (res && res.ok) {
     msg.textContent = "✅ בדיקה הופעלה!";
+    setTimeout(() => { msg.textContent = ""; }, 4000);
+  }
+}
+
+async function triggerSummary() {
+  const btn = document.getElementById("run-summary-btn");
+  const msg = document.getElementById("check-msg");
+  btn.disabled = true; btn.textContent = "שולח...";
+  const res = await apiFetch("/admin/trigger-summary", { method: "POST" });
+  btn.disabled = false; btn.textContent = "📧 שלח סיכום עכשיו";
+  if (res && res.ok) {
+    msg.textContent = "✅ סיכום יומי הופעל!";
     setTimeout(() => { msg.textContent = ""; }, 4000);
   }
 }
