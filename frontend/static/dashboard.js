@@ -58,18 +58,16 @@ function renderProducts() {
   if (filterBar) filterBar.style.display = products.length > 0 ? "flex" : "none";
 
   // Counts for filter buttons
-  const counts = { FREE: 0, NO_SHIP: 0, UNKNOWN: 0 };
+  const counts = { FREE: 0, NO_SHIP: 0 };
   products.forEach(p => {
     if (p.is_paused) return;
     if (p.last_status === 'FREE')    counts.FREE++;
     if (p.last_status === 'NO_SHIP' || p.last_status === 'PAID') counts.NO_SHIP++;
-    if (p.last_status === 'UNKNOWN' || p.last_status === 'ERROR') counts.UNKNOWN++;
   });
   // Update filter button labels
   const lblMap = {
     FREE:    `✅ משלוח חינם${counts.FREE > 0 ? ` (${counts.FREE})` : ''}`,
     NO_SHIP: `💳 משלוח בתשלום${counts.NO_SHIP > 0 ? ` (${counts.NO_SHIP})` : ''}`,
-    UNKNOWN: `⚠️ שגיאה${counts.UNKNOWN > 0 ? ` (${counts.UNKNOWN})` : ''}`,
   };
   document.querySelectorAll('.filter-btn[onclick]').forEach(btn => {
     const m = btn.getAttribute('onclick').match(/setFilter\('(\w+)'/);
@@ -84,7 +82,6 @@ function renderProducts() {
       const parts = [`${total} מוצרים במעקב`];
       if (counts.FREE > 0)    parts.push(`${counts.FREE} חינם`);
       if (counts.NO_SHIP > 0) parts.push(`${counts.NO_SHIP} בתשלום`);
-      if (counts.UNKNOWN > 0) parts.push(`${counts.UNKNOWN} שגיאה`);
       counterEl.textContent = parts.join(' · ');
     } else {
       counterEl.textContent = '';
@@ -137,17 +134,12 @@ function renderProducts() {
       : (p.last_checked ? `בדיקה אחרונה: ${formatDate(p.last_checked)}` : "טרם נבדק");
     const notifiedStr = p.last_notified ? `התראה: ${formatDate(p.last_notified)}` : "";
     const aodNote     = p.found_in_aod ? '<span title="נמצא בכל אפשרויות הקנייה">⚠️</span>' : "";
-    const badgeStatus = p.is_paused ? 'UNKNOWN' : (isChecking ? 'UNKNOWN' : p.last_status);
+    const badgeStatus = p.is_paused ? 'UNKNOWN'
+      : (isChecking || p.last_status === 'UNKNOWN' || p.last_status === 'ERROR') ? 'UNKNOWN'
+      : p.last_status;
     const tooltip     = STATUS_TOOLTIP[p.last_status] || "";
     const linkUrl     = p.affiliate_url || p.url;
 
-    const unknownNote = (!p.is_paused && !isChecking && (p.last_status === 'UNKNOWN' || p.last_status === 'ERROR'))
-      ? `<div class="unknown-reason">${
-          p.raw_text
-            ? `טקסט שנמצא: "${p.raw_text.substring(0, 120)}${p.raw_text.length > 120 ? '…' : ''}"`
-            : "לא נמצא טקסט משלוח — בדוק אם ה-ASIN תקין"
-        }</div>`
-      : "";
 
     const pauseBtn = `
       <button
@@ -159,7 +151,7 @@ function renderProducts() {
 
     const badgeHtml = p.is_paused
       ? '<span class="status-badge badge-paused">⏸ מושהה</span>'
-      : isChecking
+      : (isChecking || p.last_status === 'UNKNOWN' || p.last_status === 'ERROR')
         ? '<span class="status-badge badge-UNKNOWN">⏳ בודק...</span>'
         : `<span class="status-badge badge-${p.last_status}" title="${tooltip}">${statusLabel(p.last_status)}</span>`;
 
@@ -182,8 +174,6 @@ function renderProducts() {
           <span class="card-meta-checked">${checkedStr}${notifiedStr ? ' · ' + notifiedStr : ''}</span>
           <span class="card-meta-asin" dir="ltr">ASIN: ${p.asin}</span>
         </div>
-
-        ${unknownNote}
 
         <!-- שורה 3: סטטוס | השהה | בדוק | הסר -->
         <div class="card-row-actions">
