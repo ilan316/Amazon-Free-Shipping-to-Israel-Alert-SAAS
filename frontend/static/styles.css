@@ -37,7 +37,7 @@ a:hover { text-decoration: underline; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 60px;
+  height: 76px;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -54,7 +54,7 @@ a:hover { text-decoration: underline; }
   pointer-events: none;
 }
 
-.navbar-logo img { height: 54px; pointer-events: auto; }
+.navbar-logo img { height: 70px; pointer-events: auto; }
 
 .navbar-links {
   display: flex;
