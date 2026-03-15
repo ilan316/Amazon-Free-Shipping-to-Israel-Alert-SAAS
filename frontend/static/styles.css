@@ -32,35 +32,29 @@ a:hover { text-decoration: underline; }
 /* ── Navbar ───────────────────────────────────────────────────────────────── */
 .navbar {
   background: var(--bg);
-  border-bottom: 2px solid var(--brand);
-  padding: 0 24px;
   display: flex;
-  align-items: center;
-  height: 92px;
+  flex-direction: column;
   position: sticky;
   top: 0;
   z-index: 100;
   box-shadow: var(--shadow);
 }
 
-/* spacer on the right (RTL) to balance the links on the left */
-.navbar::before {
-  content: '';
-  flex: 1;
-}
-
 .navbar-logo {
-  flex: 0 0 auto;
   display: flex;
+  justify-content: center;
   align-items: center;
+  padding: 6px 24px;
+  border-bottom: 2px solid var(--brand);
 }
 
 .navbar-logo img { height: 85px; }
 
 .navbar-links {
-  flex: 1;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  padding: 4px 24px;
   gap: 16px;
   font-size: 0.9rem;
 }
