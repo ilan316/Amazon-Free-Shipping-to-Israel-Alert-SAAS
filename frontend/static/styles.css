@@ -36,7 +36,6 @@ a:hover { text-decoration: underline; }
   padding: 0 24px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   height: 92px;
   position: sticky;
   top: 0;
@@ -44,19 +43,22 @@ a:hover { text-decoration: underline; }
   box-shadow: var(--shadow);
 }
 
-.navbar-logo {
-  position: absolute;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  pointer-events: none;
+/* spacer on the right (RTL) to balance the links on the left */
+.navbar::before {
+  content: '';
+  flex: 1;
 }
 
-.navbar-logo img { height: 85px; pointer-events: auto; }
+.navbar-logo {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+
+.navbar-logo img { height: 85px; }
 
 .navbar-links {
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 16px;
