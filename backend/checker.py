@@ -88,6 +88,13 @@ CAPTCHA_SELECTORS = [
     "input#captchacharacters",
 ]
 
+REDIRECT_DECLINE_SELECTORS = [
+    "#redir-modal .a-popover-closebutton",
+    "#redir-modal .a-button-close",
+    "#redir-modal [data-action='a-popover-close']",
+    "button[data-action='a-popover-close']",
+]
+
 SEE_ALL_BUYING_SELECTORS = [
     "#buybox-see-all-buying-choices a",
     "#buybox-see-all-buying-choices",
@@ -134,16 +141,19 @@ async def _is_captcha(page: Page) -> bool:
 # ── Location setup ────────────────────────────────────────────────────────────
 
 async def _dismiss_redirect_modal(page: Page):
-    """Dismiss the Amazon geo-redirect modal (e.g. 'Go to Amazon.sg?') if present."""
-    try:
-        modal = await page.query_selector("#redir-modal")
-        if modal:
-            await modal.click(timeout=3000)
-            await _pause(0.5, 1.0)
-            logger.debug("Redirect modal dismissed.")
-            return
-    except Exception:
-        pass
+    """Dismiss the Amazon geo-redirect modal (e.g. 'Go to Amazon.sg?') if present.
+    Always clicks the close/decline button — never the 'accept redirect' button.
+    """
+    for sel in REDIRECT_DECLINE_SELECTORS:
+        try:
+            el = await page.query_selector(sel)
+            if el:
+                await el.click(timeout=3000)
+                await _pause(0.5, 1.0)
+                logger.debug(f"Redirect modal dismissed via {sel}.")
+                return
+        except Exception:
+            continue
     try:
         await page.keyboard.press("Escape")
         await _pause(0.3, 0.6)
@@ -294,6 +304,15 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
     try:
         await page.goto(f"{url}?psc=1&th=1", wait_until="domcontentloaded", timeout=30000)
         await _dismiss_redirect_modal(page)
+        # Guard: if Amazon redirected us to a regional domain (e.g. amazon.sg), force back to .com
+        if "amazon.com" not in page.url:
+            logger.warning(f"[{asin}] Redirected to {page.url} — forcing amazon.com")
+            await page.goto(
+                f"https://www.amazon.com/dp/{asin}?psc=1&th=1",
+                wait_until="domcontentloaded",
+                timeout=30000,
+            )
+            await _dismiss_redirect_modal(page)
         product_name = ""
         try:
             await page.wait_for_selector("#productTitle", timeout=12000)
