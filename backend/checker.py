@@ -293,6 +293,7 @@ async def _check_all_buying_options(page: Page, asin: str) -> str:
 async def check_product(page: Page, asin: str, url: str) -> CheckResult:
     try:
         await page.goto(f"{url}?psc=1&th=1", wait_until="domcontentloaded", timeout=30000)
+        await _dismiss_redirect_modal(page)
         product_name = ""
         try:
             await page.wait_for_selector("#productTitle", timeout=12000)
