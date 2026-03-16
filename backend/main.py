@@ -33,17 +33,8 @@ async def lifespan(app: FastAPI):
 
     await browser_manager.startup()
 
-    scheduler.add_job(
-        run_global_check_cycle,
-        trigger="interval",
-        minutes=CHECK_INTERVAL,
-        id="global_check",
-        misfire_grace_time=300,
-        replace_existing=True,
-    )
-    logger.info(f"global_check job registered — every {CHECK_INTERVAL} minutes")
-
-    # Cron job: always update (cron recalculates next_run_time from the schedule itself).
+    # Start scheduler first so the job store loads from DB — this allows
+    # get_job() to correctly find previously persisted jobs.
     daily_hour = int(os.environ.get("DAILY_SUMMARY_HOUR", "8"))
     scheduler.add_job(
         run_daily_summary,
@@ -55,8 +46,21 @@ async def lifespan(app: FastAPI):
         misfire_grace_time=600,
         replace_existing=True,
     )
-
     scheduler.start()
+
+    # Interval job: preserve next_run_time across redeploys.
+    # Must check AFTER start() so the job store is loaded from DB.
+    if not scheduler.get_job("global_check"):
+        scheduler.add_job(
+            run_global_check_cycle,
+            trigger="interval",
+            minutes=CHECK_INTERVAL,
+            id="global_check",
+            misfire_grace_time=300,
+        )
+        logger.info(f"global_check job created — every {CHECK_INTERVAL} minutes")
+    else:
+        logger.info(f"global_check job restored from DB — keeping existing schedule")
     logger.info(f"Scheduler started — check interval: {CHECK_INTERVAL} minutes, daily summary at {daily_hour:02d}:00 Israel time")
 
     yield
