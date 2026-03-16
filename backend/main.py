@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 
 from backend.database import create_tables
 from backend.routes import auth, products, settings, admin as admin_routes
@@ -14,8 +15,11 @@ from backend.routes import auth, products, settings, admin as admin_routes
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-scheduler = AsyncIOScheduler(timezone="UTC")
 CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL_MINUTES", "120"))
+
+_db_url = os.environ.get("DATABASE_URL", "")
+_jobstores = {"default": SQLAlchemyJobStore(url=_db_url)} if _db_url else {}
+scheduler = AsyncIOScheduler(timezone="UTC", jobstores=_jobstores)
 
 
 @asynccontextmanager
@@ -29,15 +33,21 @@ async def lifespan(app: FastAPI):
 
     await browser_manager.startup()
 
-    scheduler.add_job(
-        run_global_check_cycle,
-        trigger="interval",
-        minutes=CHECK_INTERVAL,
-        id="global_check",
-        misfire_grace_time=300,
-        replace_existing=True,
-    )
+    # Interval job: preserve next_run_time across redeploys.
+    # Only add if not already persisted; otherwise keep the stored schedule.
+    if not scheduler.get_job("global_check"):
+        scheduler.add_job(
+            run_global_check_cycle,
+            trigger="interval",
+            minutes=CHECK_INTERVAL,
+            id="global_check",
+            misfire_grace_time=300,
+        )
+        logger.info(f"global_check job created — every {CHECK_INTERVAL} minutes")
+    else:
+        logger.info(f"global_check job restored from DB — keeping existing schedule")
 
+    # Cron job: always update (cron recalculates next_run_time from the schedule itself).
     daily_hour = int(os.environ.get("DAILY_SUMMARY_HOUR", "8"))
     scheduler.add_job(
         run_daily_summary,
