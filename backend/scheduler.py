@@ -81,10 +81,17 @@ async def run_global_check_cycle():
 
         logger.info(f"Checking {len(products)} product(s)...")
         newly_failed = []
+        newly_blocked = []
 
         for i, product in enumerate(products):
             if product.consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
                 logger.warning(f"[{product.asin}] Skipping — {product.consecutive_errors} consecutive errors.")
+                if product.consecutive_errors == MAX_CONSECUTIVE_ERRORS:
+                    # First cycle where it's being skipped — notify admin once
+                    from backend.checker import CheckResult
+                    newly_blocked.append((product, CheckResult(product.asin, ShippingStatus.ERROR, error_message=f"Product blocked after {MAX_CONSECUTIVE_ERRORS} consecutive errors — no longer being checked.")))
+                    product.consecutive_errors += 1  # increment past threshold so we don't re-notify next cycle
+                    await db.commit()
                 continue
 
             try:
@@ -106,6 +113,8 @@ async def run_global_check_cycle():
 
     if newly_failed:
         await _notify_admin_of_errors(newly_failed)
+    if newly_blocked:
+        await _notify_admin_of_errors(newly_blocked)
 
     logger.info("=== Check cycle complete ===")
 
