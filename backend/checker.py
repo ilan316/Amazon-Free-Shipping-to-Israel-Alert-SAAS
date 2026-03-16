@@ -56,6 +56,18 @@ DELIVER_TO_SELECTORS = [
     "#glow-ingress-line1",
 ]
 
+SHIP_OUTSIDE_US_SELECTORS = [
+    "#GLUXCountryList",          # already on international tab
+    "span#GLUXDeliveryToAddress",
+    "a#GLUXChangeAddressLink",
+    "span[id*='GLUXChangeAddress']",
+    "a[href*='GLUXChangeAddress']",
+    "span.a-declarative[data-action*='GLUXChangeAddress']",
+    "text=Ship outside the US",
+    "text=Deliver outside the US",
+    "text=Change",
+]
+
 COUNTRY_DROPDOWN_SELECTORS = [
     "#GLUXCountryList",
     "select.a-native-dropdown[name='countryCode']",
@@ -171,13 +183,62 @@ async def _set_location_on_page(page: Page, country_code: str = "IL") -> bool:
     await deliver_btn.click()
     await _pause(1.5, 2.5)
 
+    # Wait for the modal to appear and finish loading
     await _first(page, [
         "#GLUXCountryList",
         "#GLUXZipUpdateInput",
         ".a-popover-content",
+        "#nav-flyout-delivery",
     ], timeout=6000)
 
-    dropdown = await _first(page, COUNTRY_DROPDOWN_SELECTORS, timeout=5000)
+    # Wait for loading spinner to disappear
+    try:
+        await page.wait_for_selector(".a-popover-loading", state="detached", timeout=5000)
+        await _pause(0.5, 1.0)
+    except PWTimeout:
+        pass  # Loading may have already finished
+
+    # Log page state for debugging
+    try:
+        nav_html = await page.inner_html("#nav-global-location-popover-link", timeout=2000)
+        logger.warning(f"[DEBUG] Deliver To button HTML: {nav_html[:400]}")
+    except Exception:
+        pass
+    try:
+        body_classes = await page.evaluate("() => document.body.className")
+        logger.warning(f"[DEBUG] Body classes: {body_classes[:200]}")
+    except Exception:
+        pass
+    try:
+        popup_html = await page.evaluate("""() => {
+            const sel = ['#GLUXPopoverID', '.a-popover-inner', '#nav-flyout-delivery',
+                         '.nav-flyout', '[data-csa-c-type=\"popover\"]', '.glow-toaster-content'];
+            for (const s of sel) {
+                const el = document.querySelector(s);
+                if (el) return s + '::' + el.innerHTML.substring(0, 600);
+            }
+            return 'none found';
+        }""")
+        logger.warning(f"[DEBUG] Popup content: {popup_html}")
+    except Exception as e:
+        logger.warning(f"[DEBUG] Popup eval failed: {e}")
+
+    # Amazon shows ZIP input by default — need to click "Ship outside the US" to get country dropdown
+    dropdown = await _first(page, COUNTRY_DROPDOWN_SELECTORS, timeout=2000)
+    if not dropdown:
+        logger.info("Country dropdown not visible — trying 'Ship outside the US' link...")
+        outside_link = await _first(page, SHIP_OUTSIDE_US_SELECTORS, timeout=4000)
+        if outside_link:
+            try:
+                await outside_link.click()
+                await _pause(1.0, 1.5)
+                logger.info("Clicked 'Ship outside the US' link.")
+            except Exception as e:
+                logger.debug(f"Could not click outside-US link: {e}")
+        else:
+            logger.warning("'Ship outside the US' link not found either.")
+        dropdown = await _first(page, COUNTRY_DROPDOWN_SELECTORS, timeout=5000)
+
     if dropdown:
         try:
             await dropdown.select_option(value=country_code)
@@ -194,17 +255,6 @@ async def _set_location_on_page(page: Page, country_code: str = "IL") -> bool:
             return True
         except Exception as e:
             logger.debug(f"Country dropdown failed: {e}")
-    else:
-        # Debug: log popup HTML so we can identify the correct selectors
-        try:
-            for popup_sel in [".a-popover-content", "#GLUXPopoverContent", "#nav-flyout-delivery"]:
-                el = await page.query_selector(popup_sel)
-                if el:
-                    html = await el.inner_html()
-                    logger.warning(f"Popup HTML (no dropdown found): {html[:800]}")
-                    break
-        except Exception:
-            pass
 
     logger.warning("Could not set delivery location automatically.")
     return False
@@ -253,11 +303,17 @@ def _classify(text: str) -> ShippingStatus:
     if "free delivery" in t and any(p in t for p in ("eligible orders", "eligible international", "eligible items")):
         return ShippingStatus.FREE
 
-    paid_pat = re.compile(
+    # With Israel as active location, Amazon shows "$X.XX delivery [date]" without mentioning Israel
+    paid_pat_explicit = re.compile(
         r'\$[\d]+\.[\d]{2}.{0,40}israel|israel.{0,40}\$[\d]+\.[\d]{2}',
         re.IGNORECASE,
     )
-    if paid_pat.search(text) and "israel" in t:
+    if paid_pat_explicit.search(text) and "israel" in t:
+        return ShippingStatus.PAID
+
+    # Generic paid delivery: "$X.XX delivery" or "ILS X.XX delivery" — shown when Israel is active location
+    paid_pat_generic = re.compile(r'(\$|ILS|₪)\s*[\d,]+\.?\d*\s+delivery', re.IGNORECASE)
+    if paid_pat_generic.search(text) and "free" not in t:
         return ShippingStatus.PAID
 
     return ShippingStatus.UNKNOWN
@@ -400,10 +456,26 @@ class BrowserManager:
         logger.info("Setting delivery location to Israel...")
         page = await self._context.new_page()
         try:
-            await page.goto("https://www.amazon.com", wait_until="domcontentloaded", timeout=20000)
+            # Use a product page instead of homepage — less likely to trigger CAPTCHA
+            await page.goto("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1", wait_until="domcontentloaded", timeout=20000)
+            await _dismiss_redirect_modal(page)
             await _pause(2.0, 3.5)
-            if not await _is_captcha(page):
-                await _set_location_on_page(page, "IL")
+            if await _is_captcha(page):
+                logger.warning("CAPTCHA on startup — location NOT set.")
+            else:
+                if await _verify_location(page):
+                    logger.info("Startup: location already Israel ✓")
+                else:
+                    success = await _set_location_on_page(page, "IL")
+                    if success:
+                        await page.reload(wait_until="domcontentloaded", timeout=15000)
+                        await _pause(1.5, 2.0)
+                        if await _verify_location(page):
+                            logger.info("Startup: location set to Israel ✓")
+                        else:
+                            logger.warning("Startup: location set but verify failed — will retry on first cycle.")
+                    else:
+                        logger.warning("Startup: could not set location to Israel — will retry on first cycle.")
         except Exception as e:
             logger.warning(f"Location setup failed (will retry next cycle): {e}")
         finally:
@@ -420,20 +492,22 @@ class BrowserManager:
         except Exception as e:
             logger.warning(f"Browser shutdown error (ignored): {e}")
 
-    async def refresh_location(self):
-        """Re-set delivery location to Israel. Called at the start of each check cycle."""
+    async def refresh_location(self) -> bool:
+        """Re-set delivery location to Israel. Called at the start of each check cycle.
+        Returns True if location is confirmed as Israel, False otherwise."""
         page = await self._context.new_page()
         try:
             for attempt in range(3):
-                await page.goto("https://www.amazon.com", wait_until="domcontentloaded", timeout=20000)
+                # Use a product page instead of homepage — less likely to trigger CAPTCHA
+                await page.goto("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1", wait_until="domcontentloaded", timeout=20000)
                 await _pause(2.0, 3.5)
                 if await _is_captcha(page):
                     logger.warning("CAPTCHA during location refresh — skipping.")
-                    return
+                    return False
                 await _dismiss_redirect_modal(page)
                 if await _verify_location(page):
                     logger.info("Location already Israel ✓ — no change needed.")
-                    return
+                    return True
                 success = await _set_location_on_page(page, "IL")
                 if success:
                     # Reload to confirm the location was saved
@@ -441,15 +515,17 @@ class BrowserManager:
                     await _pause(1.5, 2.0)
                     if await _verify_location(page):
                         logger.info("Location verified: Israel ✓")
-                        return
+                        return True
                     logger.warning(f"Location verify failed (attempt {attempt + 1}/3) — retrying...")
                     await _pause(2.0, 3.0)
                 else:
                     logger.warning(f"Location set failed (attempt {attempt + 1}/3) — retrying...")
                     await _pause(2.0, 3.0)
-            logger.error("Failed to set Israel location after 3 attempts — checks may return UNKNOWN.")
+            logger.error("Failed to set Israel location after 3 attempts — skipping check cycle.")
+            return False
         except Exception as e:
             logger.warning(f"Location refresh error (ignored): {e}")
+            return False
         finally:
             await page.close()
 

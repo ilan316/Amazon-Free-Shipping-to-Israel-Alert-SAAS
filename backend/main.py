@@ -48,9 +48,28 @@ async def lifespan(app: FastAPI):
     )
     scheduler.start()
 
-    # Interval job: preserve next_run_time across redeploys.
-    # Must check AFTER start() so the job store is loaded from DB.
-    if not scheduler.get_job("global_check"):
+    # Interval job: always reschedule with the configured interval (env var wins).
+    # replace_existing=True ensures that if interval changed (e.g. CHECK_INTERVAL_MINUTES),
+    # the new trigger takes effect immediately on redeploy.
+    existing_job = scheduler.get_job("global_check")
+    if existing_job:
+        try:
+            existing_minutes = int(existing_job.trigger.interval.total_seconds() // 60)
+        except Exception:
+            existing_minutes = None
+        if existing_minutes == CHECK_INTERVAL:
+            logger.info(f"global_check job restored from DB — keeping existing schedule ({CHECK_INTERVAL} min)")
+        else:
+            scheduler.add_job(
+                run_global_check_cycle,
+                trigger="interval",
+                minutes=CHECK_INTERVAL,
+                id="global_check",
+                misfire_grace_time=300,
+                replace_existing=True,
+            )
+            logger.info(f"global_check rescheduled — interval changed to {CHECK_INTERVAL} minutes")
+    else:
         scheduler.add_job(
             run_global_check_cycle,
             trigger="interval",
@@ -59,8 +78,6 @@ async def lifespan(app: FastAPI):
             misfire_grace_time=300,
         )
         logger.info(f"global_check job created — every {CHECK_INTERVAL} minutes")
-    else:
-        logger.info(f"global_check job restored from DB — keeping existing schedule")
     logger.info(f"Scheduler started — check interval: {CHECK_INTERVAL} minutes, daily summary at {daily_hour:02d}:00 Israel time")
 
     yield

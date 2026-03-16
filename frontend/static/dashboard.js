@@ -7,7 +7,7 @@ let currentFilter = 'ALL';
 const STATUS_TOOLTIP = {
   FREE:    "משלוח חינם לישראל זמין",
   PAID:    "משלוח לישראל בתשלום",
-  NO_SHIP: "ניתן לקנות אך לא במשלוח חינם",
+  NO_SHIP: "לא נשלח לארץ",
   UNKNOWN: "לא ניתן לקבוע סטטוס — ראה פרטים",
   ERROR:   "שגיאה בבדיקה (קפצ'ה או תקלה)",
 };
@@ -58,16 +58,18 @@ function renderProducts() {
   if (filterBar) filterBar.style.display = products.length > 0 ? "flex" : "none";
 
   // Counts for filter buttons
-  const counts = { FREE: 0, NO_SHIP: 0 };
+  const counts = { FREE: 0, PAID: 0, NO_SHIP: 0 };
   products.forEach(p => {
     if (p.is_paused) return;
     if (p.last_status === 'FREE')    counts.FREE++;
-    if (p.last_status === 'NO_SHIP' || p.last_status === 'PAID') counts.NO_SHIP++;
+    if (p.last_status === 'PAID')    counts.PAID++;
+    if (p.last_status === 'NO_SHIP') counts.NO_SHIP++;
   });
   // Update filter button labels
   const lblMap = {
     FREE:    `✅ משלוח חינם${counts.FREE > 0 ? ` (${counts.FREE})` : ''}`,
-    NO_SHIP: `💳 משלוח בתשלום${counts.NO_SHIP > 0 ? ` (${counts.NO_SHIP})` : ''}`,
+    PAID:    `💳 משלוח בתשלום${counts.PAID > 0 ? ` (${counts.PAID})` : ''}`,
+    NO_SHIP: `🚫 לא נשלח לארץ${counts.NO_SHIP > 0 ? ` (${counts.NO_SHIP})` : ''}`,
   };
   document.querySelectorAll('.filter-btn[onclick]').forEach(btn => {
     const m = btn.getAttribute('onclick').match(/setFilter\('(\w+)'/);
@@ -81,7 +83,8 @@ function renderProducts() {
     if (total > 0) {
       const parts = [`${total} מוצרים במעקב`];
       if (counts.FREE > 0)    parts.push(`${counts.FREE} חינם`);
-      if (counts.NO_SHIP > 0) parts.push(`${counts.NO_SHIP} בתשלום`);
+      if (counts.PAID > 0)    parts.push(`${counts.PAID} בתשלום`);
+      if (counts.NO_SHIP > 0) parts.push(`${counts.NO_SHIP} לא נשלח`);
       counterEl.textContent = parts.join(' · ');
     } else {
       counterEl.textContent = '';
@@ -100,9 +103,7 @@ function renderProducts() {
 
   // Filter by status
   let filtered = [...products];
-  if (currentFilter === 'NO_SHIP') {
-    filtered = filtered.filter(p => !p.is_paused && (p.last_status === 'NO_SHIP' || p.last_status === 'PAID'));
-  } else if (currentFilter !== 'ALL') {
+  if (currentFilter !== 'ALL') {
     filtered = filtered.filter(p => !p.is_paused && p.last_status === currentFilter);
   }
 

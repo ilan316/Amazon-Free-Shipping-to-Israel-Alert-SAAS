@@ -66,7 +66,11 @@ async def _update_product(db: AsyncSession, product: Product, result: CheckResul
 async def run_global_check_cycle():
     """Check all tracked products and update DB. No emails sent here."""
     logger.info("=== Check cycle started ===")
-    await browser_manager.refresh_location()
+    location_ok = await browser_manager.refresh_location()
+    if not location_ok:
+        logger.warning("Location not set to Israel (CAPTCHA?) — skipping check cycle to avoid UNKNOWN results.")
+        logger.info("=== Check cycle skipped ===")
+        return
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(Product).where(
@@ -179,7 +183,10 @@ async def _notify_admin_of_errors(failed_items: list):
 async def check_single_product(asin: str, url: str):
     """Check a single product immediately (used after a user adds it)."""
     logger.info(f"[{asin}] Immediate first check triggered")
-    await browser_manager.refresh_location()
+    location_ok = await browser_manager.refresh_location()
+    if not location_ok:
+        logger.warning(f"[{asin}] Location not set to Israel — skipping immediate check.")
+        return
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Product).where(Product.asin == asin))
         product = result.scalar_one_or_none()
