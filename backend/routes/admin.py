@@ -236,6 +236,21 @@ async def trigger_check(
     return {"message": "Check cycle triggered"}
 
 
+@router.post("/products/{product_id}/reset-errors")
+async def reset_product_errors(
+    product_id: int,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    result = await db.execute(select(Product).where(Product.id == product_id))
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    product.consecutive_errors = 0
+    await db.commit()
+    return {"asin": product.asin, "consecutive_errors": 0}
+
+
 @router.delete("/products/{product_id}")
 async def delete_product(
     product_id: int,

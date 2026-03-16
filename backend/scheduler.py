@@ -46,8 +46,15 @@ async def _update_product(db: AsyncSession, product: Product, result: CheckResul
             product.name = result.product_name
         await db.commit()
         return False
+    elif result.status == ShippingStatus.UNKNOWN:
+        # Delivery text found but unclassifiable — update status visibly, not a scraping failure
+        product.last_status = result.status.value
+        product.raw_text = result.raw_text or ""
+        product.consecutive_errors = 0
+        await db.commit()
+        return False
     else:
-        # ERROR or UNKNOWN — keep existing last_status (customers see previous result)
+        # ERROR — true scraping/network failure; keep existing last_status for customers
         prev_errors = product.consecutive_errors
         product.consecutive_errors += 1
         if result.raw_text:
@@ -115,7 +122,7 @@ async def run_daily_summary():
         sent = 0
         for user in users:
             free_products_result = await db.execute(
-                select(Product)
+                select(Product, UserProduct.custom_name)
                 .join(UserProduct, Product.id == UserProduct.product_id)
                 .where(
                     UserProduct.user_id == user.id,
@@ -123,14 +130,14 @@ async def run_daily_summary():
                     Product.last_status == ShippingStatus.FREE.value,
                 )
             )
-            free_products = free_products_result.scalars().all()
+            free_products = free_products_result.all()  # list of (Product, custom_name)
 
             if not free_products:
                 continue
 
             success = send_daily_summary(user, free_products)
 
-            for product in free_products:
+            for product, _ in free_products:
                 db.add(NotificationLog(
                     user_id=user.id,
                     product_id=product.id,
