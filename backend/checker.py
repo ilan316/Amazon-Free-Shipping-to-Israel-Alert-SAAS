@@ -141,10 +141,36 @@ async def _pause(min_s: float, max_s: float):
 
 # ── httpx location-setting via Amazon address-change API ──────────────────────
 
+def _extract_csrf(html: str) -> str:
+    """Extract Amazon anti-CSRF token from HTML via multiple known locations."""
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Method 1: hidden input field
+    el = soup.find("input", attrs={"name": "anti-csrftoken-a2z"})
+    if el and el.get("value"):
+        return el["value"]
+
+    # Method 2: span with data attribute (used in some page variants)
+    el = soup.find(attrs={"data-anti-csrftoken-a2z": True})
+    if el:
+        return el["data-anti-csrftoken-a2z"]
+
+    # Method 3: script tag — "csrfToken":"<value>"
+    m = re.search(r'"csrfToken"\s*:\s*"([^"]+)"', html)
+    if m:
+        return m.group(1)
+
+    # Method 4: anti-csrftoken-a2z in any data attribute
+    m = re.search(r'anti-csrftoken-a2z["\s:=]+([A-Za-z0-9+/=]{20,})', html)
+    if m:
+        return m.group(1)
+
+    return ""
+
+
 async def _try_set_location_httpx() -> tuple:
     """Set Israel delivery location by calling Amazon's internal address-change API.
     No browser UI interaction — much less likely to trigger CAPTCHA.
-    Tries two approaches: countryCode=IL (international), then zipCode (Tel Aviv).
     Returns (success: bool, cookies: list) tuple."""
     base_headers = {
         "User-Agent": _BROWSER_UA,
@@ -158,40 +184,16 @@ async def _try_set_location_httpx() -> tuple:
         async with httpx.AsyncClient(
             headers=base_headers, follow_redirects=True, timeout=20.0
         ) as client:
-            # Step 1: Get Amazon homepage to establish a session and grab CSRF token
-            resp = await client.get("https://www.amazon.com/")
+            # Step 1: Fetch a product page (richer HTML than homepage) for session + CSRF
+            resp = await client.get("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1")
             if "validateCaptcha" in str(resp.url) or "captchacharacters" in resp.text:
-                logger.warning("httpx location: CAPTCHA on Amazon homepage")
+                logger.warning("httpx location: CAPTCHA on initial page fetch")
                 return False, []
 
-            soup = BeautifulSoup(resp.text, "html.parser")
-            csrf_el = soup.find("input", attrs={"name": "anti-csrftoken-a2z"})
-            csrf_token = csrf_el["value"] if csrf_el else ""
-            logger.info(f"httpx location: session established, csrf={'found' if csrf_token else 'not found'}")
+            csrf_token = _extract_csrf(resp.text)
+            logger.info(f"httpx location: initial fetch status={resp.status_code}, csrf={'found' if csrf_token else 'NOT found'}")
 
-            # Step 2: Try two payload variants — country code first, then zip code
-            payloads = [
-                # Variant A: international country code (for "Ship outside the US")
-                {
-                    "locationType": "LOCATION_INPUT",
-                    "zipCode": "",
-                    "countryCode": "IL",
-                    "storeContext": "generic",
-                    "deviceType": "web",
-                    "pageType": "Gateway",
-                    "actionSource": "glow",
-                },
-                # Variant B: Tel Aviv zip code
-                {
-                    "locationType": "LOCATION_INPUT",
-                    "zipCode": "6100001",
-                    "storeContext": "generic",
-                    "deviceType": "web",
-                    "pageType": "Gateway",
-                    "actionSource": "glow",
-                },
-            ]
-
+            # Step 2: POST to address-change — try countryCode=IL, then zip
             api_headers = {
                 **base_headers,
                 "Content-Type": "application/x-www-form-urlencoded",
@@ -199,29 +201,37 @@ async def _try_set_location_httpx() -> tuple:
                 "anti-csrftoken-a2z": csrf_token,
                 "X-Requested-With": "XMLHttpRequest",
             }
+            payloads = [
+                {"locationType": "LOCATION_INPUT", "zipCode": "", "countryCode": "IL",
+                 "storeContext": "generic", "deviceType": "web",
+                 "pageType": "Detail", "actionSource": "glow"},
+                {"locationType": "LOCATION_INPUT", "zipCode": "6100001",
+                 "storeContext": "generic", "deviceType": "web",
+                 "pageType": "Detail", "actionSource": "glow"},
+            ]
 
+            api_resp = None
             for i, payload in enumerate(payloads):
-                resp2 = await client.post(
+                r = await client.post(
                     "https://www.amazon.com/portal-migration/hz/glow/address-change",
-                    data=payload,
-                    headers=api_headers,
+                    data=payload, headers=api_headers,
                 )
-                logger.info(f"httpx location: address-change variant {i+1} → status {resp2.status_code}")
-                if resp2.status_code in (200, 302):
+                body_preview = r.text[:200].replace("\n", " ")
+                logger.info(f"httpx location: variant {i+1} → {r.status_code} | {body_preview!r}")
+                if r.status_code in (200, 302):
+                    api_resp = r
                     break
-            else:
+
+            if not api_resp:
                 return False, []
 
-            # Step 3: Small delay then verify
-            await asyncio.sleep(1.5)
+            # Step 3: Delay then verify location on product page
+            await asyncio.sleep(2.0)
             resp3 = await client.get("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1")
             if "validateCaptcha" in str(resp3.url) or "captchacharacters" in resp3.text:
                 logger.warning("httpx location: CAPTCHA on verification page")
                 return False, []
 
-            html_lower = resp3.text.lower()
-
-            # Check "Deliver to" nav button — it shows "Israel" when location is set
             soup3 = BeautifulSoup(resp3.text, "html.parser")
             nav_text = ""
             for nav_id in ["glow-ingress-line2", "glow-ingress-line1",
@@ -231,24 +241,14 @@ async def _try_set_location_httpx() -> tuple:
                     nav_text = el.get_text(strip=True).lower()
                     break
 
-            logger.info(f"httpx location: nav text = {nav_text!r}")
+            logger.info(f"httpx location: verification nav text = {nav_text!r}")
 
-            if "israel" in nav_text or "israel" in html_lower:
+            if "israel" in nav_text or "israel" in resp3.text.lower():
                 cookie_list = [{"name": k, "value": v} for k, v in client.cookies.items()]
                 logger.info(f"httpx location: Israel confirmed ✓ ({len(cookie_list)} cookies)")
                 return True, cookie_list
 
-            # If "israel" not found but we got a real product page (not CAPTCHA),
-            # log delivery block text for debugging
-            delivery_ids = ["mir-layout-DELIVERY_BLOCK", "ddmDeliveryMessage",
-                            "deliveryMessageMirId", "exports_feature_div", "buybox"]
-            for el_id in delivery_ids:
-                el = soup3.find(id=el_id)
-                if el:
-                    logger.warning(f"httpx location: delivery block = {el.get_text(strip=True)[:120]!r}")
-                    break
-
-            logger.warning("httpx location: Israel NOT confirmed in product page")
+            logger.warning("httpx location: Israel NOT confirmed — API approach not working for this session")
             return False, []
     except Exception as e:
         logger.warning(f"httpx location: error — {e}")
