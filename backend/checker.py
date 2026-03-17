@@ -689,7 +689,7 @@ class BrowserManager:
             logger.warning("Startup: httpx location failed — trying Playwright...")
             page = await self._context.new_page()
             try:
-                await page.goto("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1", wait_until="domcontentloaded", timeout=45000)
+                await page.goto("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1", wait_until="domcontentloaded", timeout=90000)
                 await _dismiss_redirect_modal(page)
                 await _pause(2.0, 3.5)
                 if await _is_captcha(page):
@@ -745,7 +745,7 @@ class BrowserManager:
         try:
             for attempt in range(3):
                 # Use a product page instead of homepage — less likely to trigger CAPTCHA
-                await page.goto("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1", wait_until="domcontentloaded", timeout=45000)
+                await page.goto("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1", wait_until="domcontentloaded", timeout=90000)
                 await _pause(2.0, 3.5)
                 if await _is_captcha(page):
                     logger.warning("CAPTCHA during location refresh — skipping.")
