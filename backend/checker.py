@@ -139,6 +139,87 @@ async def _pause(min_s: float, max_s: float):
     await asyncio.sleep(random.uniform(min_s, max_s))
 
 
+# ── httpx location-setting via Amazon address-change API ──────────────────────
+
+async def _try_set_location_httpx(zip_code: str = "6100001") -> tuple:
+    """Set Israel delivery location by calling Amazon's internal address-change API.
+    No browser UI interaction — much less likely to trigger CAPTCHA.
+    Returns (success: bool, cookies: list) tuple."""
+    base_headers = {
+        "User-Agent": _BROWSER_UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+    }
+    try:
+        async with httpx.AsyncClient(
+            headers=base_headers, follow_redirects=True, timeout=20.0
+        ) as client:
+            # Step 1: Get Amazon homepage to establish a session and grab CSRF token
+            resp = await client.get("https://www.amazon.com/")
+            if "validateCaptcha" in str(resp.url) or "captchacharacters" in resp.text:
+                logger.warning("httpx location: CAPTCHA on Amazon homepage")
+                return False, []
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+            csrf_el = soup.find("input", attrs={"name": "anti-csrftoken-a2z"})
+            csrf_token = csrf_el["value"] if csrf_el else ""
+
+            # Step 2: POST to address-change endpoint with Israel zip code
+            resp2 = await client.post(
+                "https://www.amazon.com/portal-migration/hz/glow/address-change",
+                data={
+                    "locationType": "LOCATION_INPUT",
+                    "zipCode": zip_code,
+                    "storeContext": "generic",
+                    "deviceType": "web",
+                    "pageType": "Gateway",
+                    "actionSource": "glow",
+                },
+                headers={
+                    **base_headers,
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Referer": "https://www.amazon.com/",
+                    "anti-csrftoken-a2z": csrf_token,
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+            )
+            logger.info(f"httpx location: address-change status {resp2.status_code}")
+            if resp2.status_code not in (200, 302):
+                return False, []
+
+            # Step 3: Verify by fetching a product page and checking for Israel in delivery block
+            resp3 = await client.get("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1")
+            if "validateCaptcha" in str(resp3.url) or "captchacharacters" in resp3.text:
+                logger.warning("httpx location: CAPTCHA on verification page")
+                return False, []
+
+            # Check if delivery text mentions Israel
+            soup3 = BeautifulSoup(resp3.text, "html.parser")
+            delivery_ids = ["mir-layout-DELIVERY_BLOCK", "ddmDeliveryMessage",
+                            "deliveryMessageMirId", "exports_feature_div", "buybox"]
+            delivery_text = ""
+            for el_id in delivery_ids:
+                el = soup3.find(id=el_id)
+                if el:
+                    delivery_text = el.get_text(separator=" ", strip=True).lower()
+                    if delivery_text:
+                        break
+
+            if "israel" in delivery_text or "israel" in resp3.text.lower():
+                cookie_list = [{"name": k, "value": v} for k, v in client.cookies.items()]
+                logger.info(f"httpx location: Israel confirmed ✓ ({len(cookie_list)} cookies)")
+                return True, cookie_list
+            else:
+                logger.warning("httpx location: Israel NOT found in product page after API call")
+                return False, []
+    except Exception as e:
+        logger.warning(f"httpx location: error — {e}")
+        return False, []
+
+
 # ── httpx / HTML-based check (fast, parallel) ─────────────────────────────────
 
 def _parse_html_delivery(html: str, asin: str) -> CheckResult:
@@ -554,34 +635,39 @@ class BrowserManager:
 
         await self._context.route("**/*", _block_resources)
 
-        # Set Israel delivery location once at startup
-        logger.info("Setting delivery location to Israel...")
-        page = await self._context.new_page()
-        try:
-            # Use a product page instead of homepage — less likely to trigger CAPTCHA
-            await page.goto("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1", wait_until="domcontentloaded", timeout=20000)
-            await _dismiss_redirect_modal(page)
-            await _pause(2.0, 3.5)
-            if await _is_captcha(page):
-                logger.warning("CAPTCHA on startup — location NOT set.")
-            else:
-                if await _verify_location(page):
-                    logger.info("Startup: location already Israel ✓")
+        # Set Israel delivery location once at startup (httpx first, Playwright fallback)
+        logger.info("Setting delivery location to Israel (startup)...")
+        success, cookies = await _try_set_location_httpx()
+        if success:
+            self._session_cookies = cookies
+            logger.info("Startup: location set via httpx API ✓")
+        else:
+            logger.warning("Startup: httpx location failed — trying Playwright...")
+            page = await self._context.new_page()
+            try:
+                await page.goto("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1", wait_until="domcontentloaded", timeout=20000)
+                await _dismiss_redirect_modal(page)
+                await _pause(2.0, 3.5)
+                if await _is_captcha(page):
+                    logger.warning("Startup: CAPTCHA on Playwright — location NOT set, will retry on first cycle.")
                 else:
-                    success = await _set_location_on_page(page, "IL")
-                    if success:
-                        await page.reload(wait_until="domcontentloaded", timeout=15000)
-                        await _pause(1.5, 2.0)
-                        if await _verify_location(page):
-                            logger.info("Startup: location set to Israel ✓")
-                        else:
-                            logger.warning("Startup: location set but verify failed — will retry on first cycle.")
+                    if await _verify_location(page):
+                        logger.info("Startup: location already Israel ✓ (Playwright)")
                     else:
-                        logger.warning("Startup: could not set location to Israel — will retry on first cycle.")
-        except Exception as e:
-            logger.warning(f"Location setup failed (will retry next cycle): {e}")
-        finally:
-            await page.close()
+                        set_ok = await _set_location_on_page(page, "IL")
+                        if set_ok:
+                            await page.reload(wait_until="domcontentloaded", timeout=15000)
+                            await _pause(1.5, 2.0)
+                            if await _verify_location(page):
+                                logger.info("Startup: location set to Israel ✓ (Playwright)")
+                            else:
+                                logger.warning("Startup: location set but verify failed — will retry on first cycle.")
+                        else:
+                            logger.warning("Startup: could not set location — will retry on first cycle.")
+            except Exception as e:
+                logger.warning(f"Startup location setup failed (will retry next cycle): {e}")
+            finally:
+                await page.close()
 
         logger.info("Browser ready.")
 
@@ -596,7 +682,21 @@ class BrowserManager:
 
     async def refresh_location(self) -> bool:
         """Re-set delivery location to Israel. Called at the start of each check cycle.
-        Returns True if location is confirmed as Israel, False otherwise."""
+        Returns True if location is confirmed as Israel, False otherwise.
+
+        Strategy:
+          1. Try httpx-based API call (no browser fingerprint — less CAPTCHA risk).
+          2. If that fails, fall back to Playwright UI interaction.
+        """
+        # ── Attempt 1: httpx API approach ─────────────────────────────────────
+        logger.info("Location refresh: trying httpx API approach...")
+        success, cookies = await _try_set_location_httpx()
+        if success:
+            self._session_cookies = cookies
+            return True
+        logger.warning("httpx location failed — falling back to Playwright UI")
+
+        # ── Attempt 2: Playwright UI approach ─────────────────────────────────
         page = await self._context.new_page()
         try:
             for attempt in range(3):
