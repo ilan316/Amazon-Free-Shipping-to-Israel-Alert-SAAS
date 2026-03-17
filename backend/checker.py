@@ -39,6 +39,11 @@ logger = logging.getLogger(__name__)
 
 BROWSER_PROFILE_DIR = os.environ.get("BROWSER_PROFILE_DIR", "/app/browser_profile")
 
+# Optional NordVPN SOCKS5 proxy for Playwright (reduces CAPTCHA on location setting)
+# Format: socks5://username:password@server:1080
+# Example: socks5://xy12345678:AbCdEfGhIj@us5510.nordvpn.com:1080
+NORDVPN_PROXY = os.environ.get("NORDVPN_PROXY", "")
+
 # ── Data types ────────────────────────────────────────────────────────────────
 
 class ShippingStatus(Enum):
@@ -637,10 +642,14 @@ class BrowserManager:
     async def startup(self):
         logger.info("Starting Playwright browser...")
         self._pw = await async_playwright().start()
+        proxy_cfg = {"server": NORDVPN_PROXY} if NORDVPN_PROXY else None
+        if proxy_cfg:
+            logger.info(f"Playwright: using proxy {NORDVPN_PROXY.split('@')[-1]}")  # log server only, hide credentials
         self._context = await self._pw.chromium.launch_persistent_context(
             user_data_dir=BROWSER_PROFILE_DIR,
             headless=True,
             slow_mo=80,
+            proxy=proxy_cfg,
             args=[
                 "--disable-blink-features=AutomationControlled",
                 "--no-sandbox",
