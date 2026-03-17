@@ -189,9 +189,10 @@ def _extract_csrf(html: str) -> str:
     return ""
 
 
-async def _try_set_location_httpx() -> tuple:
+async def _try_set_location_httpx(proxy_url: str = "") -> tuple:
     """Set Israel delivery location by calling Amazon's internal address-change API.
     No browser UI interaction — much less likely to trigger CAPTCHA.
+    When proxy_url is provided, requests are routed through it (residential IP avoids bot blocks).
     Returns (success: bool, cookies: list) tuple."""
     base_headers = {
         "User-Agent": _BROWSER_UA,
@@ -202,9 +203,10 @@ async def _try_set_location_httpx() -> tuple:
         "Upgrade-Insecure-Requests": "1",
     }
     try:
-        async with httpx.AsyncClient(
-            headers=base_headers, follow_redirects=True, timeout=20.0
-        ) as client:
+        client_kwargs: dict = {"headers": base_headers, "follow_redirects": True, "timeout": 30.0}
+        if proxy_url:
+            client_kwargs["proxy"] = proxy_url
+        async with httpx.AsyncClient(**client_kwargs) as client:
             # Step 1: Fetch a product page (richer HTML than homepage) for session + CSRF
             resp = await client.get("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1")
             if "validateCaptcha" in str(resp.url) or "captchacharacters" in resp.text:
@@ -697,25 +699,12 @@ class BrowserManager:
     async def startup(self):
         logger.info("Starting Playwright browser...")
         self._pw = await async_playwright().start()
-        proxy_cfg = None
-        if NORDVPN_PROXY:
-            from urllib.parse import urlparse
-            _p = urlparse(NORDVPN_PROXY)
-            host, port = _p.hostname, _p.port or 10001
-            if await _proxy_reachable(host, port):
-                proxy_cfg = {
-                    "server": f"{_p.scheme}://{host}:{port}",
-                    "username": _p.username or "",
-                    "password": _p.password or "",
-                }
-                logger.info(f"Playwright: using proxy {host}:{port}")
-            else:
-                logger.warning(f"Playwright: proxy {host}:{port} unreachable — running without proxy")
+        # Playwright runs WITHOUT proxy — httpx handles the proxy for location-setting
         self._context = await self._pw.chromium.launch_persistent_context(
             user_data_dir=BROWSER_PROFILE_DIR,
             headless=True,
             slow_mo=80,
-            proxy=proxy_cfg,
+            proxy=None,
             args=[
                 "--disable-blink-features=AutomationControlled",
                 "--no-sandbox",
@@ -745,12 +734,18 @@ class BrowserManager:
 
         await self._context.route("**/*", _block_resources)
 
-        # Set Israel delivery location once at startup (httpx first, Playwright fallback)
+        # Set Israel delivery location once at startup (httpx+proxy first, Playwright fallback)
         logger.info("Setting delivery location to Israel (startup)...")
-        success, cookies = await _try_set_location_httpx()
+        success, cookies = await _try_set_location_httpx(proxy_url=NORDVPN_PROXY)
         if success:
             self._session_cookies = cookies
-            logger.info("Startup: location set via httpx API ✓")
+            # Inject into Playwright context so browser also has Israel session
+            pw_cookies = [
+                {"name": c["name"], "value": c["value"], "domain": ".amazon.com", "path": "/"}
+                for c in cookies
+            ]
+            await self._context.add_cookies(pw_cookies)
+            logger.info(f"Startup: location set via httpx+proxy ✓ ({len(cookies)} cookies injected)")
         else:
             logger.warning("Startup: httpx location failed — trying Playwright...")
             page = await self._context.new_page()
@@ -809,11 +804,17 @@ class BrowserManager:
           1. Try httpx-based API call (no browser fingerprint — less CAPTCHA risk).
           2. If that fails, fall back to Playwright UI interaction.
         """
-        # ── Attempt 1: httpx API approach ─────────────────────────────────────
-        logger.info("Location refresh: trying httpx API approach...")
-        success, cookies = await _try_set_location_httpx()
+        # ── Attempt 1: httpx API approach (via proxy if configured) ───────────
+        logger.info("Location refresh: trying httpx+proxy approach...")
+        success, cookies = await _try_set_location_httpx(proxy_url=NORDVPN_PROXY)
         if success:
             self._session_cookies = cookies
+            pw_cookies = [
+                {"name": c["name"], "value": c["value"], "domain": ".amazon.com", "path": "/"}
+                for c in cookies
+            ]
+            await self._context.add_cookies(pw_cookies)
+            logger.info(f"Location refresh: Israel via httpx+proxy ✓ ({len(cookies)} cookies injected)")
             return True
         logger.warning("httpx location failed — falling back to Playwright UI")
 
