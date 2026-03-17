@@ -18,11 +18,22 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 
+import httpx
+from bs4 import BeautifulSoup
 from playwright.async_api import (
     async_playwright,
     Page,
     TimeoutError as PWTimeout,
 )
+
+_BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/120.0.0.0 Safari/537.36"
+)
+
+# Resource types to block in Playwright pages (speed optimisation)
+_BLOCK_RESOURCE_TYPES = {"image", "media", "font", "stylesheet"}
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +137,87 @@ AOD_OFFER_SELECTORS = [
 
 async def _pause(min_s: float, max_s: float):
     await asyncio.sleep(random.uniform(min_s, max_s))
+
+
+# ── httpx / HTML-based check (fast, parallel) ─────────────────────────────────
+
+def _parse_html_delivery(html: str, asin: str) -> CheckResult:
+    """Parse Amazon product HTML (from httpx) into a CheckResult."""
+    soup = BeautifulSoup(html, "html.parser")
+
+    # CAPTCHA detection
+    if soup.find("form", attrs={"action": "/errors/validateCaptcha"}):
+        return CheckResult(asin, ShippingStatus.ERROR, error_message="CAPTCHA detected")
+    if soup.find("input", id="captchacharacters"):
+        return CheckResult(asin, ShippingStatus.ERROR, error_message="CAPTCHA detected")
+    title_text = (soup.title.string or "").lower() if soup.title else ""
+    if "robot" in title_text or "captcha" in title_text or "validatecaptcha" in title_text:
+        return CheckResult(asin, ShippingStatus.ERROR, error_message="CAPTCHA detected")
+
+    # Product name
+    product_name = ""
+    title_el = soup.find(id="productTitle")
+    if title_el:
+        product_name = title_el.get_text(strip=True)
+    if not product_name:
+        logger.warning(f"[{asin}] httpx: productTitle not found.")
+        return CheckResult(asin, ShippingStatus.ERROR, error_message="productTitle not found.")
+
+    # Delivery text — same selector priority as Playwright path
+    delivery_ids = [
+        "mir-layout-DELIVERY_BLOCK",
+        "ddmDeliveryMessage",
+        "deliveryMessageMirId",
+        "delivery-message",
+        "price-shipping-message",
+        "exports_feature_div",
+        "shippingMessageInsideBuyBox_feature_div",
+        "buybox",
+        "buyBoxInner",
+    ]
+    raw_text = ""
+    for el_id in delivery_ids:
+        el = soup.find(id=el_id)
+        if el:
+            text = el.get_text(separator=" ", strip=True)
+            if text:
+                raw_text = text
+                break
+
+    if not raw_text:
+        return CheckResult(asin, ShippingStatus.UNKNOWN, error_message="No delivery block found",
+                           product_name=product_name)
+
+    status = _classify(raw_text)
+    logger.info(f"[{asin}] httpx: {status.value} | {raw_text[:120]!r}")
+    return CheckResult(asin, status, raw_text=raw_text, product_name=product_name)
+
+
+async def _check_product_httpx(asin: str, url: str, cookies: list) -> CheckResult:
+    """Lightweight product check using httpx with Amazon session cookies."""
+    cookie_dict = {c["name"]: c["value"] for c in cookies}
+    headers = {
+        "User-Agent": _BROWSER_UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+    }
+    try:
+        async with httpx.AsyncClient(
+            headers=headers,
+            cookies=cookie_dict,
+            follow_redirects=True,
+            timeout=20.0,
+        ) as client:
+            resp = await client.get(f"{url}?psc=1&th=1")
+            if "amazon.com" not in str(resp.url):
+                return CheckResult(asin, ShippingStatus.ERROR,
+                                   error_message=f"Redirected away from amazon.com: {resp.url}")
+            return _parse_html_delivery(resp.text, asin)
+    except Exception as e:
+        return CheckResult(asin, ShippingStatus.ERROR, error_message=f"httpx error: {e}")
 
 
 async def _first(page: Page, selectors: list, timeout: int = 4000):
@@ -424,6 +516,7 @@ class BrowserManager:
         self._pw = None
         self._context = None
         self._lock = asyncio.Lock()
+        self._session_cookies: list = []  # cached after each successful location refresh
 
     async def startup(self):
         logger.info("Starting Playwright browser...")
@@ -451,6 +544,15 @@ class BrowserManager:
         await self._context.add_init_script(
             "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
         )
+
+        # Block images, media, fonts and stylesheets — we only need HTML text
+        async def _block_resources(route, request):
+            if request.resource_type in _BLOCK_RESOURCE_TYPES:
+                await route.abort()
+            else:
+                await route.continue_()
+
+        await self._context.route("**/*", _block_resources)
 
         # Set Israel delivery location once at startup
         logger.info("Setting delivery location to Israel...")
@@ -507,6 +609,7 @@ class BrowserManager:
                 await _dismiss_redirect_modal(page)
                 if await _verify_location(page):
                     logger.info("Location already Israel ✓ — no change needed.")
+                    self._session_cookies = await self._context.cookies()
                     return True
                 success = await _set_location_on_page(page, "IL")
                 if success:
@@ -515,6 +618,7 @@ class BrowserManager:
                     await _pause(1.5, 2.0)
                     if await _verify_location(page):
                         logger.info("Location verified: Israel ✓")
+                        self._session_cookies = await self._context.cookies()
                         return True
                     logger.warning(f"Location verify failed (attempt {attempt + 1}/3) — retrying...")
                     await _pause(2.0, 3.0)
@@ -530,13 +634,62 @@ class BrowserManager:
             await page.close()
 
     async def check(self, asin: str, url: str) -> CheckResult:
-        """Check a single product. Serialized via lock to avoid CAPTCHA triggers."""
+        """Check a single product via Playwright. Serialized via lock to avoid CAPTCHA triggers."""
         async with self._lock:
             page = await self._context.new_page()
             try:
-                return await check_product(page, asin, url)
+                result = await check_product(page, asin, url)
             finally:
                 await page.close()
+
+        # CAPTCHA retry: wait outside the lock, then retry once
+        if result.status == ShippingStatus.ERROR and "CAPTCHA" in result.error_message:
+            logger.warning(f"[{asin}] Playwright CAPTCHA — waiting 45s before retry...")
+            await asyncio.sleep(45)
+            async with self._lock:
+                page = await self._context.new_page()
+                try:
+                    result = await check_product(page, asin, url)
+                finally:
+                    await page.close()
+
+        return result
+
+    async def check_many(self, products: list) -> list:
+        """Check multiple products in parallel.
+
+        Strategy per product:
+          1. Try httpx (fast, lightweight) using cached session cookies.
+          2. If httpx returns an error or CAPTCHA → fall back to Playwright check().
+        Returns results in the same order as `products`.
+        """
+        if not products:
+            return []
+
+        semaphore = asyncio.Semaphore(4)
+
+        async def _check_one(idx: int, asin: str, url: str):
+            async with semaphore:
+                # Small random stagger to avoid request bursts
+                await asyncio.sleep(random.uniform(0.0, 2.0))
+
+                if self._session_cookies:
+                    result = await _check_product_httpx(asin, url, self._session_cookies)
+                    if result.status == ShippingStatus.ERROR:
+                        logger.warning(
+                            f"[{asin}] httpx failed ({result.error_message}) — falling back to Playwright"
+                        )
+                        result = await self.check(asin, url)
+                else:
+                    # No cookies yet (first cycle before location refresh) — use Playwright
+                    result = await self.check(asin, url)
+
+                return idx, result
+
+        tasks = [_check_one(i, asin, url) for i, (asin, url) in enumerate(products)]
+        indexed = await asyncio.gather(*tasks)
+        indexed.sort(key=lambda x: x[0])
+        return [r for _, r in indexed]
 
 
 browser_manager = BrowserManager()

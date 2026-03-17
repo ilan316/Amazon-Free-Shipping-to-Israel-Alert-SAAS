@@ -16,7 +16,6 @@ Daily summary logic:
 import asyncio
 import logging
 import os
-import random
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -87,33 +86,38 @@ async def run_global_check_cycle():
         newly_failed = []
         newly_blocked = []
 
-        for i, product in enumerate(products):
+        # Separate products to skip (too many consecutive errors) from those to check
+        to_check = []
+        for product in products:
             if product.consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
                 logger.warning(f"[{product.asin}] Skipping — {product.consecutive_errors} consecutive errors.")
                 if product.consecutive_errors == MAX_CONSECUTIVE_ERRORS:
-                    # First cycle where it's being skipped — notify admin once
                     from backend.checker import CheckResult
-                    newly_blocked.append((product, CheckResult(product.asin, ShippingStatus.ERROR, error_message=f"Product blocked after {MAX_CONSECUTIVE_ERRORS} consecutive errors — no longer being checked.")))
-                    product.consecutive_errors += 1  # increment past threshold so we don't re-notify next cycle
+                    newly_blocked.append((product, CheckResult(product.asin, ShippingStatus.ERROR,
+                        error_message=f"Product blocked after {MAX_CONSECUTIVE_ERRORS} consecutive errors — no longer being checked.")))
+                    product.consecutive_errors += 1
                     await db.commit()
-                continue
+            else:
+                to_check.append(product)
 
-            try:
-                check_result = await browser_manager.check(product.asin, product.url)
-                is_first_error = await _update_product(db, product, check_result)
-                if is_first_error:
-                    newly_failed.append((product, check_result))
-                logger.info(f"[{i+1}/{len(products)}] [{product.asin}] → {check_result.status.value}")
-            except Exception as e:
-                logger.error(f"[{product.asin}] Unexpected error: {e}")
-                if product.consecutive_errors == 0:
-                    from backend.checker import CheckResult
-                    newly_failed.append((product, CheckResult(product.asin, ShippingStatus.ERROR, error_message=str(e))))
-                product.consecutive_errors += 1
-                await db.commit()
-
-            if i < len(products) - 1:
-                await asyncio.sleep(random.uniform(5.0, 12.0))
+        # Check all eligible products in parallel (httpx-first with Playwright fallback)
+        if to_check:
+            check_results = await browser_manager.check_many(
+                [(p.asin, p.url) for p in to_check]
+            )
+            for i, (product, check_result) in enumerate(zip(to_check, check_results)):
+                try:
+                    is_first_error = await _update_product(db, product, check_result)
+                    if is_first_error:
+                        newly_failed.append((product, check_result))
+                    logger.info(f"[{i+1}/{len(to_check)}] [{product.asin}] → {check_result.status.value}")
+                except Exception as e:
+                    logger.error(f"[{product.asin}] Unexpected error saving result: {e}")
+                    if product.consecutive_errors == 0:
+                        from backend.checker import CheckResult
+                        newly_failed.append((product, CheckResult(product.asin, ShippingStatus.ERROR, error_message=str(e))))
+                    product.consecutive_errors += 1
+                    await db.commit()
 
     if newly_failed:
         await _notify_admin_of_errors(newly_failed)
