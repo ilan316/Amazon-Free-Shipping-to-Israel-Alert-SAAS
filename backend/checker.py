@@ -734,56 +734,44 @@ class BrowserManager:
 
         await self._context.route("**/*", _block_resources)
 
-        # Set Israel delivery location once at startup (httpx+proxy first, Playwright fallback)
+        # Set Israel delivery location via Playwright
         logger.info("Setting delivery location to Israel (startup)...")
-        success, cookies = await _try_set_location_httpx(proxy_url=NORDVPN_PROXY)
-        if success:
-            self._session_cookies = cookies
-            # Inject into Playwright context so browser also has Israel session
-            pw_cookies = [
-                {"name": c["name"], "value": c["value"], "domain": ".amazon.com", "path": "/"}
-                for c in cookies
-            ]
-            await self._context.add_cookies(pw_cookies)
-            logger.info(f"Startup: location set via httpx+proxy ✓ ({len(cookies)} cookies injected)")
-        else:
-            logger.warning("Startup: httpx location failed — trying Playwright...")
-            page = await self._context.new_page()
-            try:
-                await page.goto("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1", wait_until="domcontentloaded", timeout=90000)
-                await _dismiss_redirect_modal(page)
-                await _pause(2.0, 3.5)
-                if await _is_captcha(page):
-                    logger.warning("Startup: CAPTCHA on Playwright — location NOT set, will retry on first cycle.")
+        page = await self._context.new_page()
+        try:
+            await page.goto("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1", wait_until="domcontentloaded", timeout=90000)
+            await _dismiss_redirect_modal(page)
+            await _pause(2.0, 3.5)
+            if await _is_captcha(page):
+                logger.warning("Startup: CAPTCHA on Playwright — location NOT set, will retry on first cycle.")
+            else:
+                if await _verify_location(page):
+                    logger.info("Startup: location already Israel ✓ (Playwright)")
                 else:
-                    if await _verify_location(page):
-                        logger.info("Startup: location already Israel ✓ (Playwright)")
-                    else:
-                        # Try JS-based first (no UI interaction — faster, less detectable)
-                        js_ok = await _set_location_js(page)
-                        if js_ok:
+                    # Try JS-based first (no UI interaction — faster, less detectable)
+                    js_ok = await _set_location_js(page)
+                    if js_ok:
+                        await page.reload(wait_until="domcontentloaded", timeout=15000)
+                        await _pause(1.5, 2.0)
+                        if await _verify_location(page):
+                            logger.info("Startup: location set to Israel via JS ✓")
+                        else:
+                            logger.warning("Startup: JS set responded OK but verify failed — trying UI...")
+                            js_ok = False
+                    if not js_ok:
+                        set_ok = await _set_location_on_page(page, "IL")
+                        if set_ok:
                             await page.reload(wait_until="domcontentloaded", timeout=15000)
                             await _pause(1.5, 2.0)
                             if await _verify_location(page):
-                                logger.info("Startup: location set to Israel via JS ✓")
+                                logger.info("Startup: location set to Israel via UI ✓")
                             else:
-                                logger.warning("Startup: JS set responded OK but verify failed — trying UI...")
-                                js_ok = False
-                        if not js_ok:
-                            set_ok = await _set_location_on_page(page, "IL")
-                            if set_ok:
-                                await page.reload(wait_until="domcontentloaded", timeout=15000)
-                                await _pause(1.5, 2.0)
-                                if await _verify_location(page):
-                                    logger.info("Startup: location set to Israel via UI ✓")
-                                else:
-                                    logger.warning("Startup: location set but verify failed — will retry on first cycle.")
-                            else:
-                                logger.warning("Startup: could not set location — will retry on first cycle.")
-            except Exception as e:
-                logger.warning(f"Startup location setup failed (will retry next cycle): {e}")
-            finally:
-                await page.close()
+                                logger.warning("Startup: location set but verify failed — will retry on first cycle.")
+                        else:
+                            logger.warning("Startup: could not set location — will retry on first cycle.")
+        except Exception as e:
+            logger.warning(f"Startup location setup failed (will retry next cycle): {e}")
+        finally:
+            await page.close()
 
         logger.info("Browser ready.")
 
@@ -799,26 +787,7 @@ class BrowserManager:
     async def refresh_location(self) -> bool:
         """Re-set delivery location to Israel. Called at the start of each check cycle.
         Returns True if location is confirmed as Israel, False otherwise.
-
-        Strategy:
-          1. Try httpx-based API call (no browser fingerprint — less CAPTCHA risk).
-          2. If that fails, fall back to Playwright UI interaction.
         """
-        # ── Attempt 1: httpx API approach (via proxy if configured) ───────────
-        logger.info("Location refresh: trying httpx+proxy approach...")
-        success, cookies = await _try_set_location_httpx(proxy_url=NORDVPN_PROXY)
-        if success:
-            self._session_cookies = cookies
-            pw_cookies = [
-                {"name": c["name"], "value": c["value"], "domain": ".amazon.com", "path": "/"}
-                for c in cookies
-            ]
-            await self._context.add_cookies(pw_cookies)
-            logger.info(f"Location refresh: Israel via httpx+proxy ✓ ({len(cookies)} cookies injected)")
-            return True
-        logger.warning("httpx location failed — falling back to Playwright UI")
-
-        # ── Attempt 2: Playwright UI approach ─────────────────────────────────
         page = await self._context.new_page()
         try:
             for attempt in range(3):
