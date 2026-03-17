@@ -642,9 +642,16 @@ class BrowserManager:
     async def startup(self):
         logger.info("Starting Playwright browser...")
         self._pw = await async_playwright().start()
-        proxy_cfg = {"server": NORDVPN_PROXY} if NORDVPN_PROXY else None
-        if proxy_cfg:
-            logger.info(f"Playwright: using proxy {NORDVPN_PROXY.split('@')[-1]}")  # log server only, hide credentials
+        proxy_cfg = None
+        if NORDVPN_PROXY:
+            from urllib.parse import urlparse
+            _p = urlparse(NORDVPN_PROXY)
+            proxy_cfg = {
+                "server": f"{_p.scheme}://{_p.hostname}:{_p.port}",
+                "username": _p.username or "",
+                "password": _p.password or "",
+            }
+            logger.info(f"Playwright: using proxy {_p.hostname}:{_p.port}")  # hide credentials
         self._context = await self._pw.chromium.launch_persistent_context(
             user_data_dir=BROWSER_PROFILE_DIR,
             headless=True,
