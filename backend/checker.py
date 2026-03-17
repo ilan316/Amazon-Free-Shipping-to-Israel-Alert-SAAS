@@ -144,6 +144,22 @@ async def _pause(min_s: float, max_s: float):
     await asyncio.sleep(random.uniform(min_s, max_s))
 
 
+async def _proxy_reachable(host: str, port: int, timeout: float = 5.0) -> bool:
+    """Quick TCP connectivity check — returns False if port is blocked/unreachable."""
+    try:
+        _, writer = await asyncio.wait_for(
+            asyncio.open_connection(host, port), timeout=timeout
+        )
+        writer.close()
+        try:
+            await writer.wait_closed()
+        except Exception:
+            pass
+        return True
+    except Exception:
+        return False
+
+
 # ── httpx location-setting via Amazon address-change API ──────────────────────
 
 def _extract_csrf(html: str) -> str:
@@ -364,6 +380,45 @@ async def _is_captcha(page: Page) -> bool:
 
 
 # ── Location setup ────────────────────────────────────────────────────────────
+
+async def _set_location_js(page: Page) -> bool:
+    """Set delivery location to Israel via in-page JS fetch.
+    Faster than UI — no modal interaction, uses real CSRF token from page JS context.
+    """
+    try:
+        result = await page.evaluate("""async () => {
+            const csrf =
+                (typeof ue !== 'undefined' && ue?.idb?.csrfToken) ||
+                document.querySelector('[data-anti-csrftoken-a2z]')?.getAttribute('data-anti-csrftoken-a2z') ||
+                document.querySelector('input[name="anti-csrftoken-a2z"]')?.value || '';
+            if (!csrf) return {ok: false, reason: 'no_csrf'};
+            try {
+                const r = await fetch('/portal-migration/hz/glow/address-change', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'anti-csrftoken-a2z': csrf,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: new URLSearchParams({
+                        locationType: 'LOCATION_INPUT', zipCode: '', countryCode: 'IL',
+                        storeContext: 'generic', deviceType: 'web',
+                        pageType: 'Detail', actionSource: 'glow'
+                    }).toString()
+                });
+                return {ok: r.ok, status: r.status, csrf_len: csrf.length};
+            } catch(e) {
+                return {ok: false, reason: 'fetch_failed', error: String(e)};
+            }
+        }""")
+        ok = result.get("ok", False)
+        logger.info(f"JS location: status={result.get('status')}, csrf_len={result.get('csrf_len', 0)}, ok={ok}")
+        return ok
+    except Exception as e:
+        logger.warning(f"JS location set failed: {e}")
+        return False
+
 
 async def _dismiss_redirect_modal(page: Page):
     """Dismiss the Amazon geo-redirect modal (e.g. 'Go to Amazon.sg?') if present.
@@ -646,12 +701,16 @@ class BrowserManager:
         if NORDVPN_PROXY:
             from urllib.parse import urlparse
             _p = urlparse(NORDVPN_PROXY)
-            proxy_cfg = {
-                "server": f"{_p.scheme}://{_p.hostname}:{_p.port}",
-                "username": _p.username or "",
-                "password": _p.password or "",
-            }
-            logger.info(f"Playwright: using proxy {_p.hostname}:{_p.port}")  # hide credentials
+            host, port = _p.hostname, _p.port or 10001
+            if await _proxy_reachable(host, port):
+                proxy_cfg = {
+                    "server": f"{_p.scheme}://{host}:{port}",
+                    "username": _p.username or "",
+                    "password": _p.password or "",
+                }
+                logger.info(f"Playwright: using proxy {host}:{port}")
+            else:
+                logger.warning(f"Playwright: proxy {host}:{port} unreachable — running without proxy")
         self._context = await self._pw.chromium.launch_persistent_context(
             user_data_dir=BROWSER_PROFILE_DIR,
             headless=True,
@@ -705,16 +764,27 @@ class BrowserManager:
                     if await _verify_location(page):
                         logger.info("Startup: location already Israel ✓ (Playwright)")
                     else:
-                        set_ok = await _set_location_on_page(page, "IL")
-                        if set_ok:
+                        # Try JS-based first (no UI interaction — faster, less detectable)
+                        js_ok = await _set_location_js(page)
+                        if js_ok:
                             await page.reload(wait_until="domcontentloaded", timeout=15000)
                             await _pause(1.5, 2.0)
                             if await _verify_location(page):
-                                logger.info("Startup: location set to Israel ✓ (Playwright)")
+                                logger.info("Startup: location set to Israel via JS ✓")
                             else:
-                                logger.warning("Startup: location set but verify failed — will retry on first cycle.")
-                        else:
-                            logger.warning("Startup: could not set location — will retry on first cycle.")
+                                logger.warning("Startup: JS set responded OK but verify failed — trying UI...")
+                                js_ok = False
+                        if not js_ok:
+                            set_ok = await _set_location_on_page(page, "IL")
+                            if set_ok:
+                                await page.reload(wait_until="domcontentloaded", timeout=15000)
+                                await _pause(1.5, 2.0)
+                                if await _verify_location(page):
+                                    logger.info("Startup: location set to Israel via UI ✓")
+                                else:
+                                    logger.warning("Startup: location set but verify failed — will retry on first cycle.")
+                            else:
+                                logger.warning("Startup: could not set location — will retry on first cycle.")
             except Exception as e:
                 logger.warning(f"Startup location setup failed (will retry next cycle): {e}")
             finally:
@@ -762,20 +832,28 @@ class BrowserManager:
                     logger.info("Location already Israel ✓ — no change needed.")
                     self._session_cookies = await self._context.cookies()
                     return True
-                success = await _set_location_on_page(page, "IL")
-                if success:
-                    # Reload to confirm the location was saved
+                # Try JS-based first (faster, less detectable)
+                set_ok = await _set_location_js(page)
+                if set_ok:
                     await page.reload(wait_until="domcontentloaded", timeout=15000)
                     await _pause(1.5, 2.0)
                     if await _verify_location(page):
-                        logger.info("Location verified: Israel ✓")
+                        logger.info("Location verified: Israel via JS ✓")
                         self._session_cookies = await self._context.cookies()
                         return True
-                    logger.warning(f"Location verify failed (attempt {attempt + 1}/3) — retrying...")
-                    await _pause(2.0, 3.0)
-                else:
-                    logger.warning(f"Location set failed (attempt {attempt + 1}/3) — retrying...")
-                    await _pause(2.0, 3.0)
+                    logger.warning(f"JS set OK but verify failed (attempt {attempt + 1}/3) — trying UI...")
+                    set_ok = False
+                if not set_ok:
+                    set_ok = await _set_location_on_page(page, "IL")
+                if set_ok:
+                    await page.reload(wait_until="domcontentloaded", timeout=15000)
+                    await _pause(1.5, 2.0)
+                    if await _verify_location(page):
+                        logger.info("Location verified: Israel via UI ✓")
+                        self._session_cookies = await self._context.cookies()
+                        return True
+                logger.warning(f"Location set failed (attempt {attempt + 1}/3) — retrying...")
+                await _pause(2.0, 3.0)
             logger.error("Failed to set Israel location after 3 attempts — skipping check cycle.")
             return False
         except Exception as e:
