@@ -112,12 +112,18 @@ async def run_global_check_cycle():
                         newly_failed.append((product, check_result))
                     logger.info(f"[{i+1}/{len(to_check)}] [{product.asin}] → {check_result.status.value}")
                 except Exception as e:
+                    await db.rollback()
+                    # Product may have been deleted mid-cycle (e.g. admin bulk-delete) — skip silently
+                    from sqlalchemy.orm.exc import StaleDataError
+                    if isinstance(e, StaleDataError):
+                        logger.warning(f"[{product.asin}] Product deleted mid-cycle, skipping.")
+                        continue
                     logger.error(f"[{product.asin}] Unexpected error saving result: {e}")
-                    if product.consecutive_errors == 0:
-                        from backend.checker import CheckResult
-                        newly_failed.append((product, CheckResult(product.asin, ShippingStatus.ERROR, error_message=str(e))))
-                    product.consecutive_errors += 1
-                    await db.commit()
+                    try:
+                        product.consecutive_errors += 1
+                        await db.commit()
+                    except Exception:
+                        await db.rollback()
 
     if newly_failed:
         await _notify_admin_of_errors(newly_failed)
