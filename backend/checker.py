@@ -734,44 +734,14 @@ class BrowserManager:
 
         await self._context.route("**/*", _block_resources)
 
-        # Set Israel delivery location via Playwright
-        logger.info("Setting delivery location to Israel (startup)...")
-        page = await self._context.new_page()
-        try:
-            await page.goto("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1", wait_until="domcontentloaded", timeout=90000)
-            await _dismiss_redirect_modal(page)
-            await _pause(2.0, 3.5)
-            if await _is_captcha(page):
-                logger.warning("Startup: CAPTCHA on Playwright — location NOT set, will retry on first cycle.")
-            else:
-                if await _verify_location(page):
-                    logger.info("Startup: location already Israel ✓ (Playwright)")
-                else:
-                    # Try JS-based first (no UI interaction — faster, less detectable)
-                    js_ok = await _set_location_js(page)
-                    if js_ok:
-                        await page.reload(wait_until="domcontentloaded", timeout=15000)
-                        await _pause(1.5, 2.0)
-                        if await _verify_location(page):
-                            logger.info("Startup: location set to Israel via JS ✓")
-                        else:
-                            logger.warning("Startup: JS set responded OK but verify failed — trying UI...")
-                            js_ok = False
-                    if not js_ok:
-                        set_ok = await _set_location_on_page(page, "IL")
-                        if set_ok:
-                            await page.reload(wait_until="domcontentloaded", timeout=15000)
-                            await _pause(1.5, 2.0)
-                            if await _verify_location(page):
-                                logger.info("Startup: location set to Israel via UI ✓")
-                            else:
-                                logger.warning("Startup: location set but verify failed — will retry on first cycle.")
-                        else:
-                            logger.warning("Startup: could not set location — will retry on first cycle.")
-        except Exception as e:
-            logger.warning(f"Startup location setup failed (will retry next cycle): {e}")
-        finally:
-            await page.close()
+        # Set Israel delivery location via httpx (primary — less detectable than Playwright)
+        logger.info("Setting delivery location to Israel (startup via httpx)...")
+        httpx_ok, cookies = await _try_set_location_httpx()
+        if httpx_ok and cookies:
+            self._session_cookies = cookies
+            logger.info("Startup: location set to Israel via httpx ✓")
+        else:
+            logger.warning("Startup: httpx location failed — will retry on first cycle.")
 
         logger.info("Browser ready.")
 
@@ -786,51 +756,19 @@ class BrowserManager:
 
     async def refresh_location(self) -> bool:
         """Re-set delivery location to Israel. Called at the start of each check cycle.
+        Uses httpx (primary) — less detectable than Playwright.
         Returns True if location is confirmed as Israel, False otherwise.
         """
-        page = await self._context.new_page()
-        try:
-            for attempt in range(3):
-                # Use a product page instead of homepage — less likely to trigger CAPTCHA
-                await page.goto("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1", wait_until="domcontentloaded", timeout=90000)
-                await _pause(2.0, 3.5)
-                if await _is_captcha(page):
-                    logger.warning("CAPTCHA during location refresh — skipping.")
-                    return False
-                await _dismiss_redirect_modal(page)
-                if await _verify_location(page):
-                    logger.info("Location already Israel ✓ — no change needed.")
-                    self._session_cookies = await self._context.cookies()
-                    return True
-                # Try JS-based first (faster, less detectable)
-                set_ok = await _set_location_js(page)
-                if set_ok:
-                    await page.reload(wait_until="domcontentloaded", timeout=15000)
-                    await _pause(1.5, 2.0)
-                    if await _verify_location(page):
-                        logger.info("Location verified: Israel via JS ✓")
-                        self._session_cookies = await self._context.cookies()
-                        return True
-                    logger.warning(f"JS set OK but verify failed (attempt {attempt + 1}/3) — trying UI...")
-                    set_ok = False
-                if not set_ok:
-                    set_ok = await _set_location_on_page(page, "IL")
-                if set_ok:
-                    await page.reload(wait_until="domcontentloaded", timeout=15000)
-                    await _pause(1.5, 2.0)
-                    if await _verify_location(page):
-                        logger.info("Location verified: Israel via UI ✓")
-                        self._session_cookies = await self._context.cookies()
-                        return True
-                logger.warning(f"Location set failed (attempt {attempt + 1}/3) — retrying...")
-                await _pause(2.0, 3.0)
-            logger.error("Failed to set Israel location after 3 attempts — skipping check cycle.")
-            return False
-        except Exception as e:
-            logger.warning(f"Location refresh error (ignored): {e}")
-            return False
-        finally:
-            await page.close()
+        for attempt in range(3):
+            httpx_ok, cookies = await _try_set_location_httpx()
+            if httpx_ok and cookies:
+                self._session_cookies = cookies
+                logger.info(f"Location set to Israel via httpx ✓ (attempt {attempt + 1})")
+                return True
+            logger.warning(f"httpx location failed (attempt {attempt + 1}/3) — retrying in 5s...")
+            await asyncio.sleep(5)
+        logger.error("Failed to set Israel location after 3 httpx attempts.")
+        return False
 
     async def check(self, asin: str, url: str) -> CheckResult:
         """Check a single product via Playwright. Serialized via lock to avoid CAPTCHA triggers."""
