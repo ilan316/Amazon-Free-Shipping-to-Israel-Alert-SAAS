@@ -62,14 +62,31 @@ async def _update_product(db: AsyncSession, product: Product, result: CheckResul
         return prev_errors == 0  # True only on first failure
 
 
+async def _retry_check_cycle_after(minutes: int):
+    """Wait and retry the check cycle once."""
+    await asyncio.sleep(minutes * 60)
+    logger.info(f"=== Retrying check cycle after {minutes}-minute delay ===")
+    await run_global_check_cycle()
+
+
 async def run_global_check_cycle():
     """Check all tracked products and update DB. No emails sent here."""
     logger.info("=== Check cycle started ===")
     location_ok = await browser_manager.refresh_location()
     if not location_ok:
-        logger.warning("Location not set to Israel (CAPTCHA?) — skipping check cycle to avoid UNKNOWN results.")
-        logger.info("=== Check cycle skipped ===")
-        return
+        # Playwright failed — try httpx as fallback
+        logger.warning("Playwright location failed — trying httpx fallback...")
+        from backend.checker import _try_set_location_httpx
+        httpx_ok, cookies = await _try_set_location_httpx()
+        if httpx_ok and cookies:
+            browser_manager._session_cookies = cookies
+            location_ok = True
+            logger.info("httpx location fallback succeeded ✓")
+        else:
+            logger.warning("httpx fallback also failed — retrying in 10 minutes.")
+            logger.info("=== Check cycle skipped ===")
+            asyncio.create_task(_retry_check_cycle_after(minutes=10))
+            return
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(Product).where(
