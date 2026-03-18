@@ -309,6 +309,28 @@ async function cleanOrphans() {
   }
 }
 
+async function injectCookiesAndRun() {
+  const raw = document.getElementById("cookies-input").value.trim();
+  const msgEl = document.getElementById("inject-msg");
+  if (!raw) { msgEl.textContent = "❌ הדבק cookies תחילה"; msgEl.style.color = "var(--error)"; return; }
+  let cookies;
+  try { cookies = JSON.parse(raw); } catch(e) { msgEl.textContent = "❌ JSON לא תקין"; msgEl.style.color = "var(--error)"; return; }
+  msgEl.textContent = "שולח..."; msgEl.style.color = "var(--text-muted)";
+  const res = await apiFetch("/admin/inject-cookies", {
+    method: "POST",
+    body: JSON.stringify({ cookies }),
+  });
+  if (res && res.ok) {
+    const data = await res.json();
+    msgEl.textContent = "✅ " + data.message;
+    msgEl.style.color = "var(--success)";
+  } else {
+    const err = res ? await res.json().catch(() => ({})) : {};
+    msgEl.textContent = "❌ " + (err.detail || "שגיאה");
+    msgEl.style.color = "var(--error)";
+  }
+}
+
 async function triggerCheck() {
   const btn = document.getElementById("run-check-btn");
   const msg = document.getElementById("check-msg");
