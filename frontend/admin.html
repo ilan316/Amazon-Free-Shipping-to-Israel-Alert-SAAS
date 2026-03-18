@@ -162,20 +162,6 @@
         <span id="interval-msg" style="font-size:0.85rem; color:var(--success);"></span>
       </div>
 
-      <!-- Cookie injection -->
-      <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:28px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
-          <span style="font-weight:600; font-size:0.9rem;">🍪 הזרקת Amazon Cookies</span>
-          <span id="cookie-status-badge" style="font-size:0.82rem; padding:3px 10px; border-radius:12px; font-weight:600;">טוען...</span>
-        </div>
-        <textarea id="cookies-input" rows="4" placeholder='הדבק כאן JSON של cookies מהדפדפן (מערך [...] או אובייקט {...})'
-          style="width:100%; box-sizing:border-box; padding:8px; border:1px solid var(--border); border-radius:6px; background:var(--bg); color:var(--text); font-size:0.8rem; font-family:monospace; resize:vertical;"></textarea>
-        <div style="display:flex; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap;">
-          <button class="btn-run-check" onclick="injectCookiesAndRun()" style="padding:8px 18px;">▶ הזרק והרץ בדיקה</button>
-          <button class="btn-outline" onclick="clearCookies()" style="padding:7px 14px; color:var(--error); border-color:var(--error);">🗑 נקה cookies</button>
-          <span id="inject-msg" style="font-size:0.85rem;"></span>
-        </div>
-      </div>
 
       <!-- Registrations chart -->
       <div class="section">
