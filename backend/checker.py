@@ -386,6 +386,51 @@ async def _check_product_httpx(asin: str, url: str, cookies: list) -> CheckResul
         return CheckResult(asin, ShippingStatus.ERROR, error_message=f"httpx error: {e}")
 
 
+async def _check_aod_httpx(asin: str, cookies: list) -> CheckResult:
+    """Fetch the AOD (All Offers Display) AJAX panel via curl_cffi and parse delivery text.
+    Used as a fallback for UNKNOWN products that require 'See All Buying Options'.
+    """
+    cookie_dict = {c["name"]: c["value"] for c in cookies}
+    headers = {
+        "User-Agent": _BROWSER_UA,
+        "Accept": "text/html,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Referer": f"https://www.amazon.com/dp/{asin}?psc=1&th=1",
+        "X-Requested-With": "XMLHttpRequest",
+    }
+    proxies = {"https": NORDVPN_PROXY, "http": NORDVPN_PROXY} if NORDVPN_PROXY else {}
+    try:
+        async with CurlSession(impersonate="chrome120") as session:
+            resp = await session.get(
+                f"https://www.amazon.com/gp/aod/ajax?asin={asin}&pc=dp",
+                headers=headers,
+                cookies=cookie_dict,
+                proxies=proxies,
+                allow_redirects=True,
+                timeout=20,
+            )
+            if resp.status_code != 200:
+                return CheckResult(asin, ShippingStatus.ERROR,
+                                   error_message=f"AOD status {resp.status_code}")
+            if "validateCaptcha" in str(resp.url) or "captchacharacters" in resp.text:
+                return CheckResult(asin, ShippingStatus.ERROR, error_message="AOD: CAPTCHA detected")
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+            # Try offer-list container first, fall back to full page text
+            offer_el = soup.find(id="aod-offer-list") or soup.find(id="aod-container") or soup.find(id="aod-offer")
+            raw_text = offer_el.get_text(separator=" ", strip=True) if offer_el else soup.get_text(separator=" ", strip=True)
+            if not raw_text:
+                return CheckResult(asin, ShippingStatus.UNKNOWN, error_message="AOD: no text found")
+
+            status = _classify(raw_text)
+            logger.info(f"[{asin}] AOD httpx: {status.value} | {raw_text[:120]!r}")
+            return CheckResult(asin, status, raw_text=raw_text[:500],
+                               found_in_aod=(status == ShippingStatus.FREE))
+    except Exception as e:
+        return CheckResult(asin, ShippingStatus.ERROR, error_message=f"AOD error: {e}")
+
+
 async def _first(page: Page, selectors: list, timeout: int = 4000):
     for sel in selectors:
         try:
@@ -764,16 +809,35 @@ class BrowserManager:
 
         await self._context.route("**/*", _block_resources)
 
-        # Set Israel delivery location via httpx only at startup (non-blocking)
-        # Playwright is NOT used here — it can hang for minutes through proxies.
-        # If httpx fails, the first check cycle will retry via refresh_location().
-        logger.info("Setting delivery location to Israel (startup via curl_cffi)...")
-        cffi_ok, cookies = await _try_set_location_httpx(proxy_url=NORDVPN_PROXY)
-        if cffi_ok and cookies:
-            self._session_cookies = cookies
-            logger.info("Startup: location set to Israel via curl_cffi ✓")
+        # Load persisted cookies from DB (saved by inject-cookies endpoint)
+        try:
+            import json
+            from backend.database import AsyncSessionLocal
+            from backend.models import SystemSetting
+            from sqlalchemy import select as sa_select
+            async with AsyncSessionLocal() as _db:
+                row = (await _db.execute(
+                    sa_select(SystemSetting).where(SystemSetting.key == "amazon_session_cookies")
+                )).scalar_one_or_none()
+                if row and row.value:
+                    self._session_cookies = json.loads(row.value)
+                    logger.info(f"Startup: loaded {len(self._session_cookies)} cookies from DB ✓")
+        except Exception as e:
+            logger.warning(f"Startup: failed to load cookies from DB: {e}")
+
+        if self._session_cookies:
+            logger.info("Startup: using cookies from DB — skipping curl_cffi location setup.")
         else:
-            logger.warning("Startup: curl_cffi location failed — will retry on first cycle.")
+            # Set Israel delivery location via httpx only at startup (non-blocking)
+            # Playwright is NOT used here — it can hang for minutes through proxies.
+            # If httpx fails, the first check cycle will retry via refresh_location().
+            logger.info("Setting delivery location to Israel (startup via curl_cffi)...")
+            cffi_ok, cookies = await _try_set_location_httpx(proxy_url=NORDVPN_PROXY)
+            if cffi_ok and cookies:
+                self._session_cookies = cookies
+                logger.info("Startup: location set to Israel via curl_cffi ✓")
+            else:
+                logger.warning("Startup: curl_cffi location failed — will retry on first cycle.")
 
         logger.info("Browser ready.")
 
@@ -916,6 +980,14 @@ class BrowserManager:
                             f"[{asin}] httpx failed ({result.error_message}) — falling back to Playwright"
                         )
                         result = await self.check(asin, url)
+                    elif result.status == ShippingStatus.UNKNOWN:
+                        # Main page shows no delivery info — try AOD panel
+                        logger.info(f"[{asin}] UNKNOWN — trying AOD panel via curl_cffi")
+                        aod_result = await _check_aod_httpx(asin, self._session_cookies)
+                        if aod_result.status != ShippingStatus.ERROR:
+                            result = aod_result
+                        else:
+                            logger.warning(f"[{asin}] AOD also failed: {aod_result.error_message}")
                 else:
                     # No cookies yet (first cycle before location refresh) — use Playwright
                     result = await self.check(asin, url)

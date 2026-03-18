@@ -274,11 +274,13 @@ async def trigger_check(
 async def inject_cookies(
     body: dict,
     admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Inject Amazon session cookies into the running checker and trigger a check cycle.
     Accepts: {"cookies": [{"name": "...", "value": "..."}]} (JSON array from browser export)
     """
     import asyncio
+    import json
     from backend.checker import browser_manager
     from backend.scheduler import run_global_check_cycle
 
@@ -294,9 +296,17 @@ async def inject_cookies(
     else:
         raise HTTPException(status_code=400, detail="Invalid cookies format")
 
+    # Persist cookies to DB so they survive restarts
+    row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "amazon_session_cookies"))).scalar_one_or_none()
+    if row:
+        row.value = json.dumps(cookie_list)
+    else:
+        db.add(SystemSetting(key="amazon_session_cookies", value=json.dumps(cookie_list)))
+    await db.commit()
+
     browser_manager._session_cookies = cookie_list
     asyncio.create_task(run_global_check_cycle())
-    return {"injected": len(cookie_list), "message": f"הוזרקו {len(cookie_list)} cookies — בדיקה מתחילה"}
+    return {"injected": len(cookie_list), "message": f"הוזרקו {len(cookie_list)} cookies — נשמרו ב-DB — בדיקה מתחילה"}
 
 
 @router.post("/products/{product_id}/reset-errors")
