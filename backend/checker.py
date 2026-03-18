@@ -891,9 +891,9 @@ class BrowserManager:
 
                 if self._session_cookies:
                     result = await _check_product_httpx(asin, url, self._session_cookies)
-                    if result.status in (ShippingStatus.ERROR, ShippingStatus.UNKNOWN):
+                    if result.status == ShippingStatus.ERROR:
                         logger.warning(
-                            f"[{asin}] httpx {result.status.value} — falling back to Playwright (AOD check)"
+                            f"[{asin}] httpx failed ({result.error_message}) — falling back to Playwright"
                         )
                         result = await self.check(asin, url)
                 else:
