@@ -254,8 +254,16 @@ async def set_check_interval(
     else:
         db.add(SystemSetting(key="check_interval_minutes", value=str(minutes)))
     await db.commit()
-    from backend.main import reschedule_check_job
-    reschedule_check_job(minutes)
+    from backend.main import scheduler
+    from backend.scheduler import run_global_check_cycle
+    scheduler.add_job(
+        run_global_check_cycle,
+        trigger="interval",
+        minutes=minutes,
+        id="global_check",
+        misfire_grace_time=300,
+        replace_existing=True,
+    )
     return {"minutes": minutes, "message": f"מחזור עודכן ל-{minutes} דקות"}
 
 

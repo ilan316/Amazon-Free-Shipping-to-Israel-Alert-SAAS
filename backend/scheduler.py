@@ -72,17 +72,7 @@ async def _retry_check_cycle_after(minutes: int):
 async def run_global_check_cycle():
     """Check all tracked products and update DB. No emails sent here."""
     logger.info("=== Check cycle started ===")
-
-    # Skip location refresh if session cookies are already available
-    if browser_manager._session_cookies:
-        logger.info("Session cookies present — skipping location refresh.")
-    else:
-        location_ok = await browser_manager.refresh_location()
-        if not location_ok:
-            logger.warning("Location not set to Israel — retrying in 10 minutes.")
-            logger.info("=== Check cycle skipped ===")
-            asyncio.create_task(_retry_check_cycle_after(minutes=10))
-            return
+    # Israeli residential proxy provides location automatically — no cookie setup needed
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(Product).where(

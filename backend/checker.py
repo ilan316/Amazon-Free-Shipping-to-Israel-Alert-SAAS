@@ -929,15 +929,12 @@ class BrowserManager:
                 # Small random stagger to avoid request bursts
                 await asyncio.sleep(random.uniform(0.0, 2.0))
 
-                if self._session_cookies:
-                    result = await _check_product_httpx(asin, url, self._session_cookies)
-                    if result.status == ShippingStatus.ERROR:
-                        logger.warning(
-                            f"[{asin}] httpx failed ({result.error_message}) — falling back to Playwright"
-                        )
-                        result = await self.check(asin, url)
-                else:
-                    # No cookies yet (first cycle before location refresh) — use Playwright
+                # Israeli residential proxy handles location — curl_cffi always, cookies optional
+                result = await _check_product_httpx(asin, url, self._session_cookies)
+                if result.status == ShippingStatus.ERROR:
+                    logger.warning(
+                        f"[{asin}] httpx failed ({result.error_message}) — falling back to Playwright"
+                    )
                     result = await self.check(asin, url)
 
                 return idx, result
