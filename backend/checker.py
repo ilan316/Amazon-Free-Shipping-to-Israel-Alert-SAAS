@@ -734,14 +734,44 @@ class BrowserManager:
 
         await self._context.route("**/*", _block_resources)
 
-        # Set Israel delivery location via httpx (primary — less detectable than Playwright)
-        logger.info("Setting delivery location to Israel (startup via httpx)...")
+        # Set Israel delivery location — httpx first, Playwright fallback
+        logger.info("Setting delivery location to Israel (startup)...")
         httpx_ok, cookies = await _try_set_location_httpx()
         if httpx_ok and cookies:
             self._session_cookies = cookies
             logger.info("Startup: location set to Israel via httpx ✓")
         else:
-            logger.warning("Startup: httpx location failed — will retry on first cycle.")
+            logger.info("Startup: httpx failed — trying Playwright...")
+            page = await self._context.new_page()
+            try:
+                await page.goto("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1",
+                                wait_until="domcontentloaded", timeout=90000)
+                await _dismiss_redirect_modal(page)
+                await _pause(2.0, 3.5)
+                if await _is_captcha(page):
+                    logger.warning("Startup: CAPTCHA on Playwright — will retry on first cycle.")
+                elif await _verify_location(page):
+                    self._session_cookies = await self._context.cookies()
+                    logger.info("Startup: location already Israel ✓ (Playwright profile)")
+                else:
+                    js_ok = await _set_location_js(page)
+                    if js_ok:
+                        await page.reload(wait_until="domcontentloaded", timeout=15000)
+                        await _pause(1.5, 2.0)
+                    if not js_ok or not await _verify_location(page):
+                        set_ok = await _set_location_on_page(page, "IL")
+                        if set_ok:
+                            await page.reload(wait_until="domcontentloaded", timeout=15000)
+                            await _pause(1.5, 2.0)
+                    if await _verify_location(page):
+                        self._session_cookies = await self._context.cookies()
+                        logger.info("Startup: location set to Israel via Playwright ✓")
+                    else:
+                        logger.warning("Startup: Playwright also failed — will retry on first cycle.")
+            except Exception as e:
+                logger.warning(f"Startup Playwright location failed: {e}")
+            finally:
+                await page.close()
 
         logger.info("Browser ready.")
 
@@ -756,19 +786,58 @@ class BrowserManager:
 
     async def refresh_location(self) -> bool:
         """Re-set delivery location to Israel. Called at the start of each check cycle.
-        Uses httpx (primary) — less detectable than Playwright.
+        Tries httpx first (less detectable), falls back to Playwright.
         Returns True if location is confirmed as Israel, False otherwise.
         """
-        for attempt in range(3):
-            httpx_ok, cookies = await _try_set_location_httpx()
-            if httpx_ok and cookies:
-                self._session_cookies = cookies
-                logger.info(f"Location set to Israel via httpx ✓ (attempt {attempt + 1})")
-                return True
-            logger.warning(f"httpx location failed (attempt {attempt + 1}/3) — retrying in 5s...")
-            await asyncio.sleep(5)
-        logger.error("Failed to set Israel location after 3 httpx attempts.")
-        return False
+        # 1. Try httpx
+        httpx_ok, cookies = await _try_set_location_httpx()
+        if httpx_ok and cookies:
+            self._session_cookies = cookies
+            logger.info("Location set to Israel via httpx ✓")
+            return True
+
+        logger.warning("httpx location failed — falling back to Playwright...")
+
+        # 2. Playwright fallback
+        page = await self._context.new_page()
+        try:
+            for attempt in range(3):
+                await page.goto("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1",
+                                wait_until="domcontentloaded", timeout=90000)
+                await _pause(2.0, 3.5)
+                if await _is_captcha(page):
+                    logger.warning("CAPTCHA during location refresh — skipping.")
+                    return False
+                await _dismiss_redirect_modal(page)
+                if await _verify_location(page):
+                    self._session_cookies = await self._context.cookies()
+                    logger.info("Location already Israel ✓ (Playwright)")
+                    return True
+                set_ok = await _set_location_js(page)
+                if set_ok:
+                    await page.reload(wait_until="domcontentloaded", timeout=15000)
+                    await _pause(1.5, 2.0)
+                    if await _verify_location(page):
+                        self._session_cookies = await self._context.cookies()
+                        logger.info("Location set to Israel via Playwright JS ✓")
+                        return True
+                set_ok = await _set_location_on_page(page, "IL")
+                if set_ok:
+                    await page.reload(wait_until="domcontentloaded", timeout=15000)
+                    await _pause(1.5, 2.0)
+                    if await _verify_location(page):
+                        self._session_cookies = await self._context.cookies()
+                        logger.info("Location set to Israel via Playwright UI ✓")
+                        return True
+                logger.warning(f"Location set failed (attempt {attempt + 1}/3)")
+                await _pause(2.0, 3.0)
+            logger.error("Failed to set Israel location after all attempts.")
+            return False
+        except Exception as e:
+            logger.warning(f"Location refresh error: {e}")
+            return False
+        finally:
+            await page.close()
 
     async def check(self, asin: str, url: str) -> CheckResult:
         """Check a single product via Playwright. Serialized via lock to avoid CAPTCHA triggers."""
