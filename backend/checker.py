@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 import httpx
+from curl_cffi.requests import AsyncSession as CurlSession
 from bs4 import BeautifulSoup
 from playwright.async_api import (
     async_playwright,
@@ -210,8 +211,7 @@ def _extract_csrf(html: str) -> str:
 
 async def _try_set_location_httpx(proxy_url: str = "") -> tuple:
     """Set Israel delivery location by calling Amazon's internal address-change API.
-    No browser UI interaction — much less likely to trigger CAPTCHA.
-    When proxy_url is provided, requests are routed through it (residential IP avoids bot blocks).
+    Uses curl_cffi to impersonate Chrome's TLS fingerprint — bypasses Amazon bot detection.
     Returns (success: bool, cookies: list) tuple."""
     base_headers = {
         "User-Agent": _BROWSER_UA,
@@ -221,19 +221,20 @@ async def _try_set_location_httpx(proxy_url: str = "") -> tuple:
         "Connection": "keep-alive",
         "Upgrade-Insecure-Requests": "1",
     }
+    proxies = {"https": proxy_url, "http": proxy_url} if proxy_url else {}
     try:
-        client_kwargs: dict = {"headers": base_headers, "follow_redirects": True, "timeout": 30.0}
-        if proxy_url:
-            client_kwargs["proxy"] = proxy_url
-        async with httpx.AsyncClient(**client_kwargs) as client:
-            # Step 1: Fetch a product page (richer HTML than homepage) for session + CSRF
-            resp = await client.get("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1")
+        async with CurlSession(impersonate="chrome120") as session:
+            # Step 1: Fetch a product page for session cookies + CSRF token
+            resp = await session.get(
+                "https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1",
+                headers=base_headers, proxies=proxies, allow_redirects=True, timeout=30,
+            )
             if "validateCaptcha" in str(resp.url) or "captchacharacters" in resp.text:
-                logger.warning("httpx location: CAPTCHA on initial page fetch")
+                logger.warning("curl_cffi location: CAPTCHA on initial page fetch")
                 return False, []
 
             csrf_token = _extract_csrf(resp.text)
-            logger.info(f"httpx location: initial fetch status={resp.status_code}, csrf={'found' if csrf_token else 'NOT found'}")
+            logger.info(f"curl_cffi location: initial fetch status={resp.status_code}, csrf={'found' if csrf_token else 'NOT found'}")
 
             # Step 2: POST to address-change — try countryCode=IL, then zip
             api_headers = {
@@ -254,12 +255,13 @@ async def _try_set_location_httpx(proxy_url: str = "") -> tuple:
 
             api_resp = None
             for i, payload in enumerate(payloads):
-                r = await client.post(
+                r = await session.post(
                     "https://www.amazon.com/portal-migration/hz/glow/address-change",
                     data=payload, headers=api_headers,
+                    proxies=proxies, allow_redirects=True, timeout=30,
                 )
                 body_preview = r.text[:200].replace("\n", " ")
-                logger.info(f"httpx location: variant {i+1} → {r.status_code} | {body_preview!r}")
+                logger.info(f"curl_cffi location: variant {i+1} → {r.status_code} | {body_preview!r}")
                 if r.status_code in (200, 302):
                     api_resp = r
                     break
@@ -269,9 +271,12 @@ async def _try_set_location_httpx(proxy_url: str = "") -> tuple:
 
             # Step 3: Delay then verify location on product page
             await asyncio.sleep(2.0)
-            resp3 = await client.get("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1")
+            resp3 = await session.get(
+                "https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1",
+                headers=base_headers, proxies=proxies, allow_redirects=True, timeout=30,
+            )
             if "validateCaptcha" in str(resp3.url) or "captchacharacters" in resp3.text:
-                logger.warning("httpx location: CAPTCHA on verification page")
+                logger.warning("curl_cffi location: CAPTCHA on verification page")
                 return False, []
 
             soup3 = BeautifulSoup(resp3.text, "html.parser")
@@ -283,17 +288,17 @@ async def _try_set_location_httpx(proxy_url: str = "") -> tuple:
                     nav_text = el.get_text(strip=True).lower()
                     break
 
-            logger.info(f"httpx location: verification nav text = {nav_text!r}")
+            logger.info(f"curl_cffi location: verification nav text = {nav_text!r}")
 
             if "israel" in nav_text or "israel" in resp3.text.lower():
-                cookie_list = [{"name": k, "value": v} for k, v in client.cookies.items()]
-                logger.info(f"httpx location: Israel confirmed ✓ ({len(cookie_list)} cookies)")
+                cookie_list = [{"name": k, "value": v} for k, v in session.cookies.items()]
+                logger.info(f"curl_cffi location: Israel confirmed ✓ ({len(cookie_list)} cookies)")
                 return True, cookie_list
 
-            logger.warning("httpx location: Israel NOT confirmed — API approach not working for this session")
+            logger.warning("curl_cffi location: Israel NOT confirmed")
             return False, []
     except Exception as e:
-        logger.warning(f"httpx location: error — {e}")
+        logger.warning(f"curl_cffi location: error — {e}")
         return False, []
 
 
@@ -759,13 +764,13 @@ class BrowserManager:
         # Set Israel delivery location via httpx only at startup (non-blocking)
         # Playwright is NOT used here — it can hang for minutes through proxies.
         # If httpx fails, the first check cycle will retry via refresh_location().
-        logger.info("Setting delivery location to Israel (startup via httpx)...")
-        httpx_ok, cookies = await _try_set_location_httpx(proxy_url=NORDVPN_PROXY)
-        if httpx_ok and cookies:
+        logger.info("Setting delivery location to Israel (startup via curl_cffi)...")
+        cffi_ok, cookies = await _try_set_location_httpx(proxy_url=NORDVPN_PROXY)
+        if cffi_ok and cookies:
             self._session_cookies = cookies
-            logger.info("Startup: location set to Israel via httpx ✓")
+            logger.info("Startup: location set to Israel via curl_cffi ✓")
         else:
-            logger.warning("Startup: httpx location failed — will retry on first cycle.")
+            logger.warning("Startup: curl_cffi location failed — will retry on first cycle.")
 
         logger.info("Browser ready.")
 
@@ -783,14 +788,14 @@ class BrowserManager:
         Tries httpx first (less detectable), falls back to Playwright.
         Returns True if location is confirmed as Israel, False otherwise.
         """
-        # 1. Try httpx
-        httpx_ok, cookies = await _try_set_location_httpx(proxy_url=NORDVPN_PROXY)
-        if httpx_ok and cookies:
+        # 1. Try curl_cffi (Chrome TLS fingerprint impersonation)
+        cffi_ok, cookies = await _try_set_location_httpx(proxy_url=NORDVPN_PROXY)
+        if cffi_ok and cookies:
             self._session_cookies = cookies
-            logger.info("Location set to Israel via httpx ✓")
+            logger.info("Location set to Israel via curl_cffi ✓")
             return True
 
-        logger.warning("httpx location failed — falling back to Playwright...")
+        logger.warning("curl_cffi location failed — falling back to Playwright...")
 
         # 2. Playwright fallback — hard timeout to prevent hanging
         try:
