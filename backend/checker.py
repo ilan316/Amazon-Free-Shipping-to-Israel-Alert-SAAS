@@ -348,7 +348,7 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
                 break
 
     if not raw_text:
-        return CheckResult(asin, ShippingStatus.UNKNOWN, error_message="No delivery block found",
+        return CheckResult(asin, ShippingStatus.NO_SHIP, error_message="No delivery block found",
                            product_name=product_name)
 
     status = _classify(raw_text)
@@ -384,51 +384,6 @@ async def _check_product_httpx(asin: str, url: str, cookies: list) -> CheckResul
             return _parse_html_delivery(resp.text, asin)
     except Exception as e:
         return CheckResult(asin, ShippingStatus.ERROR, error_message=f"httpx error: {e}")
-
-
-async def _check_aod_httpx(asin: str, cookies: list) -> CheckResult:
-    """Fetch the AOD (All Offers Display) AJAX panel via curl_cffi and parse delivery text.
-    Used as a fallback for UNKNOWN products that require 'See All Buying Options'.
-    """
-    cookie_dict = {c["name"]: c["value"] for c in cookies}
-    headers = {
-        "User-Agent": _BROWSER_UA,
-        "Accept": "text/html,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Referer": f"https://www.amazon.com/dp/{asin}?psc=1&th=1",
-        "X-Requested-With": "XMLHttpRequest",
-    }
-    proxies = {"https": NORDVPN_PROXY, "http": NORDVPN_PROXY} if NORDVPN_PROXY else {}
-    try:
-        async with CurlSession(impersonate="chrome120") as session:
-            resp = await session.get(
-                f"https://www.amazon.com/gp/aod/ajax?asin={asin}&pc=dp",
-                headers=headers,
-                cookies=cookie_dict,
-                proxies=proxies,
-                allow_redirects=True,
-                timeout=20,
-            )
-            if resp.status_code != 200:
-                return CheckResult(asin, ShippingStatus.ERROR,
-                                   error_message=f"AOD status {resp.status_code}")
-            if "validateCaptcha" in str(resp.url) or "captchacharacters" in resp.text:
-                return CheckResult(asin, ShippingStatus.ERROR, error_message="AOD: CAPTCHA detected")
-
-            soup = BeautifulSoup(resp.text, "html.parser")
-            # Try offer-list container first, fall back to full page text
-            offer_el = soup.find(id="aod-offer-list") or soup.find(id="aod-container") or soup.find(id="aod-offer")
-            raw_text = offer_el.get_text(separator=" ", strip=True) if offer_el else soup.get_text(separator=" ", strip=True)
-            if not raw_text:
-                return CheckResult(asin, ShippingStatus.UNKNOWN, error_message="AOD: no text found")
-
-            status = _classify(raw_text)
-            logger.info(f"[{asin}] AOD httpx: {status.value} | {raw_text[:120]!r}")
-            return CheckResult(asin, status, raw_text=raw_text[:500],
-                               found_in_aod=(status == ShippingStatus.FREE))
-    except Exception as e:
-        return CheckResult(asin, ShippingStatus.ERROR, error_message=f"AOD error: {e}")
 
 
 async def _first(page: Page, selectors: list, timeout: int = 4000):
@@ -658,7 +613,8 @@ def _classify(text: str) -> ShippingStatus:
     if paid_pat_generic.search(text) and "free" not in t:
         return ShippingStatus.PAID
 
-    return ShippingStatus.UNKNOWN
+    # No recognisable pattern — treat conservatively as not shipping to Israel
+    return ShippingStatus.NO_SHIP
 
 
 # ── Delivery text reading ─────────────────────────────────────────────────────
@@ -744,7 +700,7 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
                     found_in_aod = (aod_status == ShippingStatus.FREE)
 
         if not raw_text:
-            return CheckResult(asin, ShippingStatus.UNKNOWN, error_message="No delivery block found",
+            return CheckResult(asin, ShippingStatus.NO_SHIP, error_message="No delivery block found",
                                product_name=product_name)
 
         logger.info(f"[{asin}] {status.value} | {raw_text[:120]!r}")
@@ -980,14 +936,6 @@ class BrowserManager:
                             f"[{asin}] httpx failed ({result.error_message}) — falling back to Playwright"
                         )
                         result = await self.check(asin, url)
-                    elif result.status == ShippingStatus.UNKNOWN:
-                        # Main page shows no delivery info — try AOD panel
-                        logger.info(f"[{asin}] UNKNOWN — trying AOD panel via curl_cffi")
-                        aod_result = await _check_aod_httpx(asin, self._session_cookies)
-                        if aod_result.status != ShippingStatus.ERROR:
-                            result = aod_result
-                        else:
-                            logger.warning(f"[{asin}] AOD also failed: {aod_result.error_message}")
                 else:
                     # No cookies yet (first cycle before location refresh) — use Playwright
                     result = await self.check(asin, url)
