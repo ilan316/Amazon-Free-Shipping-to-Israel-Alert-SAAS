@@ -1,5 +1,6 @@
 import re
 import urllib.request
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -199,6 +200,14 @@ async def check_now(
         raise HTTPException(status_code=404, detail="Product not found in your list")
     product_result = await db.execute(select(Product).where(Product.asin == asin))
     product = product_result.scalar_one()
+
+    if product.last_checked:
+        cooldown = timedelta(minutes=30)
+        elapsed = datetime.now(timezone.utc) - product.last_checked.replace(tzinfo=timezone.utc)
+        if elapsed < cooldown:
+            remaining = int((cooldown - elapsed).total_seconds() / 60) + 1
+            raise HTTPException(status_code=429, detail=f"המוצר נבדק לאחרונה. ניתן לבדוק שוב בעוד {remaining} דקות.")
+
     import asyncio
     asyncio.create_task(_check_product_soon(product.asin, product.url))
     return MessageResponse(message="בדיקה הופעלה")
