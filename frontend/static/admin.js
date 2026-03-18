@@ -35,12 +35,9 @@ async function loadCookieStatus() {
   const res = await apiFetch("/admin/cookie-status");
   if (!res || !res.ok) { badge.textContent = "לא ידוע"; return; }
   const d = await res.json();
-  if (d.loaded && d.israel_cookie) {
-    badge.textContent = `✅ פעיל · ${d.count} cookies · ישראל מאושר`;
+  if (d.loaded) {
+    badge.textContent = `✅ פעיל · ${d.count} cookies`;
     badge.style.background = "#e8f5e9"; badge.style.color = "#2e7d32";
-  } else if (d.loaded) {
-    badge.textContent = `⚠️ נטען · ${d.count} cookies · ישראל לא מאושר`;
-    badge.style.background = "#fff8e1"; badge.style.color = "#f57f17";
   } else {
     badge.textContent = "❌ אין cookies — הזרק כדי להפעיל בדיקות";
     badge.style.background = "#fdecea"; badge.style.color = "var(--error)";
