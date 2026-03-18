@@ -849,9 +849,28 @@ class BrowserManager:
         finally:
             await page.close()
 
+    async def _inject_cookies_to_context(self):
+        """Inject current session cookies into the Playwright browser context."""
+        if not self._session_cookies:
+            return
+        try:
+            pw_cookies = [
+                {
+                    "name": c["name"],
+                    "value": c["value"],
+                    "domain": ".amazon.com",
+                    "path": "/",
+                }
+                for c in self._session_cookies
+            ]
+            await self._context.add_cookies(pw_cookies)
+        except Exception as e:
+            logger.warning(f"Failed to inject cookies into Playwright context: {e}")
+
     async def check(self, asin: str, url: str) -> CheckResult:
         """Check a single product via Playwright. Serialized via lock to avoid CAPTCHA triggers."""
         async with self._lock:
+            await self._inject_cookies_to_context()
             page = await self._context.new_page()
             try:
                 result = await check_product(page, asin, url)
@@ -863,6 +882,7 @@ class BrowserManager:
             logger.warning(f"[{asin}] Playwright CAPTCHA — waiting 45s before retry...")
             await asyncio.sleep(45)
             async with self._lock:
+                await self._inject_cookies_to_context()
                 page = await self._context.new_page()
                 try:
                     result = await check_product(page, asin, url)
@@ -891,9 +911,9 @@ class BrowserManager:
 
                 if self._session_cookies:
                     result = await _check_product_httpx(asin, url, self._session_cookies)
-                    if result.status == ShippingStatus.ERROR:
+                    if result.status in (ShippingStatus.ERROR, ShippingStatus.UNKNOWN):
                         logger.warning(
-                            f"[{asin}] httpx failed ({result.error_message}) — falling back to Playwright"
+                            f"[{asin}] httpx {result.status.value} — falling back to Playwright (AOD check)"
                         )
                         result = await self.check(asin, url)
                 else:
