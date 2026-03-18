@@ -270,6 +270,21 @@ async def trigger_check(
     return {"message": "Check cycle triggered"}
 
 
+@router.post("/clear-cookies")
+async def clear_cookies(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Clear session cookies from memory and DB."""
+    from backend.checker import browser_manager
+    browser_manager._session_cookies = []
+    row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "amazon_session_cookies"))).scalar_one_or_none()
+    if row:
+        await db.delete(row)
+        await db.commit()
+    return {"message": "Cookies cleared"}
+
+
 @router.get("/cookie-status")
 async def cookie_status(
     admin: Annotated[User, Depends(get_current_admin)],

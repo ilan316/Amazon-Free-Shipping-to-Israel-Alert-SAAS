@@ -325,6 +325,20 @@ async function cleanOrphans() {
   }
 }
 
+async function clearCookies() {
+  const msgEl = document.getElementById("inject-msg");
+  const res = await apiFetch("/admin/clear-cookies", { method: "POST" });
+  if (res && res.ok) {
+    msgEl.textContent = "✅ Cookies נוקו";
+    msgEl.style.color = "var(--success)";
+    await loadCookieStatus();
+  } else {
+    msgEl.textContent = "❌ שגיאה בניקוי";
+    msgEl.style.color = "var(--error)";
+  }
+  setTimeout(() => { msgEl.textContent = ""; }, 3000);
+}
+
 async function injectCookiesAndRun() {
   const raw = document.getElementById("cookies-input").value.trim();
   const msgEl = document.getElementById("inject-msg");
