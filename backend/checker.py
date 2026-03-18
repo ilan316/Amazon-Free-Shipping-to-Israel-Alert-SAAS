@@ -357,7 +357,7 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
 
 
 async def _check_product_httpx(asin: str, url: str, cookies: list) -> CheckResult:
-    """Lightweight product check using httpx with Amazon session cookies."""
+    """Lightweight product check using curl_cffi with Amazon session cookies and residential proxy."""
     cookie_dict = {c["name"]: c["value"] for c in cookies}
     headers = {
         "User-Agent": _BROWSER_UA,
@@ -367,14 +367,17 @@ async def _check_product_httpx(asin: str, url: str, cookies: list) -> CheckResul
         "Connection": "keep-alive",
         "Upgrade-Insecure-Requests": "1",
     }
+    proxies = {"https": NORDVPN_PROXY, "http": NORDVPN_PROXY} if NORDVPN_PROXY else {}
     try:
-        async with httpx.AsyncClient(
-            headers=headers,
-            cookies=cookie_dict,
-            follow_redirects=True,
-            timeout=20.0,
-        ) as client:
-            resp = await client.get(f"{url}?psc=1&th=1")
+        async with CurlSession(impersonate="chrome120") as session:
+            resp = await session.get(
+                f"{url}?psc=1&th=1",
+                headers=headers,
+                cookies=cookie_dict,
+                proxies=proxies,
+                allow_redirects=True,
+                timeout=20,
+            )
             if "amazon.com" not in str(resp.url):
                 return CheckResult(asin, ShippingStatus.ERROR,
                                    error_message=f"Redirected away from amazon.com: {resp.url}")
