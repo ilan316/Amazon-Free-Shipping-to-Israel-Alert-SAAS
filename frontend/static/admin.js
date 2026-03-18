@@ -25,7 +25,26 @@ async function loadAdminData() {
     loadNotificationsLog(),
     loadSystemMessageAdmin(),
     loadCheckInterval(),
+    loadCookieStatus(),
   ]);
+}
+
+async function loadCookieStatus() {
+  const badge = document.getElementById("cookie-status-badge");
+  if (!badge) return;
+  const res = await apiFetch("/admin/cookie-status");
+  if (!res || !res.ok) { badge.textContent = "לא ידוע"; return; }
+  const d = await res.json();
+  if (d.loaded && d.israel_cookie) {
+    badge.textContent = `✅ פעיל · ${d.count} cookies · ישראל מאושר`;
+    badge.style.background = "#e8f5e9"; badge.style.color = "#2e7d32";
+  } else if (d.loaded) {
+    badge.textContent = `⚠️ נטען · ${d.count} cookies · ישראל לא מאושר`;
+    badge.style.background = "#fff8e1"; badge.style.color = "#f57f17";
+  } else {
+    badge.textContent = "❌ אין cookies — הזרק כדי להפעיל בדיקות";
+    badge.style.background = "#fdecea"; badge.style.color = "var(--error)";
+  }
 }
 
 async function loadCheckInterval() {
@@ -324,6 +343,7 @@ async function injectCookiesAndRun() {
     const data = await res.json();
     msgEl.textContent = "✅ " + data.message;
     msgEl.style.color = "var(--success)";
+    await loadCookieStatus();
   } else {
     const err = res ? await res.json().catch(() => ({})) : {};
     msgEl.textContent = "❌ " + (err.detail || "שגיאה");

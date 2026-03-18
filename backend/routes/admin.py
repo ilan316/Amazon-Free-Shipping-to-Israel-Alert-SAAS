@@ -270,6 +270,21 @@ async def trigger_check(
     return {"message": "Check cycle triggered"}
 
 
+@router.get("/cookie-status")
+async def cookie_status(
+    admin: Annotated[User, Depends(get_current_admin)],
+):
+    """Return current session cookie state loaded in the running checker."""
+    from backend.checker import browser_manager
+    count = len(browser_manager._session_cookies)
+    sp_cdn = next((c["value"] for c in browser_manager._session_cookies if c["name"] == "sp-cdn"), None)
+    return {
+        "loaded": count > 0,
+        "count": count,
+        "israel_cookie": sp_cdn == "L5Z9:IL" if sp_cdn else False,
+    }
+
+
 @router.post("/inject-cookies")
 async def inject_cookies(
     body: dict,
