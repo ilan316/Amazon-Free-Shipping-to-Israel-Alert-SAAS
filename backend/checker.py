@@ -39,10 +39,29 @@ logger = logging.getLogger(__name__)
 
 BROWSER_PROFILE_DIR = os.environ.get("BROWSER_PROFILE_DIR", "/app/browser_profile")
 
-# Optional NordVPN SOCKS5 proxy for Playwright (reduces CAPTCHA on location setting)
-# Format: socks5://username:password@server:1080
-# Example: socks5://xy12345678:AbCdEfGhIj@us5510.nordvpn.com:1080
+# Residential proxy for httpx location requests (HTTP/HTTPS format)
 NORDVPN_PROXY = os.environ.get("NORDVPN_PROXY", "")
+
+# Residential proxy for Playwright browser (SOCKS5 format with sticky session)
+# Format: socks5h://user-SESSION-country-us:pass@gate.decodo.com:7000
+_PLAYWRIGHT_PROXY_URL = os.environ.get("PLAYWRIGHT_PROXY", "")
+
+
+def _parse_playwright_proxy(url: str) -> dict | None:
+    """Parse a proxy URL into Playwright's proxy dict format."""
+    if not url:
+        return None
+    try:
+        from urllib.parse import urlparse
+        p = urlparse(url)
+        scheme = "socks5" if p.scheme.startswith("socks5") else p.scheme
+        return {
+            "server": f"{scheme}://{p.hostname}:{p.port}",
+            "username": p.username or "",
+            "password": p.password or "",
+        }
+    except Exception:
+        return None
 
 # ── Data types ────────────────────────────────────────────────────────────────
 
@@ -700,11 +719,14 @@ class BrowserManager:
         logger.info("Starting Playwright browser...")
         self._pw = await async_playwright().start()
         # Playwright runs WITHOUT proxy — httpx handles the proxy for location-setting
+        _pw_proxy = _parse_playwright_proxy(_PLAYWRIGHT_PROXY_URL)
+        if _pw_proxy:
+            logger.info(f"Playwright: using residential proxy {_pw_proxy['server']}")
         self._context = await self._pw.chromium.launch_persistent_context(
             user_data_dir=BROWSER_PROFILE_DIR,
             headless=True,
             slow_mo=80,
-            proxy=None,
+            proxy=_pw_proxy,
             args=[
                 "--disable-blink-features=AutomationControlled",
                 "--no-sandbox",
