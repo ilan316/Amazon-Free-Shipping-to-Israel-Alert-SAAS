@@ -430,3 +430,59 @@ async def verify_email_change(
     <p>כתובת האימייל שלך עודכנה. <a href="/admin/login">לחץ כאן לכניסה מחדש</a></p>
     </body></html>
     """)
+
+
+@router.post("/test-cookies")
+async def test_cookies(
+    body: dict,
+    admin: Annotated[User, Depends(get_current_admin)],
+):
+    """Test if provided cookie string returns Israel location on Amazon.
+    Accepts: {"cookies": "session-id=xxx; ubid-main=yyy; ..."}
+    Returns: nav text and whether Israel was detected.
+    """
+    import httpx
+    from bs4 import BeautifulSoup
+
+    cookie_str = body.get("cookies", "").strip()
+    if not cookie_str:
+        raise HTTPException(status_code=400, detail="cookies field required")
+
+    # Parse "name=value; name2=value2" format
+    cookie_dict = {}
+    for part in cookie_str.split(";"):
+        part = part.strip()
+        if "=" in part:
+            k, _, v = part.partition("=")
+            cookie_dict[k.strip()] = v.strip()
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+    try:
+        async with httpx.AsyncClient(
+            headers=headers, cookies=cookie_dict,
+            follow_redirects=True, timeout=20.0,
+        ) as client:
+            resp = await client.get("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1")
+            soup = BeautifulSoup(resp.text, "html.parser")
+            nav_text = ""
+            for nav_id in ["glow-ingress-line2", "glow-ingress-line1", "nav-global-location-popover-link"]:
+                el = soup.find(id=nav_id)
+                if el:
+                    nav_text = el.get_text(strip=True)
+                    break
+            israel_detected = "israel" in nav_text.lower() or "israel" in resp.text.lower()
+            return {
+                "nav_text": nav_text,
+                "israel_detected": israel_detected,
+                "cookies_parsed": len(cookie_dict),
+                "status_code": resp.status_code,
+            }
+    except Exception as e:
+        return {"error": str(e), "israel_detected": False}
