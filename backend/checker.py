@@ -736,7 +736,7 @@ class BrowserManager:
 
         # Set Israel delivery location — httpx first, Playwright fallback
         logger.info("Setting delivery location to Israel (startup)...")
-        httpx_ok, cookies = await _try_set_location_httpx()
+        httpx_ok, cookies = await _try_set_location_httpx(proxy_url=NORDVPN_PROXY)
         if httpx_ok and cookies:
             self._session_cookies = cookies
             logger.info("Startup: location set to Israel via httpx ✓")
@@ -790,7 +790,7 @@ class BrowserManager:
         Returns True if location is confirmed as Israel, False otherwise.
         """
         # 1. Try httpx
-        httpx_ok, cookies = await _try_set_location_httpx()
+        httpx_ok, cookies = await _try_set_location_httpx(proxy_url=NORDVPN_PROXY)
         if httpx_ok and cookies:
             self._session_cookies = cookies
             logger.info("Location set to Israel via httpx ✓")
