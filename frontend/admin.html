@@ -190,15 +190,21 @@
       <div class="section">
         <div class="section-header">
           <h2>מוצרים במעקב</h2>
-          <button class="btn-outline" onclick="cleanOrphans()">🗑 נקה מוצרים ללא עוקבים</button>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button class="btn-sm danger" id="bulk-delete-btn" onclick="bulkDeleteProducts()" style="display:none;">🗑 מחק נבחרים (<span id="bulk-count">0</span>)</button>
+            <button class="btn-outline" onclick="cleanOrphans()">🗑 נקה מוצרים ללא עוקבים</button>
+          </div>
         </div>
         <div style="overflow-x:auto;">
           <table class="admin-table">
             <thead>
-              <tr><th>ASIN</th><th>שם</th><th>סטטוס</th><th>עוקבים</th><th>בדיקה אחרונה</th><th>שגיאות</th><th>טקסט שנמצא</th></tr>
+              <tr>
+                <th style="width:36px;"><input type="checkbox" id="select-all-products" onchange="toggleSelectAllProducts(this)"></th>
+                <th>ASIN</th><th>שם</th><th>סטטוס</th><th>עוקבים</th><th>בדיקה אחרונה</th><th>שגיאות</th><th>טקסט שנמצא</th>
+              </tr>
             </thead>
             <tbody id="products-body">
-              <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">טוען...</td></tr>
+              <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">טוען...</td></tr>
             </tbody>
           </table>
         </div>

@@ -181,12 +181,16 @@ async function loadProducts() {
   if (!res || !res.ok) return;
   const products = await res.json();
   const tbody = document.getElementById("products-body");
+  const selectAll = document.getElementById("select-all-products");
+  if (selectAll) selectAll.checked = false;
+  updateBulkDeleteBtn();
   if (!products.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">אין מוצרים</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">אין מוצרים</td></tr>';
     return;
   }
   tbody.innerHTML = products.map(p => `
     <tr>
+      <td style="text-align:center;"><input type="checkbox" class="product-checkbox" value="${p.id}" onchange="updateBulkDeleteBtn()"></td>
       <td class="ltr"><a href="${p.url}" target="_blank">${p.asin}</a></td>
       <td class="truncate">${p.name || "—"}</td>
       <td><span class="status-badge badge-${p.last_status}">${statusLabel(p.last_status)}</span></td>
@@ -201,6 +205,43 @@ async function loadProducts() {
       </td>
     </tr>
   `).join("");
+}
+
+function toggleSelectAllProducts(cb) {
+  document.querySelectorAll(".product-checkbox").forEach(c => c.checked = cb.checked);
+  updateBulkDeleteBtn();
+}
+
+function updateBulkDeleteBtn() {
+  const checked = document.querySelectorAll(".product-checkbox:checked");
+  const btn = document.getElementById("bulk-delete-btn");
+  const countEl = document.getElementById("bulk-count");
+  if (!btn) return;
+  if (checked.length > 0) {
+    btn.style.display = "";
+    countEl.textContent = checked.length;
+  } else {
+    btn.style.display = "none";
+  }
+}
+
+async function bulkDeleteProducts() {
+  const checked = document.querySelectorAll(".product-checkbox:checked");
+  if (!checked.length) return;
+  if (!confirm(`למחוק ${checked.length} מוצרים לצמיתות?`)) return;
+  const ids = Array.from(checked).map(c => parseInt(c.value));
+  const res = await apiFetch("/admin/products/bulk", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ product_ids: ids }),
+  });
+  if (res && res.ok) {
+    const data = await res.json();
+    await loadProducts(); await loadStats();
+  } else {
+    const err = res ? await res.json().catch(() => ({})) : {};
+    alert(err.detail || "שגיאה במחיקה");
+  }
 }
 
 async function toggleActive(userId) {

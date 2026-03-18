@@ -251,6 +251,23 @@ async def reset_product_errors(
     return {"asin": product.asin, "consecutive_errors": 0}
 
 
+class BulkDeleteRequest(BaseModel):
+    product_ids: list[int]
+
+
+@router.delete("/products/bulk")
+async def bulk_delete_products(
+    body: BulkDeleteRequest,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    if not body.product_ids:
+        raise HTTPException(status_code=400, detail="לא נבחרו מוצרים")
+    await db.execute(delete(Product).where(Product.id.in_(body.product_ids)))
+    await db.commit()
+    return {"deleted": len(body.product_ids)}
+
+
 @router.delete("/products/{product_id}")
 async def delete_product(
     product_id: int,
