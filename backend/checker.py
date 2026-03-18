@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 BROWSER_PROFILE_DIR = os.environ.get("BROWSER_PROFILE_DIR", "/app/browser_profile")
 
 # Residential proxy for httpx location requests (HTTP/HTTPS format)
-NORDVPN_PROXY = os.environ.get("NORDVPN_PROXY", "")
+NORDVPN_PROXY = os.environ.get("RESIDENTIAL_PROXY", "")
 
 # Residential proxy for Playwright browser (SOCKS5 format with sticky session)
 # Format: socks5h://user-SESSION-country-us:pass@gate.decodo.com:7000
