@@ -24,7 +24,41 @@ async function loadAdminData() {
     loadProducts(),
     loadNotificationsLog(),
     loadSystemMessageAdmin(),
+    loadCheckInterval(),
   ]);
+}
+
+async function loadCheckInterval() {
+  const res = await fetch("/health");
+  if (!res.ok) return;
+  const data = await res.json();
+  // Read current interval from SystemSetting via dedicated endpoint
+  const res2 = await apiFetch("/admin/get-check-interval");
+  if (!res2 || !res2.ok) return;
+  const d = await res2.json();
+  const sel = document.getElementById("interval-select");
+  if (sel && d.minutes) sel.value = String(d.minutes);
+}
+
+async function setCheckInterval() {
+  const sel = document.getElementById("interval-select");
+  const statusEl = document.getElementById("interval-msg");
+  const minutes = parseInt(sel.value);
+  const res = await apiFetch("/admin/set-check-interval", {
+    method: "POST",
+    body: JSON.stringify({ minutes }),
+  });
+  if (res && res.ok) {
+    const data = await res.json();
+    statusEl.textContent = "✅ " + data.message;
+    statusEl.style.color = "var(--success)";
+    await loadSchedulerStatus();
+  } else {
+    const err = res ? await res.json().catch(() => ({})) : {};
+    statusEl.textContent = "❌ " + (err.detail || "שגיאה");
+    statusEl.style.color = "var(--error)";
+  }
+  setTimeout(() => { statusEl.textContent = ""; }, 4000);
 }
 
 async function loadStats() {
