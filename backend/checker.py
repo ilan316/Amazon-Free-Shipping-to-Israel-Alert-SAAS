@@ -936,6 +936,11 @@ class BrowserManager:
                         f"[{asin}] httpx failed ({result.error_message}) — falling back to Playwright"
                     )
                     result = await self.check(asin, url)
+                    if result.status == ShippingStatus.ERROR:
+                        # Final retry: wait and try curl_cffi once more
+                        await asyncio.sleep(random.uniform(8, 12))
+                        logger.info(f"[{asin}] Final retry via curl_cffi...")
+                        result = await _check_product_httpx(asin, url, self._session_cookies)
 
                 return idx, result
 
