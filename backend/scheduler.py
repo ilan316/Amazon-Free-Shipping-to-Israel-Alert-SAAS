@@ -191,17 +191,26 @@ async def check_single_product(asin: str, url: str):
     if not location_ok:
         logger.warning(f"[{asin}] Location not set to Israel — skipping immediate check.")
         return
+
+    # Run the check OUTSIDE the DB session — Playwright can hold the lock for 15-30s,
+    # and keeping a DB connection open that entire time exhausts the connection pool
+    # when multiple products are added concurrently.
+    try:
+        check_result = await browser_manager.check(asin, url)
+    except Exception as e:
+        logger.error(f"[{asin}] Immediate check error: {e}")
+        return
+
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Product).where(Product.asin == asin))
         product = result.scalar_one_or_none()
         if not product:
             return
         try:
-            check_result = await browser_manager.check(product.asin, product.url)
             await _update_product(db, product, check_result)
             logger.info(f"[{asin}] Immediate check → {check_result.status.value}")
         except Exception as e:
-            logger.error(f"[{asin}] Immediate check error: {e}")
+            logger.error(f"[{asin}] Immediate check save error: {e}")
             product.last_checked = datetime.now(timezone.utc)
             product.last_status = ShippingStatus.ERROR.value
             product.consecutive_errors += 1
