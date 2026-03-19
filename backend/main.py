@@ -97,27 +97,21 @@ async def lifespan(app: FastAPI):
     # Read effective interval: DB setting overrides env var
     effective_interval = await _get_check_interval()
 
-    # Compute next run time based on last completed check — prevents timer reset on deploy
+    # Preserve scheduled next_run_time across deploys — read from persisted job store
+    # (scheduler.start() already loaded the job; we capture its next_run_time before overwriting it)
     from datetime import datetime, timezone, timedelta
     next_run_time = None
     try:
-        from backend.models import SystemSetting
-        from sqlalchemy import select as sa_select
-        async with AsyncSessionLocal() as db:
-            row = (await db.execute(
-                sa_select(SystemSetting).where(SystemSetting.key == "last_check_at")
-            )).scalar_one_or_none()
-            if row and row.value:
-                last_check = datetime.fromisoformat(row.value)
-                candidate = last_check + timedelta(minutes=effective_interval)
-                now = datetime.now(timezone.utc)
-                if candidate > now + timedelta(seconds=10):
-                    next_run_time = candidate
-                    logger.info(f"Resuming schedule — next check at {next_run_time.isoformat()}")
-                else:
-                    logger.info("Last check was recent — running immediately after startup")
+        existing_job = scheduler.get_job("global_check")
+        if existing_job and existing_job.next_run_time:
+            now = datetime.now(timezone.utc)
+            if existing_job.next_run_time > now + timedelta(seconds=10):
+                next_run_time = existing_job.next_run_time
+                logger.info(f"Resuming schedule — next check at {next_run_time.isoformat()}")
+            else:
+                logger.info("Scheduled time has passed — running check immediately after startup")
     except Exception as e:
-        logger.warning(f"Could not read last_check_at: {e}")
+        logger.warning(f"Could not read persisted job next_run_time: {e}")
 
     reschedule_check_job(effective_interval, start_date=next_run_time)
     logger.info(f"Scheduler started — check interval: {effective_interval} minutes, daily summary at {daily_hour:02d}:00 Israel time")
