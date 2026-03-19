@@ -26,7 +26,7 @@ async function loadAdminData() {
     loadProducts(),
     loadNotificationsLog(),
     loadSystemMessageAdmin(),
-    loadCheckInterval(),
+    loadCheckTime(),
     loadGlobalProductLimit(),
     loadCookieStatus(),
     loadInactivityDays(),
@@ -124,25 +124,21 @@ async function setUserProductLimit(userId, currentLimit, globalLimit) {
   }
 }
 
-async function loadCheckInterval() {
-  const res = await fetch("/health");
-  if (!res.ok) return;
-  const data = await res.json();
-  // Read current interval from SystemSetting via dedicated endpoint
-  const res2 = await apiFetch("/admin/get-check-interval");
-  if (!res2 || !res2.ok) return;
-  const d = await res2.json();
-  const sel = document.getElementById("interval-select");
-  if (sel && d.minutes) sel.value = String(d.minutes);
+async function loadCheckTime() {
+  const res = await apiFetch("/admin/get-check-time");
+  if (!res || !res.ok) return;
+  const d = await res.json();
+  const input = document.getElementById("check-time-input");
+  if (input && d.time) input.value = d.time;
 }
 
-async function setCheckInterval() {
-  const sel = document.getElementById("interval-select");
-  const statusEl = document.getElementById("interval-msg");
-  const minutes = parseInt(sel.value);
-  const res = await apiFetch("/admin/set-check-interval", {
+async function setCheckTime() {
+  const input = document.getElementById("check-time-input");
+  const statusEl = document.getElementById("check-time-msg");
+  const time = input.value;
+  const res = await apiFetch("/admin/set-check-time", {
     method: "POST",
-    body: JSON.stringify({ minutes }),
+    body: JSON.stringify({ time }),
   });
   if (res && res.ok) {
     const data = await res.json();

@@ -15,41 +15,38 @@ from backend.routes import auth, products, settings, admin as admin_routes
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL_MINUTES", "120"))
-
-
-async def _get_check_interval() -> int:
-    """Read check interval from DB (SystemSetting), fallback to env var."""
+async def _get_check_time() -> tuple:
+    """Read daily check time from DB (SystemSetting key 'check_time'), fallback to 06:00."""
     try:
         from backend.database import AsyncSessionLocal
         from backend.models import SystemSetting
         from sqlalchemy import select
         async with AsyncSessionLocal() as db:
             row = (await db.execute(
-                select(SystemSetting).where(SystemSetting.key == "check_interval_minutes")
+                select(SystemSetting).where(SystemSetting.key == "check_time")
             )).scalar_one_or_none()
-            if row:
-                return int(row.value)
+            if row and row.value:
+                h, m = row.value.split(":")
+                return int(h), int(m)
     except Exception:
         pass
-    return CHECK_INTERVAL
+    return 6, 0  # default 06:00 Israel time
 
 
-def reschedule_check_job(minutes: int, start_date=None):
-    """Reschedule the global_check APScheduler job to run every `minutes` minutes.
-    start_date: when to run the first occurrence (None = immediately).
-    """
+def reschedule_check_job(hour: int, minute: int):
+    """Schedule the global_check job as a daily cron at the given time (Israel time)."""
     from backend.scheduler import run_global_check_cycle
     scheduler.add_job(
         run_global_check_cycle,
-        trigger="interval",
-        minutes=minutes,
-        start_date=start_date,
+        trigger="cron",
+        hour=hour,
+        minute=minute,
+        timezone="Asia/Jerusalem",
         id="global_check",
         misfire_grace_time=300,
         replace_existing=True,
     )
-    logger.info(f"global_check rescheduled to every {minutes} minutes")
+    logger.info(f"global_check scheduled daily at {hour:02d}:{minute:02d} Israel time")
 
 _db_url = os.environ.get("DATABASE_URL", "")
 _jobstores = {"default": SQLAlchemyJobStore(url=_db_url)} if _db_url else {}
@@ -94,27 +91,10 @@ async def lifespan(app: FastAPI):
         replace_existing=True,
     )
 
-    # Read effective interval: DB setting overrides env var
-    effective_interval = await _get_check_interval()
-
-    # Preserve scheduled next_run_time across deploys — read from persisted job store
-    # (scheduler.start() already loaded the job; we capture its next_run_time before overwriting it)
-    from datetime import datetime, timezone, timedelta
-    next_run_time = None
-    try:
-        existing_job = scheduler.get_job("global_check")
-        if existing_job and existing_job.next_run_time:
-            now = datetime.now(timezone.utc)
-            if existing_job.next_run_time > now + timedelta(seconds=10):
-                next_run_time = existing_job.next_run_time
-                logger.info(f"Resuming schedule — next check at {next_run_time.isoformat()}")
-            else:
-                logger.info("Scheduled time has passed — running check immediately after startup")
-    except Exception as e:
-        logger.warning(f"Could not read persisted job next_run_time: {e}")
-
-    reschedule_check_job(effective_interval, start_date=next_run_time)
-    logger.info(f"Scheduler started — check interval: {effective_interval} minutes, daily summary at {daily_hour:02d}:00 Israel time")
+    # Read daily check time from DB (cron trigger — no timer reset on deploy)
+    check_hour, check_minute = await _get_check_time()
+    reschedule_check_job(check_hour, check_minute)
+    logger.info(f"Scheduler started — daily check at {check_hour:02d}:{check_minute:02d} Israel time, summary at {daily_hour:02d}:00")
 
     yield
 
@@ -159,7 +139,6 @@ async def health():
         "status": "ok",
         "scheduler_running": scheduler.running,
         "next_check_at": next_run,
-        "check_interval_minutes": CHECK_INTERVAL,
         "next_summary_at": next_summary,
     }
 

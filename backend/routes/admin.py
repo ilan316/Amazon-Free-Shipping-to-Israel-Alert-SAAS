@@ -308,46 +308,37 @@ async def trigger_summary(
     return {"message": "Daily summary triggered"}
 
 
-VALID_INTERVALS = [15, 30, 45, 60, 120, 180, 240, 300, 360, 720, 1440]
-
-
-@router.get("/get-check-interval")
-async def get_check_interval(
+@router.get("/get-check-time")
+async def get_check_time(
     admin: Annotated[User, Depends(get_current_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    import os
-    row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "check_interval_minutes"))).scalar_one_or_none()
-    minutes = int(row.value) if row else int(os.environ.get("CHECK_INTERVAL_MINUTES", "120"))
-    return {"minutes": minutes}
+    row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "check_time"))).scalar_one_or_none()
+    return {"time": row.value if row else "06:00"}
 
 
-@router.post("/set-check-interval")
-async def set_check_interval(
+@router.post("/set-check-time")
+async def set_check_time(
     body: dict,
     admin: Annotated[User, Depends(get_current_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    minutes = int(body.get("minutes", 0))
-    if minutes not in VALID_INTERVALS:
-        raise HTTPException(status_code=400, detail=f"ערך לא חוקי. אפשרויות: {VALID_INTERVALS}")
-    row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "check_interval_minutes"))).scalar_one_or_none()
+    time_str = body.get("time", "")
+    try:
+        h, m = time_str.split(":")
+        h, m = int(h), int(m)
+        assert 0 <= h <= 23 and 0 <= m <= 59
+    except Exception:
+        raise HTTPException(status_code=400, detail="פורמט שגוי. נדרש HH:MM")
+    row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "check_time"))).scalar_one_or_none()
     if row:
-        row.value = str(minutes)
+        row.value = time_str
     else:
-        db.add(SystemSetting(key="check_interval_minutes", value=str(minutes)))
+        db.add(SystemSetting(key="check_time", value=time_str))
     await db.commit()
-    from backend.main import scheduler
-    from backend.scheduler import run_global_check_cycle
-    scheduler.add_job(
-        run_global_check_cycle,
-        trigger="interval",
-        minutes=minutes,
-        id="global_check",
-        misfire_grace_time=300,
-        replace_existing=True,
-    )
-    return {"minutes": minutes, "message": f"מחזור עודכן ל-{minutes} דקות"}
+    from backend.main import reschedule_check_job
+    reschedule_check_job(h, m)
+    return {"time": time_str, "message": f"בדיקה יומית עודכנה ל-{time_str}"}
 
 
 @router.post("/trigger-check")
