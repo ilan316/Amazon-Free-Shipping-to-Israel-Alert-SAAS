@@ -196,16 +196,9 @@ async def _notify_admin_of_errors(failed_items: list):
 async def check_single_product(asin: str, url: str):
     """Check a single product immediately (used after a user adds it)."""
     logger.info(f"[{asin}] Immediate first check triggered")
-    location_ok = await browser_manager.refresh_location()
-    if not location_ok:
-        logger.warning(f"[{asin}] Location not set to Israel — skipping immediate check.")
-        return
-
-    # Run the check OUTSIDE the DB session — Playwright can hold the lock for 15-30s,
-    # and keeping a DB connection open that entire time exhausts the connection pool
-    # when multiple products are added concurrently.
     try:
-        check_result = await browser_manager.check(asin, url)
+        results = await browser_manager.check_many([(asin, url)])
+        check_result = results[0]
     except Exception as e:
         logger.error(f"[{asin}] Immediate check error: {e}")
         return

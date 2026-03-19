@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from sqlalchemy.orm import selectinload
 
 from backend.database import get_db
@@ -80,25 +80,27 @@ async def list_products(
     )
     user_products = result.scalars().all()
 
-    items = []
     import os as _os
     _affiliate_tag = _os.environ.get("AMAZON_AFFILIATE_TAG", "").strip()
 
-    for up in user_products:
-        p = up.product
-        # Get last notification time for this user+product
-        notif_result = await db.execute(
-            select(NotificationLog.sent_at)
+    # Batch-fetch last notification times (one query instead of N)
+    product_ids = [up.product_id for up in user_products]
+    last_notified_map: dict = {}
+    if product_ids:
+        notif_rows = await db.execute(
+            select(NotificationLog.product_id, func.max(NotificationLog.sent_at).label("last_sent"))
             .where(
                 NotificationLog.user_id == current_user.id,
-                NotificationLog.product_id == p.id,
+                NotificationLog.product_id.in_(product_ids),
                 NotificationLog.success == True,
             )
-            .order_by(NotificationLog.sent_at.desc())
-            .limit(1)
+            .group_by(NotificationLog.product_id)
         )
-        last_notified = notif_result.scalar_one_or_none()
+        last_notified_map = {row.product_id: row.last_sent for row in notif_rows}
 
+    items = []
+    for up in user_products:
+        p = up.product
         _aff_url = f"{p.url}?tag={_affiliate_tag}" if _affiliate_tag else p.url
         items.append(ProductResponse(
             asin=p.asin,
@@ -108,7 +110,7 @@ async def list_products(
             last_status=p.last_status,
             last_checked=p.last_checked,
             found_in_aod=p.found_in_aod,
-            last_notified=last_notified,
+            last_notified=last_notified_map.get(p.id),
             added_at=up.added_at,
             is_paused=up.is_paused,
             raw_text=p.raw_text or "",
@@ -157,6 +159,11 @@ async def add_product(
     db.add(up)
     await db.commit()
     await db.refresh(up)
+
+    # Trigger immediate check for new products (not yet checked by system)
+    if not product.last_checked:
+        import asyncio
+        asyncio.create_task(_check_product_soon(product.asin, product.url))
 
     return ProductResponse(
         asin=product.asin,

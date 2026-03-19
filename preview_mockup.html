@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preview – לוח הבקרה</title>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --brand:      #FF9900;
+      --brand-dark: #ff6a00;
+      --bg:         #fffaf1;
+      --surface:    #ffffff;
+      --border:     #e8e2d8;
+      --text:       #172033;
+      --text-muted: #4d5a70;
+      --success:    #167d46;
+      --warning:    #b45309;
+      --error:      #c62828;
+      --radius:     10px;
+      --shadow:     0 2px 12px rgba(0,0,0,0.08);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Heebo', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      direction: rtl;
+      min-height: 100vh;
+    }
+
+    /* ── Navbar ── */
+    .navbar {
+      background: var(--surface);
+      border-bottom: 2px solid var(--brand);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 60px;
+      box-shadow: var(--shadow);
+    }
+
+    .navbar-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-placeholder {
+      height: 32px;
+      padding: 0 12px;
+      background: var(--brand);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: white;
+      letter-spacing: 1px;
+    }
+
+    .navbar-links {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-nav {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 14px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-family: 'Heebo', Arial, sans-serif;
+      color: var(--text-muted);
+    }
+
+    /* ── Page ── */
+    .page { max-width: 860px; margin: 0 auto; padding: 32px 16px; }
+
+    /* ── Dashboard Header ── */
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 24px;
+    }
+
+    .dashboard-header h1 {
+      font-size: 1.6rem;
+      font-weight: 900;
+      color: var(--text);
+    }
+
+    .products-counter {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .next-check {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      text-align: left;
+    }
+
+    /* ── Add Product Box ── */
+    .add-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .add-box h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      text-align: right;
+    }
+
+    .add-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .add-input {
+      flex: 1;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.9rem;
+      font-family: 'Heebo', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text-muted);
+      direction: rtl;
+    }
+
+    .btn-primary {
+      background: var(--brand);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      font-family: 'Heebo', Arial, sans-serif;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .auto-check-note {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 8px;
+      text-align: right;
+    }
+
+    /* ── Filter Bar ── */
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      justify-content: flex-end;
+    }
+
+    .filter-btn {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 0.82rem;
+      font-family: 'Heebo', Arial, sans-serif;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .filter-btn.active {
+      background: var(--brand);
+      border-color: var(--brand);
+      color: white;
+      font-weight: 700;
+    }
+
+    /* ── Product Cards ── */
+    .product-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 12px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+      border-right: 4px solid var(--border);
+    }
+
+    .product-card.free { border-right-color: var(--success); }
+    .product-card.paid { border-right-color: var(--error); }
+
+    .product-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .product-name {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+
+    .product-asin {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .edit-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+
+    .product-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .last-check {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .product-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .status-badge {
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .status-free {
+      background: #e8f5e9;
+      color: var(--success);
+    }
+
+    .status-paid {
+      background: #fce8e8;
+      color: var(--error);
+      border: 1px solid #f5c6c6;
+    }
+
+    .btn-sm {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 0.8rem;
+      font-family: 'Heebo', Arial, sans-serif;
+      cursor: pointer;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* ── Color diff callout ── */
+    .diff-note {
+      background: #fff8e1;
+      border: 1px dashed var(--brand);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+      text-align: right;
+    }
+    .diff-note strong { color: var(--brand-dark); }
+
+    .swatch-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+    .swatch {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+    }
+    .swatch-dot {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      border: 1px solid rgba(0,0,0,0.1);
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="navbar-logo">
+      <!-- לוגו חדש במקום אמוג'י -->
+      <div class="logo-placeholder">LOGO</div>
+    </div>
+    <div class="navbar-links">
+      <button class="btn-nav">הגדרות</button>
+      <button class="btn-nav">יציאה</button>
+    </div>
+  </nav>
+
+  <div class="page">
+
+    <!-- הערת השינויים -->
+    <div class="diff-note">
+      <strong>שינויי עיצוב מוצעים:</strong> לוגו אמיתי (logo-new.png) במקום אמוג'י · צבעים מעודכנים:
+      <div class="swatch-row">
+        <span class="swatch"><span class="swatch-dot" style="background:#ff6a00"></span> --brand-dark: #ff6a00</span>
+        <span class="swatch"><span class="swatch-dot" style="background:#172033"></span> --text: #172033</span>
+        <span class="swatch"><span class="swatch-dot" style="background:#4d5a70"></span> --text-muted: #4d5a70</span>
+        <span class="swatch"><span class="swatch-dot" style="background:#167d46"></span> --success: #167d46</span>
+      </div>
+    </div>
+
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+      <div>
+        <h1>המוצרים שלי</h1>
+        <div class="products-counter">4 מוצרים במעקב · 1 חינם · 3 בתשלום</div>
+      </div>
+      <div class="next-check">
+        בדיקה הבאה בעוד 68 דקות (22:13)
+      </div>
+    </div>
+
+    <!-- Add Product -->
+    <div class="add-box">
+      <h3>הוסף מוצר למעקב</h3>
+      <div class="add-row">
+        <button class="btn-primary">הוסף מוצר</button>
+        <input class="add-input" type="text" placeholder="הדבק קישור או ASIN – ניתן להוסיף מספר ASINs מופרדים בפסיק" readonly>
+      </div>
+      <div class="auto-check-note">הבדיקה הבאה תתבצע אוטומטית · בדיקה הבאה בשעה 22:13</div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+      <button class="filter-btn active">הכל</button>
+      <button class="filter-btn">✅ משלוח חינם (1)</button>
+      <button class="filter-btn">🚢 משלוח בתשלום (3)</button>
+      <input style="border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:0.82rem;background:var(--surface);color:var(--text-muted);font-family:Heebo,Arial,sans-serif;direction:rtl;" placeholder="... חיפוש / ASIN" readonly>
+    </div>
+
+    <!-- Product 1 – Free -->
+    <div class="product-card free">
+      <div class="product-top">
+        <div>
+          <div class="product-name">Alegria Keli Women's Professional Shoes</div>
+          <div class="product-asin">ASIN: B00EDR1X3O</div>
+        </div>
+        <button class="edit-btn">✏️ ערך שם</button>
+      </div>
+      <div class="product-bottom">
+        <div class="last-check">בדיקה אחרונה: 15.03.2026 ,20:17</div>
+        <div class="product-actions">
+          <span class="status-badge status-free">✅ משלוח חינם</span>
+          <button class="btn-sm">‖ השהה</button>
+          <button class="btn-sm">🔍 בדוק</button>
+          <button class="btn-sm">הסר</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Product 2 – Paid -->
+    <div class="product-card paid">
+      <div class="product-top">
+        <div>
+          <div class="product-name">Old Spice Aluminum Free Deodorant for Men, 24/7 Odor Protection, 24/7 Freshness & Lasting Scent, …</div>
+          <div class="product-asin">ASIN: B00HB2JR4K</div>
+        </div>
+        <button class="edit-btn">✏️ ערך שם</button>
+      </div>
+      <div class="product-bottom">
+        <div class="last-check">בדיקה אחרונה: 15.03.2026 ,20:17</div>
+        <div class="product-actions">
+          <span class="status-badge status-paid">🚢 משלוח בתשלום</span>
+          <button class="btn-sm">‖ השהה</button>
+          <button class="btn-sm">🔍 בדוק</button>
+          <button class="btn-sm">הסר</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Product 3 – Paid -->
+    <div class="product-card paid">
+      <div class="product-top">
+        <div>
+          <div class="product-name">123</div>
+          <div class="product-asin">ASIN: B08NYMBXG8</div>
+        </div>
+        <button class="edit-btn">✏️ ערך שם</button>
+      </div>
+      <div class="product-bottom">
+        <div class="last-check">בדיקה אחרונה: 15.03.2026 ,20:14</div>
+        <div class="product-actions">
+          <span class="status-badge status-paid">🚢 משלוח בתשלום</span>
+          <button class="btn-sm">‖ השהה</button>
+          <button class="btn-sm">🔍 בדוק</button>
+          <button class="btn-sm">הסר</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Product 4 – Paid -->
+    <div class="product-card paid">
+      <div class="product-top">
+        <div>
+          <div class="product-name">Every Man Jack Mens Cedar + Red Sage Hand & Body Lotion for All Skin Types - Dermatologist Teste…</div>
+          <div class="product-asin">ASIN: B0F19YKF8B</div>
+        </div>
+        <button class="edit-btn">✏️ ערך שם</button>
+      </div>
+      <div class="product-bottom">
+        <div class="last-check">בדיקה אחרונה: 15.03.2026 ,20:15</div>
+        <div class="product-actions">
+          <span class="status-badge status-paid">🚢 משלוח בתשלום</span>
+          <button class="btn-sm">‖ השהה</button>
+          <button class="btn-sm">🔍 בדוק</button>
+          <button class="btn-sm">הסר</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

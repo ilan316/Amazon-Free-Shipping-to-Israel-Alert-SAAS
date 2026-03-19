@@ -180,9 +180,6 @@ function renderProducts() {
         <div class="card-row-actions">
           ${badgeHtml}
           ${pauseBtn}
-          ${!p.is_paused && !isChecking
-            ? `<button class="btn-check-now" onclick="checkNow('${p.asin}')" title="בדוק סטטוס עכשיו">🔄 בדוק</button>`
-            : ''}
           <button class="btn-remove" onclick="removeProduct('${p.asin}')">הסר</button>
         </div>
 

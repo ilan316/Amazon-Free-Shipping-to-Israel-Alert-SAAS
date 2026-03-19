@@ -26,9 +26,9 @@ _STRINGS = {
         "preheader":            "מצאנו משלוח חינם לישראל! בדוק את המוצר שלך עכשיו",
         "header_title":         "משלוח חינם לישראל 🚚",
         "header_sub1":          "נמצא מוצר עם משלוח חינם",
-        "header_summary":       "סיכום יומי · {n} מוצרים עם משלוח חינם",
-        "shipping_badge":       "✅ משלוח חינם לישראל · הזמנות $49+",
-        "btn_buy":              "קנה עכשיו",
+        "header_summary":       "סיכום יומי · נימצאו {n} מוצרים עם משלוח חינם",
+        "shipping_badge":       "✅ משלוח חינם לישראל · ניתן למימוש בהזמנות מעל $49",
+        "btn_buy":              "קנה עכשיו — משלוח חינם",
         "urgency":              "⏰ המחיר עשוי להשתנות בכל עת",
         "quick_tip_title":      "💡 טיפ לחיסכון",
         "quick_tip_body":       "הזמינו בין $49 ל-$130 כדי ליהנות ממשלוח חינם ללא מכס ישראלי.",
@@ -242,7 +242,12 @@ def send_user_alert(user, product, result) -> bool:
           </td>
         </tr>"""
 
-    logo_tag = f'<img src="{logo_url}" width="140" alt="Amazon Free shipping to Israel Alert" style="display:block; margin:0 auto 12px; max-width:140px;">' if logo_url else ""
+    header_brand = (
+        f'<img src="{logo_url}" width="180" alt="Amazon Free shipping to Israel Alert"'
+        f' style="display:block; margin:0 auto 12px; max-width:180px;">'
+        if logo_url
+        else f'<h1 style="margin:0 0 6px;color:#e47911;font-size:22px;font-weight:bold;" {txt_dir}>{_t(lang, "header_title")}</h1>'
+    )
     disclosure_row = ""
     if affiliate_tag:
         disclosure_row = f"""<tr>
@@ -266,8 +271,7 @@ def send_user_alert(user, product, result) -> bool:
       <table width="600" cellpadding="0" cellspacing="0" class="email-container" style="max-width:600px;width:100%;">
         <tr>
           <td style="background:#ffffff;border-radius:10px 10px 0 0;border-bottom:2px solid #FF9900;padding:24px 24px 18px;text-align:center;">
-            {logo_tag}
-            <h1 style="margin:0 0 6px;color:#e47911;font-size:22px;font-weight:bold;" {txt_dir}>{_t(lang, "header_title")}</h1>
+            {header_brand}
             <p style="margin:0;color:#555;font-size:14px;" {txt_dir}>{_t(lang, "header_sub1")}</p>
           </td>
         </tr>
@@ -278,8 +282,8 @@ def send_user_alert(user, product, result) -> bool:
                    style="background:#ffffff;border:1px solid #e8e8e8;border-radius:10px;margin-bottom:14px;">
               <tr>
                 <td valign="top" style="padding:16px;">
-                  <p style="margin:0 0 4px;font-size:16px;font-weight:bold;line-height:1.4;text-align:{txt_align};" {txt_dir}>
-                    <a href="{url}" style="color:#0066cc;text-decoration:none;">{name}</a>
+                  <p style="margin:0 0 4px;font-size:16px;font-weight:bold;line-height:1.4;text-align:{txt_align};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" {txt_dir}>
+                    <a href="{url}" style="color:#111111;text-decoration:none;">{name}</a>
                   </p>
                   <p style="margin:0 0 10px;font-size:13px;color:#666;text-align:{txt_align};">ASIN: {asin}</p>
                   <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#007600;text-align:{txt_align};" {txt_dir}>{_t(lang, "shipping_badge")}</p>
@@ -344,8 +348,8 @@ def send_daily_summary(user, free_products: list) -> bool:
 
     # Plain text
     lines = [_t(lang, "plain_summary_header")]
-    for p in free_products:
-        name = _short(p.name or p.asin, _MAX_NAME_BODY)
+    for p, custom_name in free_products:
+        name = _short(custom_name or p.name or p.asin, _MAX_NAME_BODY)
         url = _product_url(p.asin)
         lines.append(f"• {name}")
         lines.append(f"  {url}")
@@ -364,16 +368,16 @@ def send_daily_summary(user, free_products: list) -> bool:
         </tr>"""
 
     product_rows = ""
-    for p in free_products:
-        name = _short(p.name or p.asin, _MAX_NAME_BODY)
+    for p, custom_name in free_products:
+        name = _short(custom_name or p.name or p.asin, _MAX_NAME_BODY)
         url = _product_url(p.asin)
         product_rows += f"""
         <table width="100%" cellpadding="0" cellspacing="0"
                style="background:#ffffff;border:1px solid #e8e8e8;border-radius:10px;margin-bottom:12px;">
           <tr>
             <td valign="top" style="padding:14px 16px;">
-              <p style="margin:0 0 4px;font-size:15px;font-weight:bold;line-height:1.4;text-align:{txt_align};" {txt_dir}>
-                <a href="{url}" style="color:#0066cc;text-decoration:none;">{name}</a>
+              <p style="margin:0 0 4px;font-size:15px;font-weight:bold;line-height:1.4;text-align:{txt_align};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" {txt_dir}>
+                <a href="{url}" style="color:#111111;text-decoration:none;">{name}</a>
               </p>
               <p style="margin:0 0 8px;font-size:12px;color:#666;text-align:{txt_align};">ASIN: {p.asin}</p>
               <p style="margin:0 0 10px;font-size:13px;font-weight:bold;color:#007600;text-align:{txt_align};" {txt_dir}>{_t(lang, "shipping_badge")}</p>
@@ -382,7 +386,12 @@ def send_daily_summary(user, free_products: list) -> bool:
           </tr>
         </table>"""
 
-    logo_tag = f'<img src="{logo_url}" width="140" alt="Amazon Free shipping to Israel Alert" style="display:block; margin:0 auto 12px; max-width:140px;">' if logo_url else ""
+    header_brand = (
+        f'<img src="{logo_url}" width="180" alt="Amazon Free shipping to Israel Alert"'
+        f' style="display:block; margin:0 auto 12px; max-width:180px;">'
+        if logo_url
+        else f'<h1 style="margin:0 0 6px;color:#e47911;font-size:22px;font-weight:bold;" {txt_dir}>{_t(lang, "header_title")}</h1>'
+    )
 
     html_body = f"""<!DOCTYPE html>
 <html{body_dir}>
@@ -398,8 +407,7 @@ def send_daily_summary(user, free_products: list) -> bool:
       <table width="600" cellpadding="0" cellspacing="0" class="email-container" style="max-width:600px;width:100%;">
         <tr>
           <td style="background:#ffffff;border-radius:10px 10px 0 0;border-bottom:2px solid #FF9900;padding:24px 24px 18px;text-align:center;">
-            {logo_tag}
-            <h1 style="margin:0 0 6px;color:#e47911;font-size:22px;font-weight:bold;" {txt_dir}>{_t(lang, "header_title")}</h1>
+            {header_brand}
             <p style="margin:0;color:#555;font-size:14px;" {txt_dir}>{_t(lang, "header_summary", n=n)}</p>
           </td>
         </tr>
