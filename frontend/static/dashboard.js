@@ -16,6 +16,16 @@ const STATUS_TOOLTIP = {
 
 // ── Limit badge ───────────────────────────────────────────────────────────────
 
+async function loadUserLimit() {
+  const res = await apiFetch("/me");
+  if (!res || !res.ok) return;
+  const user = await res.json();
+  if (user.effective_product_limit != null) {
+    userLimit = user.effective_product_limit;
+    updateLimitBadge();
+  }
+}
+
 function updateLimitBadge() {
   const badge = document.getElementById("limit-badge");
   if (!badge || userLimit === null) return;
@@ -519,6 +529,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("add-input").addEventListener("keydown", e => {
     if (e.key === "Enter") addProduct();
   });
+
+  loadUserLimit();
 
   // Auto-refresh every 5 minutes
   setInterval(() => loadProducts(true), 5 * 60 * 1000);
