@@ -59,7 +59,7 @@ async def _update_product(db: AsyncSession, product: Product, result: CheckResul
         if result.raw_text:
             product.raw_text = result.raw_text  # save for admin debugging
         await db.commit()
-        return prev_errors == 0  # True only on first failure
+        return True  # notify on every error (1 → MAX_CONSECUTIVE_ERRORS)
 
 
 async def _retry_check_cycle_after(minutes: int):

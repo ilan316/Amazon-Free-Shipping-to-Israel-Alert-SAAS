@@ -154,26 +154,34 @@ def send_admin_error_report(admin_email: str, failed_items: list) -> bool:
     rows = ""
     for product, result in failed_items:
         error_msg = (result.error_message or result.status.value)[:120]
+        err_num = getattr(product, "consecutive_errors", 1)
+        err_color = "#dc3545" if err_num >= 4 else "#856404" if err_num >= 2 else "#555"
         rows += f"""<tr>
           <td style="padding:8px 12px;border-bottom:1px solid #eee;font-family:monospace;font-size:13px;">{product.asin}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:13px;">{product.name or "—"}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#856404;font-size:13px;">{result.status.value}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:bold;color:{err_color};font-size:13px;">#{err_num} / 5</td>
           <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#721c24;font-size:12px;">{error_msg}</td>
         </tr>"""
 
     n = len(failed_items)
+    max_err = max((getattr(p, "consecutive_errors", 1) for p, _ in failed_items), default=1)
+    warning_note = (
+        "<p style='color:#dc3545;font-weight:bold;'>⚠️ מוצרים מתקרבים לחסימה (שגיאה 4+) — בדוק את הפרוקסי!</p>"
+        if max_err >= 4 else ""
+    )
     html = f"""
     <div style="font-family:Arial,sans-serif;max-width:720px;margin:auto;padding:24px;direction:ltr;">
       <h2 style="color:#dc3545;margin-top:0;">⚠️ Amazon Israel Alert — Product Check Errors</h2>
-      <p style="color:#555;">{n} product(s) failed their check for the first time.<br>
-      <strong>Customer-visible status is unchanged</strong> — customers still see the previous result.</p>
+      <p style="color:#555;">{n} product(s) failed their check this cycle.<br>
+      <strong>Customer-visible status is unchanged</strong> until 5 consecutive failures.</p>
+      {warning_note}
       <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #dee2e6;border-radius:8px;overflow:hidden;margin-bottom:20px;">
         <thead>
           <tr style="background:#f8d7da;color:#721c24;">
             <th style="padding:10px 12px;text-align:left;">ASIN</th>
             <th style="padding:10px 12px;text-align:left;">Name</th>
-            <th style="padding:10px 12px;text-align:left;">Status</th>
-            <th style="padding:10px 12px;text-align:left;">Error</th>
+            <th style="padding:10px 12px;text-align:left;">Error #</th>
+            <th style="padding:10px 12px;text-align:left;">Details</th>
           </tr>
         </thead>
         <tbody>{rows}</tbody>
@@ -185,8 +193,11 @@ def send_admin_error_report(admin_email: str, failed_items: list) -> bool:
     </div>"""
 
     plain = (
-        f"Amazon Israel Alert — {n} product(s) failed check:\n\n"
-        + "\n".join(f"- {p.asin} ({p.name or 'unnamed'}): {r.error_message or r.status.value}" for p, r in failed_items)
+        f"Amazon Israel Alert — {n} product(s) failed check this cycle:\n\n"
+        + "\n".join(
+            f"- {p.asin} ({p.name or 'unnamed'}) error #{getattr(p,'consecutive_errors',1)}/5: {r.error_message or r.status.value}"
+            for p, r in failed_items
+        )
         + "\n\nAdmin panel: https://app.amzfreeil.com/admin"
     )
 
