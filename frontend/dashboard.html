@@ -6,7 +6,7 @@
   <title>לוח הבקרה · Amazon Israel Alert</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=9">
+  <link rel="stylesheet" href="/static/styles.css?v=10">
 </head>
 <body>
 
@@ -28,7 +28,10 @@
     <div class="dashboard-header">
       <div>
         <h1>המוצרים שלי</h1>
-        <div id="products-counter" class="products-counter"></div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div id="products-counter" class="products-counter"></div>
+          <button id="csv-btn" onclick="exportUserCSV()" style="display:none;padding:3px 10px;font-size:0.78rem;font-weight:600;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;font-family:inherit;color:var(--text-muted);">⬇ CSV</button>
+        </div>
       </div>
       <div style="text-align:left;">
 <div id="next-check-display" class="next-check-display"></div>
@@ -70,7 +73,6 @@
       <button class="filter-btn" onclick="setFilter('PAID', this)">💳 משלוח בתשלום</button>
       <button class="filter-btn" onclick="setFilter('NO_SHIP', this)">🚫 לא נשלח לארץ</button>
       <button class="filter-btn" onclick="setFilter('NOT_FOUND', this)">❌ מוצר לא קיים</button>
-      <button class="filter-btn" onclick="exportUserCSV()" style="margin-right:auto;">⬇ CSV</button>
     </div>
 
     <!-- Product list -->
@@ -78,8 +80,8 @@
 
   </div>
 
-  <script src="/static/app.js?v=9"></script>
-  <script src="/static/dashboard.js?v=9"></script>
+  <script src="/static/app.js?v=10"></script>
+  <script src="/static/dashboard.js?v=10"></script>
   <script>
     requireAuth();
 

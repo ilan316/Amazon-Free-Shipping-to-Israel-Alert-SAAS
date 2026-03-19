@@ -81,16 +81,20 @@ function renderProducts() {
 
   // Update counter
   const counterEl = document.getElementById("products-counter");
+  const csvBtn = document.getElementById("csv-btn");
   if (counterEl) {
     const total = products.length;
     if (total > 0) {
       const parts = [`${total} מוצרים במעקב`];
-      if (counts.FREE > 0)    parts.push(`${counts.FREE} חינם`);
-      if (counts.PAID > 0)    parts.push(`${counts.PAID} בתשלום`);
-      if (counts.NO_SHIP > 0) parts.push(`${counts.NO_SHIP} לא נשלח`);
+      if (counts.FREE > 0)      parts.push(`${counts.FREE} חינם`);
+      if (counts.PAID > 0)      parts.push(`${counts.PAID} בתשלום`);
+      if (counts.NO_SHIP > 0)   parts.push(`${counts.NO_SHIP} לא נשלח`);
+      if (counts.NOT_FOUND > 0) parts.push(`${counts.NOT_FOUND} לא קיים`);
       counterEl.textContent = parts.join(' · ');
+      if (csvBtn) csvBtn.style.display = '';
     } else {
       counterEl.textContent = '';
+      if (csvBtn) csvBtn.style.display = 'none';
     }
   }
 
