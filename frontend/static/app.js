@@ -59,3 +59,16 @@ async function logout() {
   clearToken();
   window.location = "/";
 }
+
+function _downloadCSV(filename, headers, rows) {
+  const bom = '\uFEFF'; // UTF-8 BOM for Excel compatibility
+  const lines = [headers, ...rows].map(row =>
+    row.map(cell => `"${String(cell == null ? '' : cell).replace(/"/g, '""')}"`).join(',')
+  );
+  const blob = new Blob([bom + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}

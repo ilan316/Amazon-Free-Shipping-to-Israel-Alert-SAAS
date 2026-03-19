@@ -6,6 +6,8 @@ function switchTab(name, btn) {
 }
 
 let _allUsers = [];
+let _allAdminProducts = [];
+let _adminFilter = 'ALL';
 
 async function loadAdminData() {
   const meRes = await apiFetch("/me");
@@ -229,16 +231,49 @@ async function loadUsers() {
 async function loadProducts() {
   const res = await apiFetch("/admin/products");
   if (!res || !res.ok) return;
-  const products = await res.json();
+  _allAdminProducts = await res.json();
+  renderAdminProducts();
+}
+
+function setAdminFilter(filter, btn) {
+  _adminFilter = filter;
+  document.querySelectorAll('.admin-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderAdminProducts();
+}
+
+function renderAdminProducts() {
   const tbody = document.getElementById("products-body");
   const selectAll = document.getElementById("select-all-products");
   if (selectAll) selectAll.checked = false;
   updateBulkDeleteBtn();
-  if (!products.length) {
+
+  // Update filter button labels with counts
+  const counts = { FREE: 0, PAID: 0, NO_SHIP: 0, NOT_FOUND: 0 };
+  _allAdminProducts.forEach(p => {
+    if (counts[p.last_status] !== undefined) counts[p.last_status]++;
+  });
+  const lblMap = {
+    ALL:       `הכל (${_allAdminProducts.length})`,
+    FREE:      `✅ משלוח חינם${counts.FREE > 0 ? ` (${counts.FREE})` : ''}`,
+    PAID:      `💳 משלוח בתשלום${counts.PAID > 0 ? ` (${counts.PAID})` : ''}`,
+    NO_SHIP:   `🚫 לא נשלח לארץ${counts.NO_SHIP > 0 ? ` (${counts.NO_SHIP})` : ''}`,
+    NOT_FOUND: `❌ מוצר לא קיים${counts.NOT_FOUND > 0 ? ` (${counts.NOT_FOUND})` : ''}`,
+  };
+  document.querySelectorAll('.admin-filter-btn[data-filter]').forEach(btn => {
+    const f = btn.getAttribute('data-filter');
+    if (lblMap[f]) btn.textContent = lblMap[f];
+  });
+
+  const filtered = _adminFilter === 'ALL'
+    ? _allAdminProducts
+    : _allAdminProducts.filter(p => p.last_status === _adminFilter);
+
+  if (!filtered.length) {
     tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">אין מוצרים</td></tr>';
     return;
   }
-  tbody.innerHTML = products.map(p => `
+  tbody.innerHTML = filtered.map(p => `
     <tr>
       <td style="text-align:center;"><input type="checkbox" class="product-checkbox" value="${p.id}" onchange="updateBulkDeleteBtn()"></td>
       <td class="ltr"><a href="${p.url}" target="_blank">${p.asin}</a></td>
@@ -255,6 +290,21 @@ async function loadProducts() {
       </td>
     </tr>
   `).join("");
+}
+
+function exportAdminCSV() {
+  if (!_allAdminProducts.length) return;
+  const headers = ['ASIN', 'שם', 'סטטוס', 'עוקבים', 'בדיקה אחרונה', 'שגיאות רצופות', 'קישור'];
+  const rows = _allAdminProducts.map(p => [
+    p.asin,
+    p.name || '',
+    p.last_status || '',
+    p.watchers,
+    p.last_checked ? new Date(p.last_checked).toLocaleString('he-IL') : '',
+    p.consecutive_errors,
+    p.url,
+  ]);
+  _downloadCSV('products_admin.csv', headers, rows);
 }
 
 function toggleSelectAllProducts(cb) {

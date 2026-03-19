@@ -191,6 +191,23 @@ function renderProducts() {
   }).join("");
 }
 
+// ── CSV Export ────────────────────────────────────────────────────────────────
+
+function exportUserCSV() {
+  if (!products.length) return;
+  const headers = ['ASIN', 'שם', 'שם מותאם', 'סטטוס', 'בדיקה אחרונה', 'מושהה', 'קישור'];
+  const rows = products.map(p => [
+    p.asin,
+    p.name || '',
+    p.custom_name || '',
+    p.last_status || '',
+    p.last_checked ? new Date(p.last_checked).toLocaleString('he-IL') : '',
+    p.is_paused ? 'כן' : 'לא',
+    p.url,
+  ]);
+  _downloadCSV('my_products.csv', headers, rows);
+}
+
 // ── Filter / Search ───────────────────────────────────────────────────────────
 
 function setFilter(filter, btn) {

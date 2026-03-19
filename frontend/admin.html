@@ -6,7 +6,7 @@
   <title>פאנל מנהל · Amazon Israel Alert</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=8">
+  <link rel="stylesheet" href="/static/styles.css?v=9">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     .admin-page { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
@@ -215,10 +215,19 @@
       <div class="section">
         <div class="section-header">
           <h2>מוצרים במעקב</h2>
-          <div style="display:flex;gap:8px;align-items:center;">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <button class="btn-sm danger" id="bulk-delete-btn" onclick="bulkDeleteProducts()" style="display:none;">🗑 מחק נבחרים (<span id="bulk-count">0</span>)</button>
             <button class="btn-outline" onclick="cleanOrphans()">🗑 נקה מוצרים ללא עוקבים</button>
+            <button class="btn-outline" onclick="exportAdminCSV()">⬇ הורד CSV</button>
           </div>
+        </div>
+        <!-- Filter bar -->
+        <div class="filter-bar" style="margin-bottom:12px;">
+          <button class="filter-btn admin-filter-btn active" data-filter="ALL" onclick="setAdminFilter('ALL', this)">הכל</button>
+          <button class="filter-btn admin-filter-btn" data-filter="FREE" onclick="setAdminFilter('FREE', this)">✅ משלוח חינם</button>
+          <button class="filter-btn admin-filter-btn" data-filter="PAID" onclick="setAdminFilter('PAID', this)">💳 משלוח בתשלום</button>
+          <button class="filter-btn admin-filter-btn" data-filter="NO_SHIP" onclick="setAdminFilter('NO_SHIP', this)">🚫 לא נשלח לארץ</button>
+          <button class="filter-btn admin-filter-btn" data-filter="NOT_FOUND" onclick="setAdminFilter('NOT_FOUND', this)">❌ מוצר לא קיים</button>
         </div>
         <div style="overflow-x:auto;">
           <table class="admin-table">
@@ -280,8 +289,8 @@
 
   </div>
 
-  <script src="/static/app.js?v=8"></script>
-  <script src="/static/admin.js?v=8"></script>
+  <script src="/static/app.js?v=9"></script>
+  <script src="/static/admin.js?v=9"></script>
   <script>
     requireAuth();
     loadAdminData();

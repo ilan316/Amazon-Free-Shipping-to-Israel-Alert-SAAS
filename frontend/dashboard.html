@@ -6,7 +6,7 @@
   <title>לוח הבקרה · Amazon Israel Alert</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=8">
+  <link rel="stylesheet" href="/static/styles.css?v=9">
 </head>
 <body>
 
@@ -70,6 +70,7 @@
       <button class="filter-btn" onclick="setFilter('PAID', this)">💳 משלוח בתשלום</button>
       <button class="filter-btn" onclick="setFilter('NO_SHIP', this)">🚫 לא נשלח לארץ</button>
       <button class="filter-btn" onclick="setFilter('NOT_FOUND', this)">❌ מוצר לא קיים</button>
+      <button class="filter-btn" onclick="exportUserCSV()" style="margin-right:auto;">⬇ CSV</button>
     </div>
 
     <!-- Product list -->
@@ -77,8 +78,8 @@
 
   </div>
 
-  <script src="/static/app.js?v=8"></script>
-  <script src="/static/dashboard.js?v=8"></script>
+  <script src="/static/app.js?v=9"></script>
+  <script src="/static/dashboard.js?v=9"></script>
   <script>
     requireAuth();
 
