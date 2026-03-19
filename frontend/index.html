@@ -48,11 +48,11 @@
       </div>
       <form id="login-form" onsubmit="doLogin(event)">
         <div class="form-group">
-          <label>אימייל</label>
+          <label for="login-email">אימייל</label>
           <input type="email" id="login-email" required placeholder="your@email.com">
         </div>
         <div class="form-group">
-          <label>סיסמה</label>
+          <label for="login-password">סיסמה</label>
           <input type="password" id="login-password" required placeholder="••••••••">
         </div>
         <button type="submit" class="btn-primary" id="login-btn">כניסה</button>
@@ -64,11 +64,11 @@
       <div id="register-alert" class="alert"></div>
       <form id="register-form" onsubmit="doRegister(event)">
         <div class="form-group">
-          <label>אימייל להתחברות</label>
+          <label for="reg-email">אימייל להתחברות</label>
           <input type="email" id="reg-email" required placeholder="your@email.com">
         </div>
         <div class="form-group">
-          <label>סיסמה</label>
+          <label for="reg-password">סיסמה</label>
           <input type="password" id="reg-password" required placeholder="לפחות 6 תווים" minlength="6">
           <div style="height:4px;border-radius:2px;margin-top:4px;background:#e0e0e0;">
             <div id="pwd-strength-fill" style="height:100%;border-radius:2px;width:0;transition:width 0.3s,background 0.3s;"></div>
@@ -76,11 +76,11 @@
           <small id="pwd-strength-text" style="font-size:0.78rem;color:var(--text-muted);"></small>
         </div>
         <div class="form-group">
-          <label>אימייל לקבלת התראות</label>
+          <label for="reg-notify-email">אימייל לקבלת התראות</label>
           <input type="email" id="reg-notify-email" required placeholder="your@email.com">
         </div>
         <div class="form-group">
-          <label>שפת התראות</label>
+          <label for="reg-language">שפת התראות</label>
           <select id="reg-language">
             <option value="he" selected>עברית</option>
             <option value="en">English</option>
