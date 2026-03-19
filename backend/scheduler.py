@@ -72,9 +72,7 @@ async def _retry_check_cycle_after(minutes: int):
 async def run_global_check_cycle():
     """Check all tracked products and update DB. No emails sent here."""
     logger.info("=== Check cycle started ===")
-    loc_ok = await browser_manager.refresh_location()
-    if not loc_ok:
-        logger.warning("Location refresh failed — continuing with cached cookies")
+    # Israeli residential proxy provides location automatically — no cookie setup needed
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(Product).where(
