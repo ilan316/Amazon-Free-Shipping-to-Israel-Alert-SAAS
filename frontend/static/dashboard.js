@@ -286,31 +286,10 @@ async function addProduct() {
     renderProducts();
     showAlert(alertEl, `✅ מוצר ${newProduct.asin} נוסף — בודק סטטוס...`, "success");
 
-    let attempts = 0;
-    const poll = setInterval(async () => {
-      attempts++;
-      const refreshRes = await apiFetch("/me/products");
-      if (refreshRes && refreshRes.ok) {
-        const updated = await refreshRes.json();
-        const found = updated.find(p => p.asin === newProduct.asin);
-        if (found && found.last_checked) {
-          products = updated;
-          checkingAsins.delete(newProduct.asin);
-          renderProducts();
-          hideAlert(alertEl);
-          clearInterval(poll);
-          return;
-        }
-      }
-      if (attempts >= 5) {
-        checkingAsins.delete(newProduct.asin);
-        products = products.map(p => p.asin === newProduct.asin ? { ...p } : p);
-        renderProducts();
-        hideAlert(alertEl);
-        clearInterval(poll);
-      }
-    }, 6000);
+    // Trigger immediate check for all unchecked products
+    apiFetch("/me/products/check-new", { method: "POST" }).catch(() => {});
 
+    _pollForChecked([newProduct.asin], alertEl);
   } else {
     const err = await res.json();
     showAlert(alertEl, err.detail || "שגיאה בהוספת המוצר");
@@ -321,6 +300,7 @@ async function addProductsBulk(items, input, btn, alertEl) {
   btn.disabled = true;
   let added = 0;
   const errors = [];
+  const newAsins = [];
 
   for (let i = 0; i < items.length; i++) {
     btn.textContent = `מוסיף ${i + 1}/${items.length}...`;
@@ -332,6 +312,7 @@ async function addProductsBulk(items, input, btn, alertEl) {
       const newProduct = await res.json();
       added++;
       checkingAsins.add(newProduct.asin);
+      newAsins.push(newProduct.asin);
       products.unshift(newProduct);
     } else if (res) {
       const err = await res.json().catch(() => ({}));
@@ -345,13 +326,50 @@ async function addProductsBulk(items, input, btn, alertEl) {
   renderProducts();
 
   if (errors.length === 0) {
-    showAlert(alertEl, `✅ נוספו ${added} מוצרים בהצלחה`, "success");
+    showAlert(alertEl, `✅ נוספו ${added} מוצרים — בודק סטטוס...`, "success");
   } else {
     showAlert(alertEl,
       `נוספו ${added} מוצרים${errors.length ? `. שגיאות: ${errors.join(' | ')}` : ''}`,
       added === 0 ? "error" : "success"
     );
   }
+
+  // Trigger ONE batch check after all products are added
+  if (newAsins.length > 0) {
+    apiFetch("/me/products/check-new", { method: "POST" }).catch(() => {});
+    _pollForChecked(newAsins, alertEl);
+  }
+}
+
+// ── Poll until all new products are checked ───────────────────────────────────
+
+function _pollForChecked(asins, alertEl) {
+  let attempts = 0;
+  const poll = setInterval(async () => {
+    attempts++;
+    const refreshRes = await apiFetch("/me/products");
+    if (refreshRes && refreshRes.ok) {
+      const updated = await refreshRes.json();
+      const allChecked = asins.every(asin => {
+        const found = updated.find(p => p.asin === asin);
+        return found && found.last_checked;
+      });
+      if (allChecked) {
+        products = updated;
+        asins.forEach(a => checkingAsins.delete(a));
+        renderProducts();
+        hideAlert(alertEl);
+        clearInterval(poll);
+        return;
+      }
+    }
+    if (attempts >= 20) {
+      asins.forEach(a => checkingAsins.delete(a));
+      renderProducts();
+      hideAlert(alertEl);
+      clearInterval(poll);
+    }
+  }, 5000);
 }
 
 // ── Toggle pause ──────────────────────────────────────────────────────────────

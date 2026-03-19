@@ -160,11 +160,6 @@ async def add_product(
     await db.commit()
     await db.refresh(up)
 
-    # Trigger immediate check for new products (not yet checked by system)
-    if not product.last_checked:
-        import asyncio
-        asyncio.create_task(_check_product_soon(product.asin, product.url))
-
     return ProductResponse(
         asin=product.asin,
         name=product.name,
@@ -189,6 +184,38 @@ async def _check_product_soon(asin: str, url: str):
         import logging
         logging.getLogger(__name__).error(f"Immediate check failed for {asin}: {e}")
 
+
+
+@router.post("/check-new", response_model=MessageResponse)
+async def check_new_products(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    """Check all products that have never been checked (last_checked is None)."""
+    result = await db.execute(
+        select(Product).where(
+            Product.id.in_(select(UserProduct.product_id).distinct()),
+            Product.last_checked.is_(None),
+        )
+    )
+    new_products = result.scalars().all()
+    if not new_products:
+        return MessageResponse(message="אין מוצרים חדשים לבדיקה")
+
+    import asyncio
+    asyncio.create_task(_check_new_products_soon([(p.asin, p.url) for p in new_products]))
+    return MessageResponse(message=f"בודק {len(new_products)} מוצר(ים) חדשים...")
+
+
+async def _check_new_products_soon(items: list[tuple[str, str]]):
+    await __import__("asyncio").sleep(1)
+    try:
+        from backend.scheduler import check_single_product
+        import asyncio
+        await asyncio.gather(*[check_single_product(asin, url) for asin, url in items])
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Batch new-product check failed: {e}")
 
 
 @router.post("/{asin}/check-now", response_model=MessageResponse)
