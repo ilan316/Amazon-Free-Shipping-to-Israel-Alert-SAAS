@@ -54,23 +54,25 @@ async def list_users(
     result = await db.execute(select(User).order_by(User.created_at.desc()))
     users = result.scalars().all()
 
-    out = []
-    for u in users:
-        count = (
-            await db.execute(
-                select(func.count()).select_from(UserProduct).where(UserProduct.user_id == u.id)
-            )
-        ).scalar()
-        out.append({
+    # Batch-fetch product counts (one query instead of N)
+    count_rows = await db.execute(
+        select(UserProduct.user_id, func.count().label("cnt"))
+        .group_by(UserProduct.user_id)
+    )
+    product_count_map = {row.user_id: row.cnt for row in count_rows}
+
+    return [
+        {
             "id": u.id,
             "email": u.email,
             "notify_email": u.notify_email,
             "is_active": u.is_active,
             "is_admin": u.is_admin,
             "created_at": u.created_at.isoformat() if u.created_at else None,
-            "product_count": count,
-        })
-    return out
+            "product_count": product_count_map.get(u.id, 0),
+        }
+        for u in users
+    ]
 
 
 @router.patch("/users/{user_id}/toggle-active")
@@ -128,14 +130,15 @@ async def list_products(
     result = await db.execute(select(Product).order_by(Product.last_checked.desc().nullslast()))
     products = result.scalars().all()
 
-    out = []
-    for p in products:
-        watchers = (
-            await db.execute(
-                select(func.count()).select_from(UserProduct).where(UserProduct.product_id == p.id)
-            )
-        ).scalar()
-        out.append({
+    # Batch-fetch watcher counts (one query instead of N)
+    watcher_rows = await db.execute(
+        select(UserProduct.product_id, func.count().label("cnt"))
+        .group_by(UserProduct.product_id)
+    )
+    watcher_map = {row.product_id: row.cnt for row in watcher_rows}
+
+    return [
+        {
             "id": p.id,
             "asin": p.asin,
             "name": p.name,
@@ -143,10 +146,11 @@ async def list_products(
             "last_status": p.last_status,
             "last_checked": p.last_checked.isoformat() if p.last_checked else None,
             "consecutive_errors": p.consecutive_errors,
-            "watchers": watchers,
+            "watchers": watcher_map.get(p.id, 0),
             "raw_text": p.raw_text[:200] if p.raw_text else "",
-        })
-    return out
+        }
+        for p in products
+    ]
 
 
 @router.get("/registrations-chart")
