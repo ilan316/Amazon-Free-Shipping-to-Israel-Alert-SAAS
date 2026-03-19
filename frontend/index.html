@@ -70,6 +70,10 @@
         <div class="form-group">
           <label>סיסמה</label>
           <input type="password" id="reg-password" required placeholder="לפחות 6 תווים" minlength="6">
+          <div style="height:4px;border-radius:2px;margin-top:4px;background:#e0e0e0;">
+            <div id="pwd-strength-fill" style="height:100%;border-radius:2px;width:0;transition:width 0.3s,background 0.3s;"></div>
+          </div>
+          <small id="pwd-strength-text" style="font-size:0.78rem;color:var(--text-muted);"></small>
         </div>
         <div class="form-group">
           <label>אימייל לקבלת התראות</label>
@@ -127,6 +131,21 @@
   <script>
     if (!localStorage.getItem('cookie_consent')) document.getElementById('cookie-banner').style.display = 'flex';
     function acceptCookies() { localStorage.setItem('cookie_consent','1'); document.getElementById('cookie-banner').style.display = 'none'; }
+
+    document.getElementById("reg-password").addEventListener("input", function() {
+      const v = this.value;
+      const fill = document.getElementById("pwd-strength-fill");
+      const text = document.getElementById("pwd-strength-text");
+      let score = 0;
+      if (v.length >= 6) score++;
+      if (v.length >= 10) score++;
+      if (/[A-Z]/.test(v) || /[0-9]/.test(v)) score++;
+      const colors = ["#f85149", "#d29922", "#3fb950"];
+      const labels = ["חלשה", "בינונית", "חזקה"];
+      fill.style.width = score ? (score * 33) + "%" : "0";
+      fill.style.background = colors[score - 1] || "";
+      text.textContent = v.length ? `חוזק: ${labels[score - 1] || "חלשה"}` : "";
+    });
   </script>
   <script>
     // Redirect to dashboard if already logged in
@@ -148,11 +167,14 @@
       btn.disabled = true;
       btn.textContent = "מתחבר...";
       try {
+        const emailVal = document.getElementById("login-email").value.trim();
+        const passVal = document.getElementById("login-password").value;
+        if (!emailVal || !passVal) { showAlert(alertEl, "נא למלא את כל השדות"); return; }
         const res = await apiFetch("/auth/login", {
           method: "POST",
           body: JSON.stringify({
-            email: document.getElementById("login-email").value,
-            password: document.getElementById("login-password").value,
+            email: emailVal,
+            password: passVal,
           }),
         });
         if (!res) return;
@@ -191,12 +213,16 @@
       btn.disabled = true;
       btn.textContent = "נרשם...";
       try {
+        const passVal = document.getElementById("reg-password").value;
+        const notifyVal = document.getElementById("reg-notify-email").value.trim();
+        if (passVal.length < 6) { showAlert(alertEl, "הסיסמה חייבת להכיל לפחות 6 תווים"); return; }
+        if (!notifyVal) { showAlert(alertEl, "נא להזין אימייל לקבלת התראות"); return; }
         const res = await apiFetch("/auth/register", {
           method: "POST",
           body: JSON.stringify({
-            email: document.getElementById("reg-email").value,
-            password: document.getElementById("reg-password").value,
-            notify_email: document.getElementById("reg-notify-email").value,
+            email: document.getElementById("reg-email").value.trim(),
+            password: passVal,
+            notify_email: notifyVal,
             language: document.getElementById("reg-language").value,
           }),
         });

@@ -151,6 +151,8 @@
   <script>
     requireAuth();
 
+    let originalNotifyEmail = "";
+
     // Load current settings
     apiFetch("/me").then(async res => {
       if (res && res.ok) {
@@ -158,6 +160,7 @@
         document.getElementById("login-email").value = user.email;
         document.getElementById("notify-email").value = user.notify_email;
         document.getElementById("language").value = user.language;
+        originalNotifyEmail = user.notify_email || "";
         applyVacationUI(user.vacation_mode);
       }
     });
@@ -204,6 +207,10 @@
       e.preventDefault();
       const btn = document.getElementById("save-btn");
       const alert = document.getElementById("settings-alert");
+      const newEmail = document.getElementById("notify-email").value;
+      if (newEmail !== originalNotifyEmail) {
+        if (!confirm(`לשנות אימייל התראות ל-${newEmail}?`)) return;
+      }
       hideAlert(alert);
       btn.disabled = true;
       btn.textContent = "שומר...";
