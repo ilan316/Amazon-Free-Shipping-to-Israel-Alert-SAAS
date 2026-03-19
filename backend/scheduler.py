@@ -17,6 +17,7 @@ import asyncio
 import logging
 import os
 from datetime import datetime, timedelta, timezone
+from backend.models import SystemSetting
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -132,6 +133,17 @@ async def run_global_check_cycle():
         await _notify_admin_of_errors(newly_failed)
     if newly_blocked:
         await _notify_admin_of_errors(newly_blocked)
+
+    async with AsyncSessionLocal() as db:
+        row = (await db.execute(
+            select(SystemSetting).where(SystemSetting.key == "last_check_at")
+        )).scalar_one_or_none()
+        now_str = datetime.now(timezone.utc).isoformat()
+        if row:
+            row.value = now_str
+        else:
+            db.add(SystemSetting(key="last_check_at", value=now_str))
+        await db.commit()
 
     logger.info("=== Check cycle complete ===")
 
