@@ -16,6 +16,7 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     vacation_mode: Mapped[bool] = mapped_column(Boolean, default=False)
+    max_products: Mapped[int | None] = mapped_column(Integer, nullable=True)  # None = use global default
 
     user_products: Mapped[list["UserProduct"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     notifications: Mapped[list["NotificationLog"]] = relationship(back_populates="user", cascade="all, delete-orphan")

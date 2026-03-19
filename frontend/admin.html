@@ -6,7 +6,7 @@
   <title>פאנל מנהל · Amazon Israel Alert</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=9">
+  <link rel="stylesheet" href="/static/styles.css?v=10">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     .admin-page { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
@@ -138,6 +138,15 @@
         <span id="check-msg"></span>
       </div>
 
+      <!-- Product limit -->
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);">
+        <span style="font-weight:600; font-size:0.9rem;">📦 מגבלת מוצרים למשתמש:</span>
+        <input type="number" id="product-limit-input" min="1" max="10000" value="20"
+          style="width:80px; padding:6px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:0.9rem;">
+        <button class="btn-sm" onclick="setGlobalProductLimit()" style="background:var(--brand);color:#111;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;">שמור</button>
+        <span id="product-limit-msg" style="font-size:0.85rem; color:var(--success);"></span>
+      </div>
+
       <!-- Interval selector -->
       <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:28px; padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);">
         <span style="font-weight:600; font-size:0.9rem;">⏱ מחזור בדיקה:</span>
@@ -200,7 +209,7 @@
         <div style="overflow-x:auto;">
           <table class="admin-table">
             <thead>
-              <tr><th>#</th><th>אימייל</th><th>אימייל התראה</th><th>מוצרים</th><th>נרשם</th><th>סטטוס</th><th>פעולות</th></tr>
+              <tr><th>#</th><th>אימייל</th><th>אימייל התראה</th><th>מוצרים</th><th>מגבלה</th><th>נרשם</th><th>סטטוס</th><th>פעולות</th></tr>
             </thead>
             <tbody id="users-body">
               <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">טוען...</td></tr>
@@ -289,8 +298,8 @@
 
   </div>
 
-  <script src="/static/app.js?v=9"></script>
-  <script src="/static/admin.js?v=9"></script>
+  <script src="/static/app.js?v=10"></script>
+  <script src="/static/admin.js?v=10"></script>
   <script>
     requireAuth();
     loadAdminData();

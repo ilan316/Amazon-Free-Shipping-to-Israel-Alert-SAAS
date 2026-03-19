@@ -217,6 +217,56 @@ async def set_system_message(
     return {"message": msg}
 
 
+@router.get("/global-product-limit")
+async def get_global_product_limit(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "max_products_per_user"))).scalar_one_or_none()
+    return {"limit": int(row.value) if row else 20}
+
+
+@router.post("/global-product-limit")
+async def set_global_product_limit(
+    body: dict,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    limit = int(body.get("limit", 20))
+    if limit < 1 or limit > 10000:
+        raise HTTPException(status_code=400, detail="מגבלה לא חוקית (1–10000)")
+    row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "max_products_per_user"))).scalar_one_or_none()
+    if row:
+        row.value = str(limit)
+    else:
+        db.add(SystemSetting(key="max_products_per_user", value=str(limit)))
+    await db.commit()
+    return {"limit": limit, "message": f"מגבלת מוצרים גלובלית עודכנה ל-{limit}"}
+
+
+@router.patch("/users/{user_id}/product-limit")
+async def set_user_product_limit(
+    user_id: int,
+    body: dict,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    raw = body.get("limit")
+    if raw is None or raw == "":
+        user.max_products = None  # revert to global
+    else:
+        val = int(raw)
+        if val < 1 or val > 10000:
+            raise HTTPException(status_code=400, detail="מגבלה לא חוקית")
+        user.max_products = val
+    await db.commit()
+    return {"user_id": user_id, "max_products": user.max_products}
+
+
 @router.post("/trigger-summary")
 async def trigger_summary(
     admin: Annotated[User, Depends(get_current_admin)],

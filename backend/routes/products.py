@@ -10,9 +10,11 @@ from sqlalchemy import select, and_, func
 from sqlalchemy.orm import selectinload
 
 from backend.database import get_db
-from backend.models import User, Product, UserProduct, NotificationLog
+from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting
 from backend.auth import get_current_user
 from backend.schemas import AddProductRequest, ProductResponse, MessageResponse
+
+DEFAULT_MAX_PRODUCTS = 20
 
 
 class RenameRequest(BaseModel):
@@ -129,6 +131,19 @@ async def add_product(
         asin = extract_asin(body.url_or_asin)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    # Enforce per-user product limit
+    limit = current_user.max_products
+    if limit is None:
+        row = (await db.execute(
+            select(SystemSetting).where(SystemSetting.key == "max_products_per_user")
+        )).scalar_one_or_none()
+        limit = int(row.value) if row else DEFAULT_MAX_PRODUCTS
+    current_count = (await db.execute(
+        select(func.count()).select_from(UserProduct).where(UserProduct.user_id == current_user.id)
+    )).scalar()
+    if current_count >= limit:
+        raise HTTPException(status_code=403, detail=f"הגעת למגבלת {limit} המוצרים. פנה לתמיכה להגדלת המגבלה.")
 
     # Get or create global product
     result = await db.execute(select(Product).where(Product.asin == asin))

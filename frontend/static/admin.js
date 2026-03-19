@@ -27,6 +27,7 @@ async function loadAdminData() {
     loadNotificationsLog(),
     loadSystemMessageAdmin(),
     loadCheckInterval(),
+    loadGlobalProductLimit(),
     loadCookieStatus(),
   ]);
 }
@@ -43,6 +44,53 @@ async function loadCookieStatus() {
   } else {
     badge.textContent = "❌ אין cookies — הזרק כדי להפעיל בדיקות";
     badge.style.background = "#fdecea"; badge.style.color = "var(--error)";
+  }
+}
+
+async function loadGlobalProductLimit() {
+  const res = await apiFetch("/admin/global-product-limit");
+  if (!res || !res.ok) return;
+  const d = await res.json();
+  const inp = document.getElementById("product-limit-input");
+  if (inp) inp.value = d.limit;
+}
+
+async function setGlobalProductLimit() {
+  const inp = document.getElementById("product-limit-input");
+  const msgEl = document.getElementById("product-limit-msg");
+  const limit = parseInt(inp.value);
+  if (!limit || limit < 1) return;
+  const res = await apiFetch("/admin/global-product-limit", {
+    method: "POST",
+    body: JSON.stringify({ limit }),
+  });
+  if (res && res.ok) {
+    const data = await res.json();
+    msgEl.textContent = "✅ " + data.message;
+    msgEl.style.color = "var(--success)";
+  } else {
+    const err = res ? await res.json().catch(() => ({})) : {};
+    msgEl.textContent = "❌ " + (err.detail || "שגיאה");
+    msgEl.style.color = "var(--error)";
+  }
+  setTimeout(() => { msgEl.textContent = ""; }, 3000);
+}
+
+async function setUserProductLimit(userId, currentLimit, globalLimit) {
+  const val = prompt(
+    `מגבלת מוצרים למשתמש ${userId}\nגלובלית: ${globalLimit}\nהשאר ריק לאיפוס לגלובלית:`,
+    currentLimit !== null ? currentLimit : ""
+  );
+  if (val === null) return; // cancelled
+  const res = await apiFetch(`/admin/users/${userId}/product-limit`, {
+    method: "PATCH",
+    body: JSON.stringify({ limit: val.trim() === "" ? null : parseInt(val) }),
+  });
+  if (res && res.ok) {
+    await loadUsers();
+  } else {
+    const err = res ? await res.json().catch(() => ({})) : {};
+    alert(err.detail || "שגיאה");
   }
 }
 
@@ -195,10 +243,19 @@ async function loadUsers() {
   _allUsers = users;
   const tbody = document.getElementById("users-body");
   if (!users.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">אין משתמשים</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">אין משתמשים</td></tr>';
     return;
   }
-  tbody.innerHTML = users.map(u => `
+  // Read current global limit for display
+  const globalLimitEl = document.getElementById("product-limit-input");
+  const globalLimit = globalLimitEl ? parseInt(globalLimitEl.value) || 20 : 20;
+
+  tbody.innerHTML = users.map(u => {
+    const isCustom = u.max_products !== null && u.max_products !== undefined;
+    const limitDisplay = isCustom
+      ? `<span style="font-weight:600;color:var(--brand-dark);">${u.max_products}</span>`
+      : `<span style="color:var(--text-muted);">${globalLimit}</span>`;
+    return `
     <tr id="user-row-${u.id}">
       <td>${u.id}</td>
       <td class="ltr truncate">${u.email}
@@ -206,6 +263,11 @@ async function loadUsers() {
       </td>
       <td class="ltr truncate">${u.notify_email}</td>
       <td style="text-align:center;">${u.product_count}</td>
+      <td style="text-align:center;">
+        ${limitDisplay}
+        <button class="btn-sm" onclick="setUserProductLimit(${u.id}, ${isCustom ? u.max_products : 'null'}, ${globalLimit})"
+          style="margin-right:4px;padding:2px 6px;font-size:0.72rem;">✏️</button>
+      </td>
       <td class="ltr">${u.created_at ? new Date(u.created_at).toLocaleDateString("he-IL") : "—"}</td>
       <td>
         ${u.is_active
@@ -224,8 +286,8 @@ async function loadUsers() {
           <button class="btn-sm danger" onclick="deleteUser(${u.id})">מחק</button>
         </div>
       </td>
-    </tr>
-  `).join("");
+    </tr>`;
+  }).join("");
 }
 
 async function loadProducts() {

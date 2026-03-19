@@ -31,6 +31,7 @@ class UserResponse(BaseModel):
     created_at: datetime
     is_admin: bool = False
     vacation_mode: bool = False
+    max_products: int | None = None
 
     model_config = {"from_attributes": True}
 
