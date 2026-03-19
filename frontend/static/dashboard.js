@@ -5,11 +5,12 @@ let checkingAsins = new Set();
 let currentFilter = 'ALL';
 
 const STATUS_TOOLTIP = {
-  FREE:    "משלוח חינם לישראל זמין",
-  PAID:    "משלוח לישראל בתשלום",
-  NO_SHIP: "לא נשלח לארץ",
-  UNKNOWN: "לא ניתן לקבוע סטטוס — ראה פרטים",
-  ERROR:   "שגיאה בבדיקה (קפצ'ה או תקלה)",
+  FREE:      "משלוח חינם לישראל זמין",
+  PAID:      "משלוח לישראל בתשלום",
+  NO_SHIP:   "לא נשלח לארץ",
+  NOT_FOUND: "המוצר לא קיים באמזון",
+  UNKNOWN:   "לא ניתן לקבוע סטטוס — ראה פרטים",
+  ERROR:     "שגיאה בבדיקה (קפצ'ה או תקלה)",
 };
 
 // ── Next check time ───────────────────────────────────────────────────────────
@@ -154,7 +155,8 @@ function renderProducts() {
       ? '<span class="status-badge badge-paused">⏸ מושהה</span>'
       : (isChecking || p.last_status === 'UNKNOWN' || p.last_status === 'ERROR')
         ? '<span class="status-badge badge-UNKNOWN">טרם נבדק</span>'
-        : `<span class="status-badge badge-${p.last_status}" title="${tooltip}">${statusLabel(p.last_status)}</span>`;
+        : `<span class="status-badge badge-${p.last_status}" title="${tooltip}">${statusLabel(p.last_status)}</span>`
+    ;
 
     return `
       <div class="product-card status-${badgeStatus} ${p.is_paused ? 'card-paused' : ''}" id="card-${p.asin}">

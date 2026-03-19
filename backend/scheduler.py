@@ -35,7 +35,7 @@ async def _update_product(db: AsyncSession, product: Product, result: CheckResul
     """Update product in DB. Returns True if this is the product's first error (notify admin)."""
     product.last_checked = datetime.now(timezone.utc)
 
-    if result.status in (ShippingStatus.FREE, ShippingStatus.PAID, ShippingStatus.NO_SHIP):
+    if result.status in (ShippingStatus.FREE, ShippingStatus.PAID, ShippingStatus.NO_SHIP, ShippingStatus.NOT_FOUND):
         # Definitive result — update visible status
         product.last_status = result.status.value
         product.raw_text = result.raw_text or ""

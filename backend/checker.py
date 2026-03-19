@@ -67,11 +67,12 @@ def _parse_playwright_proxy(url: str) -> dict | None:
 # ── Data types ────────────────────────────────────────────────────────────────
 
 class ShippingStatus(Enum):
-    FREE    = "FREE"
-    PAID    = "PAID"
-    NO_SHIP = "NO_SHIP"
-    UNKNOWN = "UNKNOWN"
-    ERROR   = "ERROR"
+    FREE      = "FREE"
+    PAID      = "PAID"
+    NO_SHIP   = "NO_SHIP"
+    NOT_FOUND = "NOT_FOUND"
+    UNKNOWN   = "UNKNOWN"
+    ERROR     = "ERROR"
 
 
 @dataclass
@@ -309,8 +310,8 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
     soup = BeautifulSoup(html, "html.parser")
 
     # 404 / page-not-found detection
-    if "title._TTD_.png" in html or "sorry" in html.lower() and "couldn't find that page" in html.lower():
-        return CheckResult(asin, ShippingStatus.ERROR, error_message="Product not found on Amazon (404)")
+    if "title._TTD_.png" in html or ("sorry" in html.lower() and "couldn't find that page" in html.lower()):
+        return CheckResult(asin, ShippingStatus.NOT_FOUND, error_message="Product not found on Amazon (404)")
 
     # CAPTCHA detection
     if soup.find("form", attrs={"action": "/errors/validateCaptcha"}):
@@ -682,7 +683,7 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
             # Check if this is an Amazon 404 page
             page_content = await page.content()
             if "title._TTD_.png" in page_content or ("sorry" in page_content.lower() and "couldn't find that page" in page_content.lower()):
-                return CheckResult(asin, ShippingStatus.ERROR,
+                return CheckResult(asin, ShippingStatus.NOT_FOUND,
                                    error_message="Product not found on Amazon (404)",
                                    product_name=product_name)
 
@@ -941,19 +942,17 @@ class BrowserManager:
 
                 # Israeli residential proxy handles location — curl_cffi always, cookies optional
                 result = await _check_product_httpx(asin, url, self._session_cookies)
+                if result.status == ShippingStatus.NOT_FOUND:
+                    logger.warning(f"[{asin}] Product not found on Amazon (404)")
+                    return idx, result
                 if result.status == ShippingStatus.ERROR:
-                    # 404 / product-not-found — no point retrying
-                    if result.error_message and "not found on Amazon" in result.error_message:
-                        logger.warning(f"[{asin}] Product not found on Amazon (404) — skipping Playwright")
-                        return idx, result
                     logger.warning(
                         f"[{asin}] httpx failed ({result.error_message}) — falling back to Playwright"
                     )
                     result = await self.check(asin, url)
+                    if result.status == ShippingStatus.NOT_FOUND:
+                        return idx, result
                     if result.status == ShippingStatus.ERROR:
-                        # 404 confirmed by Playwright too — no retry
-                        if result.error_message and "not found on Amazon" in result.error_message:
-                            return idx, result
                         # Final retry: wait and try curl_cffi once more
                         await asyncio.sleep(random.uniform(8, 12))
                         logger.info(f"[{asin}] Final retry via curl_cffi...")

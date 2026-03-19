@@ -30,11 +30,12 @@ function requireAuth() {
 
 function statusLabel(status) {
   const map = {
-    "FREE":    "משלוח חינם ✅",
-    "PAID":    "משלוח בתשלום 💳",
-    "NO_SHIP": "לא נשלח לארץ 🚫",
-    "UNKNOWN": "לא ידוע ⚠️",
-    "ERROR":   "שגיאה ⚠️",
+    "FREE":      "משלוח חינם ✅",
+    "PAID":      "משלוח בתשלום 💳",
+    "NO_SHIP":   "לא נשלח לארץ 🚫",
+    "NOT_FOUND": "מוצר לא קיים ❌",
+    "UNKNOWN":   "לא ידוע ⚠️",
+    "ERROR":     "שגיאה ⚠️",
   };
   return map[status] || status;
 }
