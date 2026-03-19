@@ -345,26 +345,35 @@ async function addProductsBulk(items, input, btn, alertEl) {
 
 function _pollForChecked(asins, alertEl) {
   let attempts = 0;
+  const remaining = new Set(asins);
+
   const poll = setInterval(async () => {
     attempts++;
     const refreshRes = await apiFetch("/me/products");
     if (refreshRes && refreshRes.ok) {
       const updated = await refreshRes.json();
-      const allChecked = asins.every(asin => {
+
+      // Update each product as it finishes — don't wait for all
+      for (const asin of [...remaining]) {
         const found = updated.find(p => p.asin === asin);
-        return found && found.last_checked;
-      });
-      if (allChecked) {
-        products = updated;
-        asins.forEach(a => checkingAsins.delete(a));
-        renderProducts();
+        if (found && found.last_checked) {
+          remaining.delete(asin);
+          checkingAsins.delete(asin);
+        }
+      }
+
+      products = updated;
+      renderProducts();
+
+      if (remaining.size === 0) {
         hideAlert(alertEl);
         clearInterval(poll);
         return;
       }
     }
-    if (attempts >= 20) {
-      asins.forEach(a => checkingAsins.delete(a));
+
+    if (attempts >= 72) { // 6 minutes max (72 × 5s)
+      remaining.forEach(a => checkingAsins.delete(a));
       renderProducts();
       hideAlert(alertEl);
       clearInterval(poll);
