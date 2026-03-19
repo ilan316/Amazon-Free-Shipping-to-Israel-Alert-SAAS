@@ -29,6 +29,7 @@ async function loadAdminData() {
     loadCheckInterval(),
     loadGlobalProductLimit(),
     loadCookieStatus(),
+    loadInactivityDays(),
   ]);
 }
 
@@ -63,6 +64,35 @@ async function setGlobalProductLimit() {
   const res = await apiFetch("/admin/global-product-limit", {
     method: "POST",
     body: JSON.stringify({ limit }),
+  });
+  if (res && res.ok) {
+    const data = await res.json();
+    msgEl.textContent = "✅ " + data.message;
+    msgEl.style.color = "var(--success)";
+  } else {
+    const err = res ? await res.json().catch(() => ({})) : {};
+    msgEl.textContent = "❌ " + (err.detail || "שגיאה");
+    msgEl.style.color = "var(--error)";
+  }
+  setTimeout(() => { msgEl.textContent = ""; }, 3000);
+}
+
+async function loadInactivityDays() {
+  const res = await apiFetch("/admin/inactivity-days");
+  if (!res || !res.ok) return;
+  const d = await res.json();
+  const inp = document.getElementById("inactivity-days-input");
+  if (inp) inp.value = d.days;
+}
+
+async function setInactivityDays() {
+  const inp = document.getElementById("inactivity-days-input");
+  const msgEl = document.getElementById("inactivity-days-msg");
+  const days = parseInt(inp.value);
+  if (isNaN(days) || days < 0) return;
+  const res = await apiFetch("/admin/inactivity-days", {
+    method: "POST",
+    body: JSON.stringify({ days }),
   });
   if (res && res.ok) {
     const data = await res.json();

@@ -267,6 +267,34 @@ async def set_user_product_limit(
     return {"user_id": user_id, "max_products": user.max_products}
 
 
+@router.get("/inactivity-days")
+async def get_inactivity_days(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "inactivity_days"))).scalar_one_or_none()
+    return {"days": int(row.value) if row else 90}
+
+
+@router.post("/inactivity-days")
+async def set_inactivity_days(
+    body: dict,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    days = int(body.get("days", 90))
+    if days < 0 or days > 3650:
+        raise HTTPException(status_code=400, detail="ערך לא חוקי (0–3650)")
+    row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "inactivity_days"))).scalar_one_or_none()
+    if row:
+        row.value = str(days)
+    else:
+        db.add(SystemSetting(key="inactivity_days", value=str(days)))
+    await db.commit()
+    msg = f"מעבר למצב חופשה אחרי {days} ימי חוסר פעילות" if days > 0 else "בדיקת חוסר פעילות מושבתת"
+    return {"days": days, "message": msg}
+
+
 @router.post("/trigger-summary")
 async def trigger_summary(
     admin: Annotated[User, Depends(get_current_admin)],

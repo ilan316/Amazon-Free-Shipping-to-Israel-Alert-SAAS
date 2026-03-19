@@ -6,7 +6,7 @@
   <title>Amazon Free Shipping to Israel Alert</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=8">
+  <link rel="stylesheet" href="/static/styles.css?v=10">
   <style>
     .features { display: flex; gap: 20px; max-width: 860px; margin: 32px auto 0; padding: 0 16px; flex-wrap: wrap; }
     .feature-card { flex: 1; min-width: 200px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-align: center; }
@@ -108,7 +108,7 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=8"></script>
+  <script src="/static/app.js?v=10"></script>
   <script>
     // Redirect to dashboard if already logged in
     if (getToken()) window.location = "/dashboard";
@@ -144,7 +144,11 @@
         window.location = "/dashboard";
       } else {
         const err = await res.json();
-        showAlert(alert, err.detail || "שגיאה בכניסה");
+        if (err.detail === "EMAIL_NOT_VERIFIED") {
+          showAlert(alert, "האימייל לא אומת. בדוק את תיבת הדואר שלך.");
+        } else {
+          showAlert(alert, err.detail || "שגיאה בכניסה");
+        }
         btn.disabled = false;
         btn.textContent = "כניסה";
       }
@@ -171,9 +175,8 @@
       if (!res) return;
 
       if (res.ok) {
-        const data = await res.json();
-        setToken(data.access_token);
-        window.location = "/dashboard";
+        showAlert(alert, "✅ נשלח אימייל אימות לכתובתך — בדוק את תיבת הדואר ואמת את החשבון", "success");
+        document.getElementById("register-form").style.display = "none";
       } else {
         const err = await res.json();
         showAlert(alert, err.detail || "שגיאה בהרשמה");

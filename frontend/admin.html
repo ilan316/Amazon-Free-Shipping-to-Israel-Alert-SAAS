@@ -147,6 +147,16 @@
         <span id="product-limit-msg" style="font-size:0.85rem; color:var(--success);"></span>
       </div>
 
+      <!-- Inactivity vacation mode -->
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);">
+        <span style="font-weight:600; font-size:0.9rem;">🏖 מצב חופשה אחרי חוסר פעילות:</span>
+        <input type="number" id="inactivity-days-input" min="0" max="3650" value="90"
+          style="width:80px; padding:6px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:0.9rem;">
+        <span style="font-size:0.82rem;color:var(--text-muted);">ימים (0 = כבוי)</span>
+        <button class="btn-sm" onclick="setInactivityDays()" style="background:var(--brand);color:#111;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;">שמור</button>
+        <span id="inactivity-days-msg" style="font-size:0.85rem; color:var(--success);"></span>
+      </div>
+
       <!-- Interval selector -->
       <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:28px; padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);">
         <span style="font-weight:600; font-size:0.9rem;">⏱ מחזור בדיקה:</span>

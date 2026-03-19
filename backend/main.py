@@ -79,6 +79,18 @@ async def lifespan(app: FastAPI):
     )
     scheduler.start()
 
+    from backend.scheduler import run_inactivity_check
+    scheduler.add_job(
+        run_inactivity_check,
+        trigger="cron",
+        hour=3,
+        minute=0,
+        timezone="Asia/Jerusalem",
+        id="inactivity_check",
+        misfire_grace_time=600,
+        replace_existing=True,
+    )
+
     # Read effective interval: DB setting overrides env var
     effective_interval = await _get_check_interval()
     reschedule_check_job(effective_interval)
