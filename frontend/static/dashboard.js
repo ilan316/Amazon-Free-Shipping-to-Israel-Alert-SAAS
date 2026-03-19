@@ -14,6 +14,18 @@ const STATUS_TOOLTIP = {
   ERROR:     "שגיאה בבדיקה (קפצ'ה או תקלה)",
 };
 
+// ── Limit badge ───────────────────────────────────────────────────────────────
+
+function updateLimitBadge() {
+  const badge = document.getElementById("limit-badge");
+  if (!badge || userLimit === null) return;
+  const count = products.length;
+  const pct = userLimit > 0 ? count / userLimit : 1;
+  badge.textContent = `${count} / ${userLimit}`;
+  badge.className = pct >= 0.9 ? 'badge-full' : pct >= 0.7 ? 'badge-warn' : 'badge-ok';
+  badge.style.display = '';
+}
+
 // ── Next check time ───────────────────────────────────────────────────────────
 
 function updateNextCheckDisplay(nextCheckAt) {
@@ -86,8 +98,7 @@ function renderProducts() {
   if (counterEl) {
     const total = products.length;
     if (total > 0) {
-      const limitSuffix = userLimit !== null ? `/${userLimit}` : '';
-      const parts = [`${total}${limitSuffix} מוצרים במעקב`];
+      const parts = [`${total} מוצרים במעקב`];
       if (counts.FREE > 0)      parts.push(`${counts.FREE} חינם`);
       if (counts.PAID > 0)      parts.push(`${counts.PAID} בתשלום`);
       if (counts.NO_SHIP > 0)   parts.push(`${counts.NO_SHIP} לא נשלח`);
@@ -99,6 +110,8 @@ function renderProducts() {
       if (csvBtn) csvBtn.style.display = 'none';
     }
   }
+
+  updateLimitBadge();
 
   if (products.length === 0) {
     list.innerHTML = `

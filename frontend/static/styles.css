@@ -532,6 +532,20 @@ a:hover { text-decoration: underline; }
   margin-top: 3px;
 }
 
+/* ── Product limit badge ──────────────────────────────────────────────────── */
+#limit-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 20px;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
+  transition: background 0.3s, color 0.3s;
+}
+#limit-badge.badge-ok   { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+#limit-badge.badge-warn { background: #fff8e1; color: #b45309; border: 1px solid #ffe082; }
+#limit-badge.badge-full { background: #fdecea; color: var(--error); border: 1px solid #ffcdd2; }
+
 /* ── Notification email bar ───────────────────────────────────────────────── */
 .notify-email-bar {
   display: flex;

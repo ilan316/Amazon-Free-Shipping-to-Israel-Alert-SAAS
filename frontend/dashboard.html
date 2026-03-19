@@ -27,7 +27,7 @@
 
     <div class="dashboard-header">
       <div>
-        <h1>המוצרים שלי</h1>
+        <h1 style="display:flex;align-items:center;gap:10px;">המוצרים שלי <span id="limit-badge" style="display:none;"></span></h1>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <div id="products-counter" class="products-counter"></div>
           <button id="csv-btn" onclick="exportUserCSV()" style="display:none;padding:3px 10px;font-size:0.78rem;font-weight:600;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;font-family:inherit;color:var(--text-muted);">⬇ CSV</button>
