@@ -151,54 +151,82 @@ def send_admin_error_report(admin_email: str, failed_items: list) -> bool:
     Send error report to admin when products fail for the first time.
     failed_items: list of (Product, CheckResult)
     """
+    checked_at = datetime.now().strftime("%d/%m/%Y %H:%M UTC")
     rows = ""
+    plain_lines = []
     for product, result in failed_items:
-        error_msg = (result.error_message or result.status.value)[:120]
         err_num = getattr(product, "consecutive_errors", 1)
         err_color = "#dc3545" if err_num >= 4 else "#856404" if err_num >= 2 else "#555"
+        error_msg = (result.error_message or result.status.value)[:200]
+        raw = (result.raw_text or product.raw_text or "")[:300]
+        prev_status = getattr(product, "last_status", "—") or "—"
+        method = "Playwright" if "Timeout" in error_msg or "playwright" in error_msg.lower() else "httpx"
+        url = getattr(product, "url", "") or f"https://www.amazon.com/dp/{product.asin}"
+        raw_block = (
+            f'<div style="margin-top:6px;padding:6px 8px;background:#f8f8f8;border-radius:4px;'
+            f'font-size:11px;color:#555;font-family:monospace;word-break:break-all;">{raw}</div>'
+            if raw else ""
+        )
         rows += f"""<tr>
-          <td style="padding:8px 12px;border-bottom:1px solid #eee;font-family:monospace;font-size:13px;">{product.asin}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:13px;">{product.name or "—"}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:bold;color:{err_color};font-size:13px;">#{err_num} / 5</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#721c24;font-size:12px;">{error_msg}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #eee;vertical-align:top;">
+            <a href="{url}" style="font-family:monospace;font-size:13px;color:#0066cc;">{product.asin}</a><br>
+            <span style="font-size:12px;color:#555;">{product.name or "—"}</span>
+          </td>
+          <td style="padding:10px 12px;border-bottom:1px solid #eee;vertical-align:top;font-weight:bold;color:{err_color};font-size:13px;white-space:nowrap;">
+            #{err_num} / 5
+          </td>
+          <td style="padding:10px 12px;border-bottom:1px solid #eee;vertical-align:top;font-size:12px;color:#555;">
+            {prev_status}
+          </td>
+          <td style="padding:10px 12px;border-bottom:1px solid #eee;vertical-align:top;font-size:12px;">
+            <span style="color:#721c24;">[{method}] {error_msg}</span>
+            {raw_block}
+          </td>
         </tr>"""
+        plain_lines.append(
+            f"ASIN: {product.asin}\n"
+            f"Name: {product.name or '—'}\n"
+            f"URL:  {url}\n"
+            f"Error #{err_num}/5 | prev: {prev_status} | method: {method}\n"
+            f"Error: {error_msg}\n"
+            f"Raw:  {raw or '(none)'}\n"
+        )
 
     n = len(failed_items)
     max_err = max((getattr(p, "consecutive_errors", 1) for p, _ in failed_items), default=1)
     warning_note = (
-        "<p style='color:#dc3545;font-weight:bold;'>⚠️ מוצרים מתקרבים לחסימה (שגיאה 4+) — בדוק את הפרוקסי!</p>"
+        "<p style='color:#dc3545;font-weight:bold;margin:8px 0;'>⚠️ מוצרים מתקרבים לחסימה (שגיאה 4+) — בדוק את הפרוקסי!</p>"
         if max_err >= 4 else ""
     )
     html = f"""
-    <div style="font-family:Arial,sans-serif;max-width:720px;margin:auto;padding:24px;direction:ltr;">
+    <div style="font-family:Arial,sans-serif;max-width:760px;margin:auto;padding:24px;direction:ltr;">
       <h2 style="color:#dc3545;margin-top:0;">⚠️ Amazon Israel Alert — Product Check Errors</h2>
-      <p style="color:#555;">{n} product(s) failed their check this cycle.<br>
-      <strong>Customer-visible status is unchanged</strong> until 5 consecutive failures.</p>
+      <p style="color:#555;margin:0 0 4px;">
+        <strong>{n}</strong> product(s) failed · cycle at <strong>{checked_at}</strong><br>
+        Customer-visible status unchanged until 5 consecutive failures.
+      </p>
       {warning_note}
-      <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #dee2e6;border-radius:8px;overflow:hidden;margin-bottom:20px;">
+      <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #dee2e6;border-radius:8px;overflow:hidden;margin:16px 0;">
         <thead>
           <tr style="background:#f8d7da;color:#721c24;">
-            <th style="padding:10px 12px;text-align:left;">ASIN</th>
-            <th style="padding:10px 12px;text-align:left;">Name</th>
+            <th style="padding:10px 12px;text-align:left;">ASIN / Name</th>
             <th style="padding:10px 12px;text-align:left;">Error #</th>
-            <th style="padding:10px 12px;text-align:left;">Details</th>
+            <th style="padding:10px 12px;text-align:left;">Prev Status</th>
+            <th style="padding:10px 12px;text-align:left;">Error + Raw Response</th>
           </tr>
         </thead>
         <tbody>{rows}</tbody>
       </table>
-      <p style="color:#888;font-size:12px;">
-        View in admin panel:
-        <a href="https://app.amzfreeil.com/admin" style="color:#0066cc;">app.amzfreeil.com/admin</a>
+      <p style="color:#888;font-size:12px;margin:0;">
+        Admin panel: <a href="https://app.amzfreeil.com/admin" style="color:#0066cc;">app.amzfreeil.com/admin</a>
       </p>
     </div>"""
 
     plain = (
-        f"Amazon Israel Alert — {n} product(s) failed check this cycle:\n\n"
-        + "\n".join(
-            f"- {p.asin} ({p.name or 'unnamed'}) error #{getattr(p,'consecutive_errors',1)}/5: {r.error_message or r.status.value}"
-            for p, r in failed_items
-        )
-        + "\n\nAdmin panel: https://app.amzfreeil.com/admin"
+        f"Amazon Israel Alert — {n} product(s) failed · {checked_at}\n"
+        + "=" * 60 + "\n\n"
+        + ("\n" + "-" * 40 + "\n").join(plain_lines)
+        + "\nAdmin panel: https://app.amzfreeil.com/admin"
     )
 
     return _send_via_resend(
