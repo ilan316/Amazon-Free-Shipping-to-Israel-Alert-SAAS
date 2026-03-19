@@ -169,3 +169,11 @@ if os.path.isdir(frontend_dir):
     @app.get("/admin/login", include_in_schema=False)
     async def serve_admin_login():
         return FileResponse(os.path.join(frontend_dir, "admin-login.html"))
+
+    @app.get("/privacy", include_in_schema=False)
+    async def serve_privacy():
+        return FileResponse(os.path.join(frontend_dir, "privacy.html"))
+
+    @app.get("/terms", include_in_schema=False)
+    async def serve_terms():
+        return FileResponse(os.path.join(frontend_dir, "terms.html"))

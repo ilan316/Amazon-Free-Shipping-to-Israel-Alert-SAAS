@@ -116,5 +116,15 @@
 
     loadProducts();
   </script>
+
+  <!-- Cookie Consent Banner -->
+  <div id="cookie-banner" style="display:none;position:fixed;bottom:0;right:0;left:0;background:#1c2129;border-top:1px solid #30363d;padding:14px 24px;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;z-index:9999;font-size:0.88rem;">
+    <span style="color:#8b949e;">האתר משתמש ב-localStorage לשמירת מפתח ההתחברות בלבד — ללא cookies של מעקב. <a href="/privacy" style="color:#FF9900;">מדיניות פרטיות</a></span>
+    <button onclick="acceptCookies()" style="background:#FF9900;color:#111;border:none;padding:8px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-family:inherit;">הבנתי</button>
+  </div>
+  <script>
+    if (!localStorage.getItem('cookie_consent')) document.getElementById('cookie-banner').style.display = 'flex';
+    function acceptCookies() { localStorage.setItem('cookie_consent','1'); document.getElementById('cookie-banner').style.display = 'none'; }
+  </script>
 </body>
 </html>

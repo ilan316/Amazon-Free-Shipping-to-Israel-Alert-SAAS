@@ -43,6 +43,9 @@
     <!-- Login panel -->
     <div class="auth-panel active" id="panel-login">
       <div id="login-alert" class="alert"></div>
+      <div id="resend-verify-link" style="display:none;font-size:0.85rem;text-align:center;margin-bottom:8px;">
+        לא קיבלת אימייל אימות? <a href="#" onclick="resendVerification();return false;">לחץ כאן לשליחה מחדש</a>
+      </div>
       <form id="login-form" onsubmit="doLogin(event)">
         <div class="form-group">
           <label>אימייל</label>
@@ -79,6 +82,12 @@
             <option value="en">English</option>
           </select>
         </div>
+        <div class="form-group" style="flex-direction:row;align-items:center;gap:8px;">
+          <input type="checkbox" id="reg-agree" required style="width:auto;margin:0;">
+          <label for="reg-agree" style="font-size:0.85rem;color:var(--text-muted);cursor:pointer;">
+            קראתי ואני מסכים/ה ל<a href="/terms" target="_blank">תנאי השימוש</a> ול<a href="/privacy" target="_blank">מדיניות הפרטיות</a>
+          </label>
+        </div>
         <button type="submit" class="btn-primary" id="register-btn">הרשמה</button>
       </form>
     </div>
@@ -109,6 +118,16 @@
   </div>
 
   <script src="/static/app.js?v=10"></script>
+
+  <!-- Cookie Consent Banner -->
+  <div id="cookie-banner" style="display:none;position:fixed;bottom:0;right:0;left:0;background:#1c2129;border-top:1px solid #30363d;padding:14px 24px;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;z-index:9999;font-size:0.88rem;">
+    <span style="color:#8b949e;">האתר משתמש ב-localStorage לשמירת מפתח ההתחברות בלבד — ללא cookies של מעקב. <a href="/privacy" style="color:#FF9900;">מדיניות פרטיות</a></span>
+    <button onclick="acceptCookies()" style="background:#FF9900;color:#111;border:none;padding:8px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-family:inherit;">הבנתי</button>
+  </div>
+  <script>
+    if (!localStorage.getItem('cookie_consent')) document.getElementById('cookie-banner').style.display = 'flex';
+    function acceptCookies() { localStorage.setItem('cookie_consent','1'); document.getElementById('cookie-banner').style.display = 'none'; }
+  </script>
   <script>
     // Redirect to dashboard if already logged in
     if (getToken()) window.location = "/dashboard";
@@ -123,63 +142,75 @@
     async function doLogin(e) {
       e.preventDefault();
       const btn = document.getElementById("login-btn");
-      const alert = document.getElementById("login-alert");
-      hideAlert(alert);
+      const alertEl = document.getElementById("login-alert");
+      hideAlert(alertEl);
+      document.getElementById("resend-verify-link").style.display = "none";
       btn.disabled = true;
       btn.textContent = "מתחבר...";
-
-      const res = await apiFetch("/auth/login", {
-        method: "POST",
-        body: JSON.stringify({
-          email: document.getElementById("login-email").value,
-          password: document.getElementById("login-password").value,
-        }),
-      });
-
-      if (!res) return;
-
-      if (res.ok) {
-        const data = await res.json();
-        setToken(data.access_token);
-        window.location = "/dashboard";
-      } else {
-        const err = await res.json();
-        if (err.detail === "EMAIL_NOT_VERIFIED") {
-          showAlert(alert, "האימייל לא אומת. בדוק את תיבת הדואר שלך.");
+      try {
+        const res = await apiFetch("/auth/login", {
+          method: "POST",
+          body: JSON.stringify({
+            email: document.getElementById("login-email").value,
+            password: document.getElementById("login-password").value,
+          }),
+        });
+        if (!res) return;
+        if (res.ok) {
+          const data = await res.json();
+          setToken(data.access_token);
+          window.location = "/dashboard";
         } else {
-          showAlert(alert, err.detail || "שגיאה בכניסה");
+          showAlert(alertEl, "אימייל או סיסמה שגויים");
+          document.getElementById("resend-verify-link").style.display = "block";
         }
+      } catch (err) {
+        showAlert(alertEl, "שגיאת רשת — נסה שוב");
+      } finally {
         btn.disabled = false;
         btn.textContent = "כניסה";
       }
     }
 
+    async function resendVerification() {
+      const email = document.getElementById("login-email").value;
+      if (!email) return;
+      await fetch("/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      document.getElementById("resend-verify-link").textContent = "✅ נשלח — בדוק את תיבת הדואר";
+    }
+
     async function doRegister(e) {
       e.preventDefault();
       const btn = document.getElementById("register-btn");
-      const alert = document.getElementById("register-alert");
-      hideAlert(alert);
+      const alertEl = document.getElementById("register-alert");
+      hideAlert(alertEl);
       btn.disabled = true;
       btn.textContent = "נרשם...";
-
-      const res = await apiFetch("/auth/register", {
-        method: "POST",
-        body: JSON.stringify({
-          email: document.getElementById("reg-email").value,
-          password: document.getElementById("reg-password").value,
-          notify_email: document.getElementById("reg-notify-email").value,
-          language: document.getElementById("reg-language").value,
-        }),
-      });
-
-      if (!res) return;
-
-      if (res.ok) {
-        showAlert(alert, "✅ נשלח אימייל אימות לכתובתך — בדוק את תיבת הדואר ואמת את החשבון", "success");
-        document.getElementById("register-form").style.display = "none";
-      } else {
-        const err = await res.json();
-        showAlert(alert, err.detail || "שגיאה בהרשמה");
+      try {
+        const res = await apiFetch("/auth/register", {
+          method: "POST",
+          body: JSON.stringify({
+            email: document.getElementById("reg-email").value,
+            password: document.getElementById("reg-password").value,
+            notify_email: document.getElementById("reg-notify-email").value,
+            language: document.getElementById("reg-language").value,
+          }),
+        });
+        if (!res) return;
+        if (res.ok) {
+          showAlert(alertEl, "✅ נשלח אימייל אימות לכתובתך — בדוק את תיבת הדואר ואמת את החשבון", "success");
+          document.getElementById("register-form").style.display = "none";
+        } else {
+          const err = await res.json();
+          showAlert(alertEl, err.detail || "שגיאה בהרשמה");
+        }
+      } catch (err) {
+        showAlert(alertEl, "שגיאת רשת — נסה שוב");
+      } finally {
         btn.disabled = false;
         btn.textContent = "הרשמה";
       }
