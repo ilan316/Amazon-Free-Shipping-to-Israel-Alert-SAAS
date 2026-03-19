@@ -86,10 +86,8 @@ async def run_global_check_cycle():
             return
 
         logger.info(f"Checking {len(products)} product(s)...")
-        prev_statuses = {p.id: p.last_status for p in products}
         newly_failed = []
         newly_blocked = []
-        newly_free = []
 
         # Separate products to skip (too many consecutive errors) from those to check
         to_check = []
@@ -115,9 +113,6 @@ async def run_global_check_cycle():
                     is_first_error = await _update_product(db, product, check_result)
                     if is_first_error:
                         newly_failed.append((product, check_result))
-                    if (check_result.status == ShippingStatus.FREE and
-                            prev_statuses.get(product.id) != ShippingStatus.FREE.value):
-                        newly_free.append(product)
                     logger.info(f"[{i+1}/{len(to_check)}] [{product.asin}] → {check_result.status.value}")
                 except Exception as e:
                     await db.rollback()
@@ -137,60 +132,8 @@ async def run_global_check_cycle():
         await _notify_admin_of_errors(newly_failed)
     if newly_blocked:
         await _notify_admin_of_errors(newly_blocked)
-    if newly_free:
-        await _notify_newly_free_products(newly_free)
 
     logger.info("=== Check cycle complete ===")
-
-
-async def _notify_newly_free_products(products: list):
-    """Send immediate alert to all watchers when a product becomes FREE."""
-    from backend.notifier import send_user_alert
-
-    async with AsyncSessionLocal() as db:
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
-
-        for product in products:
-            watchers_result = await db.execute(
-                select(User, UserProduct)
-                .join(UserProduct, User.id == UserProduct.user_id)
-                .where(
-                    UserProduct.product_id == product.id,
-                    UserProduct.is_paused == False,
-                    User.is_active == True,
-                    User.vacation_mode == False,
-                    User.is_verified == True,
-                )
-            )
-            for user, _up in watchers_result.all():
-                # 24h cooldown per product per user
-                recent = (await db.execute(
-                    select(NotificationLog).where(
-                        NotificationLog.user_id == user.id,
-                        NotificationLog.product_id == product.id,
-                        NotificationLog.success == True,
-                        NotificationLog.sent_at >= cutoff,
-                    )
-                )).scalar_one_or_none()
-                if recent:
-                    logger.info(f"[{product.asin}] Skipping user {user.id} — 24h cooldown")
-                    continue
-
-                class _R:
-                    found_in_aod = product.found_in_aod
-
-                success = send_user_alert(user, product, _R())
-                db.add(NotificationLog(
-                    user_id=user.id,
-                    product_id=product.id,
-                    status=ShippingStatus.FREE.value,
-                    email_to=user.notify_email,
-                    success=success,
-                    error_msg=None if success else "send failed",
-                ))
-                logger.info(f"[{product.asin}] Immediate alert → user {user.id} {'✓' if success else '✗'}")
-
-            await db.commit()
 
 
 async def run_daily_summary():
