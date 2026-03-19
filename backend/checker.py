@@ -372,7 +372,7 @@ async def _check_product_httpx(asin: str, url: str, cookies: list) -> CheckResul
         "Connection": "keep-alive",
         "Upgrade-Insecure-Requests": "1",
     }
-    proxies = {"https": NORDVPN_PROXY, "http": NORDVPN_PROXY} if NORDVPN_PROXY else {}
+    proxies = {}  # location encoded in cookies; curl_cffi Chrome impersonation handles bot detection
     try:
         async with CurlSession(impersonate="chrome120") as session:
             resp = await session.get(
