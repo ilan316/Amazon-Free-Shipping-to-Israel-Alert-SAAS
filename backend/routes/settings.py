@@ -75,6 +75,18 @@ async def get_notifications(
     ]
 
 
+@router.patch("/vacation", response_model=UserResponse)
+async def set_vacation_mode(
+    body: dict,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    current_user.vacation_mode = bool(body.get("vacation_mode", False))
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
+
+
 @router.delete("", response_model=MessageResponse)
 async def delete_account(
     body: DeleteAccountRequest,

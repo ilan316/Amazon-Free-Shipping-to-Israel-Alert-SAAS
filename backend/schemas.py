@@ -30,6 +30,7 @@ class UserResponse(BaseModel):
     language: str
     created_at: datetime
     is_admin: bool = False
+    vacation_mode: bool = False
 
     model_config = {"from_attributes": True}
 

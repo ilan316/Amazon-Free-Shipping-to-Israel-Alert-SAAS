@@ -141,7 +141,7 @@ async def run_daily_summary():
     logger.info("=== Daily summary started ===")
     async with AsyncSessionLocal() as db:
         users_result = await db.execute(
-            select(User).where(User.is_active == True)
+            select(User).where(User.is_active == True, User.vacation_mode == False)
         )
         users = users_result.scalars().all()
 

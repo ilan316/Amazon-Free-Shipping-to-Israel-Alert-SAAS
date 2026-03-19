@@ -15,6 +15,7 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    vacation_mode: Mapped[bool] = mapped_column(Boolean, default=False)
 
     user_products: Mapped[list["UserProduct"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     notifications: Mapped[list["NotificationLog"]] = relationship(back_populates="user", cascade="all, delete-orphan")

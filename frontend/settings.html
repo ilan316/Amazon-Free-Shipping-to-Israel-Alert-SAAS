@@ -6,7 +6,37 @@
   <title>הגדרות · Amazon Israel Alert</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=8">
+  <link rel="stylesheet" href="/static/styles.css?v=10">
+  <style>
+    .vacation-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; flex-wrap: wrap; box-shadow: var(--shadow);
+      margin-bottom: 16px;
+    }
+    .vacation-card.active { border-color: #FF9900; background: #fffaf1; }
+    .vacation-info h3 { font-size: 1rem; margin-bottom: 4px; }
+    .vacation-info p { font-size: 0.82rem; color: var(--text-muted); margin: 0; }
+    .toggle-wrap { display: flex; align-items: center; gap: 10px; }
+    .toggle-switch {
+      position: relative; width: 48px; height: 26px; cursor: pointer;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0; background: #ccc; border-radius: 26px;
+      transition: 0.2s;
+    }
+    .toggle-slider:before {
+      content: ""; position: absolute; width: 20px; height: 20px;
+      border-radius: 50%; background: white; left: 3px; top: 3px;
+      transition: 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .toggle-switch input:checked + .toggle-slider { background: #FF9900; }
+    .toggle-switch input:checked + .toggle-slider:before { transform: translateX(22px); }
+    .toggle-label { font-size: 0.88rem; font-weight: 600; color: var(--text-muted); }
+    .toggle-label.active { color: #e47911; }
+  </style>
 </head>
 <body>
 
@@ -24,6 +54,21 @@
   <div class="page">
     <div class="dashboard-header">
       <h1>הגדרות חשבון</h1>
+    </div>
+
+    <!-- Vacation mode banner -->
+    <div class="vacation-card" id="vacation-card">
+      <div class="vacation-info">
+        <h3>🏖 מצב חופשה</h3>
+        <p>כל ההתראות מושהות — המוצרים עדיין נבדקים ברקע</p>
+      </div>
+      <div class="toggle-wrap">
+        <span class="toggle-label" id="vacation-label">כבוי</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="vacation-toggle" onchange="setVacation(this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
     </div>
 
     <div class="settings-card">
@@ -102,7 +147,7 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=8"></script>
+  <script src="/static/app.js?v=10"></script>
   <script>
     requireAuth();
 
@@ -113,8 +158,33 @@
         document.getElementById("login-email").value = user.email;
         document.getElementById("notify-email").value = user.notify_email;
         document.getElementById("language").value = user.language;
+        applyVacationUI(user.vacation_mode);
       }
     });
+
+    function applyVacationUI(isOn) {
+      const toggle = document.getElementById("vacation-toggle");
+      const label = document.getElementById("vacation-label");
+      const card = document.getElementById("vacation-card");
+      toggle.checked = isOn;
+      label.textContent = isOn ? "פעיל" : "כבוי";
+      label.className = isOn ? "toggle-label active" : "toggle-label";
+      card.className = isOn ? "vacation-card active" : "vacation-card";
+    }
+
+    async function setVacation(isOn) {
+      const res = await apiFetch("/me/vacation", {
+        method: "PATCH",
+        body: JSON.stringify({ vacation_mode: isOn }),
+      });
+      if (res && res.ok) {
+        const user = await res.json();
+        applyVacationUI(user.vacation_mode);
+      } else {
+        // Revert toggle on error
+        applyVacationUI(!isOn);
+      }
+    }
 
     // Load notification history
     apiFetch("/me/notifications").then(async res => {
