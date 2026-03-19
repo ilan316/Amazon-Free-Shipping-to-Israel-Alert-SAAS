@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database import get_db
 from sqlalchemy import select
 
-from backend.models import User, Product, NotificationLog
+from backend.models import User, Product, NotificationLog, SystemSetting
 from backend.auth import get_current_user, verify_password, hash_password
 from backend.schemas import UserResponse, UpdateSettingsRequest, ChangePasswordRequest, DeleteAccountRequest, MessageResponse
 
@@ -14,8 +14,18 @@ router = APIRouter(prefix="/me", tags=["settings"])
 
 
 @router.get("", response_model=UserResponse)
-async def get_me(current_user: Annotated[User, Depends(get_current_user)]):
-    return current_user
+async def get_me(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    effective_limit = current_user.max_products
+    if effective_limit is None:
+        row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "max_products_per_user"))).scalar_one_or_none()
+        effective_limit = int(row.value) if row else 20
+    base = UserResponse.model_validate(current_user)
+    data = base.model_dump()
+    data["effective_product_limit"] = effective_limit
+    return data
 
 
 @router.patch("/settings", response_model=UserResponse)

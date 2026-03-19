@@ -70,6 +70,7 @@ async def list_users(
             "is_admin": u.is_admin,
             "created_at": u.created_at.isoformat() if u.created_at else None,
             "product_count": product_count_map.get(u.id, 0),
+            "max_products": u.max_products,
         }
         for u in users
     ]

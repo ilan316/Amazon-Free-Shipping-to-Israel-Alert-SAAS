@@ -6,7 +6,7 @@
   <title>לוח הבקרה · Amazon Israel Alert</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=10">
+  <link rel="stylesheet" href="/static/styles.css?v=11">
 </head>
 <body>
 
@@ -80,8 +80,8 @@
 
   </div>
 
-  <script src="/static/app.js?v=10"></script>
-  <script src="/static/dashboard.js?v=10"></script>
+  <script src="/static/app.js?v=11"></script>
+  <script src="/static/dashboard.js?v=11"></script>
   <script>
     requireAuth();
 
@@ -94,6 +94,10 @@
         if (bar && display && user.notify_email) {
           display.textContent = user.notify_email;
           bar.style.display = "flex";
+        }
+        if (user.effective_product_limit != null) {
+          userLimit = user.effective_product_limit;
+          renderProducts();
         }
       }
     });

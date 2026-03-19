@@ -3,6 +3,7 @@
 let products = [];
 let checkingAsins = new Set();
 let currentFilter = 'ALL';
+let userLimit = null;
 
 const STATUS_TOOLTIP = {
   FREE:      "משלוח חינם לישראל זמין",
@@ -85,7 +86,8 @@ function renderProducts() {
   if (counterEl) {
     const total = products.length;
     if (total > 0) {
-      const parts = [`${total} מוצרים במעקב`];
+      const limitSuffix = userLimit !== null ? `/${userLimit}` : '';
+      const parts = [`${total}${limitSuffix} מוצרים במעקב`];
       if (counts.FREE > 0)      parts.push(`${counts.FREE} חינם`);
       if (counts.PAID > 0)      parts.push(`${counts.PAID} בתשלום`);
       if (counts.NO_SHIP > 0)   parts.push(`${counts.NO_SHIP} לא נשלח`);

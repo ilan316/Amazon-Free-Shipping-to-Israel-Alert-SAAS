@@ -32,6 +32,7 @@ class UserResponse(BaseModel):
     is_admin: bool = False
     vacation_mode: bool = False
     max_products: int | None = None
+    effective_product_limit: int | None = None
 
     model_config = {"from_attributes": True}
 
