@@ -59,18 +59,20 @@ function renderProducts() {
   if (filterBar) filterBar.style.display = products.length > 0 ? "flex" : "none";
 
   // Counts for filter buttons
-  const counts = { FREE: 0, PAID: 0, NO_SHIP: 0 };
+  const counts = { FREE: 0, PAID: 0, NO_SHIP: 0, NOT_FOUND: 0 };
   products.forEach(p => {
     if (p.is_paused) return;
-    if (p.last_status === 'FREE')    counts.FREE++;
-    if (p.last_status === 'PAID')    counts.PAID++;
-    if (p.last_status === 'NO_SHIP') counts.NO_SHIP++;
+    if (p.last_status === 'FREE')      counts.FREE++;
+    if (p.last_status === 'PAID')      counts.PAID++;
+    if (p.last_status === 'NO_SHIP')   counts.NO_SHIP++;
+    if (p.last_status === 'NOT_FOUND') counts.NOT_FOUND++;
   });
   // Update filter button labels
   const lblMap = {
-    FREE:    `✅ משלוח חינם${counts.FREE > 0 ? ` (${counts.FREE})` : ''}`,
-    PAID:    `💳 משלוח בתשלום${counts.PAID > 0 ? ` (${counts.PAID})` : ''}`,
-    NO_SHIP: `🚫 לא נשלח לארץ${counts.NO_SHIP > 0 ? ` (${counts.NO_SHIP})` : ''}`,
+    FREE:      `✅ משלוח חינם${counts.FREE > 0 ? ` (${counts.FREE})` : ''}`,
+    PAID:      `💳 משלוח בתשלום${counts.PAID > 0 ? ` (${counts.PAID})` : ''}`,
+    NO_SHIP:   `🚫 לא נשלח לארץ${counts.NO_SHIP > 0 ? ` (${counts.NO_SHIP})` : ''}`,
+    NOT_FOUND: `❌ מוצר לא קיים${counts.NOT_FOUND > 0 ? ` (${counts.NOT_FOUND})` : ''}`,
   };
   document.querySelectorAll('.filter-btn[onclick]').forEach(btn => {
     const m = btn.getAttribute('onclick').match(/setFilter\('(\w+)'/);
