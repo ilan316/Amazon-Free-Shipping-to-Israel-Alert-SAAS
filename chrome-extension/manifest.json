@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Amazon Free Shipping to Israel Monitor",
+  "name": "Amazon Israel Free Ship Alert",
   "version": "1.0.0",
   "description": "הוסף מוצרי אמזון למעקב ישירות מדף המוצר",
   "permissions": [
