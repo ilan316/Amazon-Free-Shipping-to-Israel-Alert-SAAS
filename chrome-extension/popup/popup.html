@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Amazon Monitor</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+
+  <!-- מסך לא מחובר -->
+  <div id="screen-login">
+    <div class="header">
+      <span class="logo">🔔</span>
+      <h1>Amazon Monitor</h1>
+    </div>
+    <p class="subtitle">התחבר לחשבון שלך</p>
+    <form id="login-form">
+      <input type="email" id="email" placeholder="אימייל" required autocomplete="email" />
+      <input type="password" id="password" placeholder="סיסמה" required autocomplete="current-password" />
+      <button type="submit" id="login-btn">התחבר</button>
+    </form>
+    <p id="login-error" class="error hidden"></p>
+  </div>
+
+  <!-- מסך מחובר — בדף מוצר -->
+  <div id="screen-product" class="hidden">
+    <div class="header">
+      <span class="logo">🔔</span>
+      <h1>Amazon Monitor</h1>
+      <button id="logout-btn" class="logout">יציאה</button>
+    </div>
+    <div id="product-info">
+      <p id="product-title" class="product-title"></p>
+      <p id="product-price" class="product-price"></p>
+    </div>
+    <button id="add-btn">+ הוסף למעקב</button>
+    <p id="add-result" class="result hidden"></p>
+  </div>
+
+  <!-- מסך מחובר — לא בדף מוצר -->
+  <div id="screen-no-product" class="hidden">
+    <div class="header">
+      <span class="logo">🔔</span>
+      <h1>Amazon Monitor</h1>
+      <button id="logout-btn-2" class="logout">יציאה</button>
+    </div>
+    <p class="no-product-msg">עבור לדף מוצר באמזון כדי להוסיף למעקב</p>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

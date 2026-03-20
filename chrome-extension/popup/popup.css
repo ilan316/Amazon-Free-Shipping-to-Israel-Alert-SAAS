@@ -1,0 +1,157 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  width: 280px;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #0f1117;
+  color: #e8e8e8;
+  padding: 16px;
+  direction: rtl;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.logo {
+  font-size: 20px;
+}
+
+h1 {
+  font-size: 15px;
+  font-weight: 600;
+  flex: 1;
+  color: #f0f0f0;
+}
+
+.logout {
+  background: none;
+  border: 1px solid #444;
+  color: #aaa;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.logout:hover {
+  border-color: #e74c3c;
+  color: #e74c3c;
+}
+
+/* Login form */
+.subtitle {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 12px;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+input {
+  background: #1e2130;
+  border: 1px solid #333;
+  color: #e8e8e8;
+  padding: 9px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  direction: ltr;
+  text-align: right;
+  outline: none;
+}
+
+input:focus {
+  border-color: #f0a500;
+}
+
+button[type="submit"],
+#add-btn {
+  background: #f0a500;
+  color: #000;
+  border: none;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 4px;
+}
+
+button[type="submit"]:hover,
+#add-btn:hover {
+  background: #d4920a;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Product info */
+.product-title {
+  font-size: 12px;
+  color: #ccc;
+  line-height: 1.4;
+  margin-bottom: 6px;
+  max-height: 48px;
+  overflow: hidden;
+}
+
+.product-price {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f0a500;
+  margin-bottom: 12px;
+}
+
+/* Messages */
+.error {
+  color: #e74c3c;
+  font-size: 12px;
+  margin-top: 6px;
+  text-align: center;
+}
+
+.result {
+  font-size: 13px;
+  margin-top: 8px;
+  text-align: center;
+  padding: 6px;
+  border-radius: 6px;
+}
+
+.result.success {
+  background: #1a3a1a;
+  color: #4caf50;
+}
+
+.result.error {
+  background: #3a1a1a;
+  color: #e74c3c;
+}
+
+/* No product */
+.no-product-msg {
+  font-size: 13px;
+  color: #888;
+  text-align: center;
+  padding: 12px 0;
+  line-height: 1.5;
+}
