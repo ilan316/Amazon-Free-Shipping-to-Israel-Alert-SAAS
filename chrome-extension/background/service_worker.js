@@ -2,7 +2,7 @@
 
 const API_BASE = 'https://app.amzfreeil.com';
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   if (request.action === 'login') {
     handleLogin(request.email, request.password).then(sendResponse);
     return true; // async
@@ -51,6 +51,11 @@ async function handleAddProduct(url_or_asin, token) {
     if (!res.ok) {
       return { ok: false, error: data.detail || 'שגיאה בהוספת מוצר' };
     }
+    // trigger immediate check (same as web app)
+    fetch(`${API_BASE}/me/products/check-new`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+    }).catch(() => {});
     return { ok: true };
   } catch (e) {
     return { ok: false, error: 'בעיית חיבור לשרת' };
