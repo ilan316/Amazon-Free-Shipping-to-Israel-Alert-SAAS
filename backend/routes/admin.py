@@ -581,6 +581,34 @@ async def verify_email_change(
     """)
 
 
+@router.get("/checks-status")
+async def checks_status(admin: Annotated[User, Depends(get_current_admin)]):
+    from backend.main import scheduler
+    job = scheduler.get_job("global_check")
+    paused = job is not None and job.next_run_time is None
+    return {"paused": paused}
+
+
+@router.post("/pause-checks")
+async def pause_checks(admin: Annotated[User, Depends(get_current_admin)]):
+    from backend.main import scheduler
+    for job_id in ("global_check", "daily_summary"):
+        job = scheduler.get_job(job_id)
+        if job:
+            scheduler.pause_job(job_id)
+    return {"paused": True, "message": "הבדיקות הושהו"}
+
+
+@router.post("/resume-checks")
+async def resume_checks(admin: Annotated[User, Depends(get_current_admin)]):
+    from backend.main import scheduler
+    for job_id in ("global_check", "daily_summary"):
+        job = scheduler.get_job(job_id)
+        if job:
+            scheduler.resume_job(job_id)
+    return {"paused": False, "message": "הבדיקות הופעלו מחדש"}
+
+
 @router.post("/test-cookies")
 async def test_cookies(
     body: dict,

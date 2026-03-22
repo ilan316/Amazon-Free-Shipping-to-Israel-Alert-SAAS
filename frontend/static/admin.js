@@ -30,6 +30,7 @@ async function loadAdminData() {
     loadGlobalProductLimit(),
     loadCookieStatus(),
     loadInactivityDays(),
+    loadChecksStatus(),
   ]);
 }
 
@@ -172,6 +173,44 @@ async function loadSchedulerStatus() {
   const el2 = document.getElementById("sched-next-summary");
   if (el1) el1.textContent = fmt(data.next_check_at);
   if (el2) el2.textContent = fmt(data.next_summary_at);
+}
+
+let _checksPaused = false;
+
+async function loadChecksStatus() {
+  const res = await apiFetch("/admin/checks-status");
+  if (!res || !res.ok) return;
+  const data = await res.json();
+  _checksPaused = data.paused;
+  const btn = document.getElementById("btn-pause-checks");
+  if (!btn) return;
+  if (_checksPaused) {
+    btn.textContent = "▶ הפעל בדיקות";
+    btn.style.background = "var(--error, #c0392b)";
+  } else {
+    btn.textContent = "⏸ השהה בדיקות";
+    btn.style.background = "";
+  }
+}
+
+async function toggleChecks() {
+  const btn = document.getElementById("btn-pause-checks");
+  const msg = document.getElementById("pause-checks-msg");
+  btn.disabled = true;
+  const endpoint = _checksPaused ? "/admin/resume-checks" : "/admin/pause-checks";
+  const res = await apiFetch(endpoint, { method: "POST" });
+  btn.disabled = false;
+  if (res && res.ok) {
+    const data = await res.json();
+    msg.textContent = "✅ " + data.message;
+    msg.style.color = "var(--success)";
+    await loadChecksStatus();
+    await loadSchedulerStatus();
+  } else {
+    msg.textContent = "❌ שגיאה";
+    msg.style.color = "var(--error)";
+  }
+  setTimeout(() => { msg.textContent = ""; }, 3000);
 }
 
 async function loadRegistrationsChart() {

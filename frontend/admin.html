@@ -135,6 +135,8 @@
       <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
         <button class="btn-run-check" id="run-check-btn" onclick="triggerCheck()">▶ הרץ בדיקה עכשיו</button>
         <button class="btn-run-check" id="run-summary-btn" onclick="triggerSummary()" style="background:var(--surface); border:1px solid var(--border); color:var(--text);">📧 שלח סיכום עכשיו</button>
+        <button class="btn-run-check" id="btn-pause-checks" onclick="toggleChecks()">טוען...</button>
+        <span id="pause-checks-msg" style="font-size:0.85rem;"></span>
         <span id="check-msg"></span>
       </div>
 
