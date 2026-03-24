@@ -144,6 +144,22 @@ def send_simple_email(to: str, subject: str, body_html: str) -> bool:
     return _send_via_resend(to, subject, body_html, "")
 
 
+# ── Admin new-user notification ──────────────────────────────────────────────
+
+def send_admin_new_user_notification(admin_email: str, new_user_email: str) -> bool:
+    """Notify admin when a new user verifies their email."""
+    registered_at = datetime.now().strftime("%d/%m/%Y %H:%M")
+    html = f"""<div dir="rtl" style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px;background:#fffaf1;border-radius:12px;">
+      <h2 style="color:#e47911;">🎉 משתמש חדש נרשם!</h2>
+      <table style="width:100%;border-collapse:collapse;margin-top:16px;">
+        <tr><td style="padding:8px 0;color:#555;width:120px;">מייל:</td><td style="padding:8px 0;font-weight:bold;">{new_user_email}</td></tr>
+        <tr><td style="padding:8px 0;color:#555;">תאריך אימות:</td><td style="padding:8px 0;">{registered_at}</td></tr>
+      </table>
+      <a href="https://app.amzfreeil.com/admin" style="display:inline-block;background:#FF9900;color:#111;padding:10px 24px;border-radius:8px;font-weight:bold;text-decoration:none;margin-top:20px;">פתח פאנל ניהול</a>
+    </div>"""
+    return _send_via_resend(admin_email, f"🎉 משתמש חדש: {new_user_email}", html, f"משתמש חדש נרשם: {new_user_email} בתאריך {registered_at}")
+
+
 # ── Admin error report ───────────────────────────────────────────────────────
 
 def send_admin_error_report(admin_email: str, failed_items: list) -> bool:
