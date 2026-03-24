@@ -20,9 +20,9 @@ jobs:
           from datetime import datetime, timezone, timedelta
 
           RAILWAY_URL = "https://backboard.railway.app/graphql/v2"
-          RAILWAY_TOKEN = os.environ["RAILWAY_TOKEN"]
-          TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
-          TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
+          RAILWAY_TOKEN = os.environ["RAILWAY_TOKEN"].strip()
+          TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"].strip()
+          TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"].strip()
           PROJECT_ID = "4c3574c6-e57a-48c2-bfe1-c272f0e851de"
           SERVICE_ID = "6364954c-cf2c-4684-8148-c0849501704d"
 
