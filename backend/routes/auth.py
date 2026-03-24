@@ -90,6 +90,7 @@ async def verify_email(token: str, db: AsyncSession = Depends(get_db)):
         return HTMLResponse("<html><body>User not found</body></html>", status_code=404)
 
     already_verified = user.is_verified
+    new_user_email = user.email  # save before commit (object expires after commit)
     user.is_verified = True
     await db.commit()
 
@@ -99,7 +100,7 @@ async def verify_email(token: str, db: AsyncSession = Depends(get_db)):
         admins = admins_result.scalars().all()
         from backend.notifier import send_admin_new_user_notification
         for admin in admins:
-            send_admin_new_user_notification(admin.email, user.email)
+            send_admin_new_user_notification(admin.email, new_user_email)
 
     return HTMLResponse("""<html dir="rtl"><body style="font-family:Arial;text-align:center;padding:60px;background:#fffaf1;">
     <h2 style="color:#2e7d32;">✅ האימייל אומת בהצלחה!</h2>
