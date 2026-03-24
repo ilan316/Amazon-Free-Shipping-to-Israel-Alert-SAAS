@@ -12,24 +12,18 @@
 </head>
 <body>
 
-  <!-- Topbar -->
-  <div id="fixed-header">
-    <div class="index-topbar-outer">
-      <header class="index-topbar" id="index-topbar">
-        <div class="index-brand">
-          <img src="/static/logo-new.png" alt="logo" class="index-brand-logo" style="width:40px;height:40px;" />
-          <span>Amazon Israel Free Ship Alert</span>
-        </div>
-        <nav class="index-nav">
-          <a href="https://amzfreeil.com">אתר ראשי</a>
-          <a href="/settings">הגדרות</a>
-        </nav>
-        <div class="index-nav-cta">
-          <button class="index-btn index-btn-outline" onclick="logout()">יציאה</button>
-        </div>
-      </header>
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="navbar-logo">
+      <img src="/static/logo-new.png" alt="Amazon Israel Free Ship Alert" style="height:40px;">
+      <span id="user-email"></span>
     </div>
-  </div>
+    <div class="navbar-links">
+      <a href="https://amzfreeil.com">אתר ראשי</a>
+      <a href="/settings">הגדרות</a>
+      <button class="btn-logout" onclick="logout()">יציאה</button>
+    </div>
+  </nav>
 
   <!-- Welcome banner — new users only -->
   <div id="welcome-banner" style="display:none;" class="welcome-banner">
@@ -45,7 +39,7 @@
     </div>
   </div>
 
-  <div class="page" style="padding-top: 90px;">
+  <div class="page">
 
     <div id="system-banner" style="display:none; background:#fff3cd; border:1px solid #ffc107; border-radius:8px; padding:10px 20px; text-align:center; font-size:0.9rem; color:#856404; direction:rtl; margin-bottom:16px;"></div>
 
