@@ -3,27 +3,54 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>לוח הבקרה · Amazon Israel Alert</title>
+  <title>לוח הבקרה · Amazon Israel Free Ship Alert</title>
+  <link rel="icon" type="image/png" href="/static/logo-new.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=11">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800&family=Rubik:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v=12">
 </head>
 <body>
 
-  <!-- Navbar -->
-  <nav class="navbar">
-    <div class="navbar-logo">
-      <img src="/static/logo-new.png" alt="Amazon Israel Alert">
-    </div>
-    <div class="navbar-links">
-      <a href="/settings">הגדרות</a>
-      <button class="btn-logout" onclick="logout()">יציאה</button>
-    </div>
-  </nav>
+  <div class="bg-glow bg-glow-a"></div>
+  <div class="bg-glow bg-glow-b"></div>
 
-  <div id="system-banner" style="display:none; background:#fff3cd; border-bottom:1px solid #ffc107; padding:10px 20px; text-align:center; font-size:0.9rem; color:#856404; direction:rtl;"></div>
+  <!-- Topbar -->
+  <div id="fixed-header">
+    <div class="index-topbar-outer">
+      <header class="index-topbar" id="index-topbar">
+        <div class="index-brand">
+          <img src="/static/logo-new.png" alt="logo" class="index-brand-logo" />
+          <span>Amazon Israel Free Ship Alert</span>
+        </div>
+        <nav class="index-nav">
+          <a href="https://amzfreeil.com">אתר ראשי</a>
+          <a href="/settings">הגדרות</a>
+        </nav>
+        <div class="index-nav-cta">
+          <button class="index-btn index-btn-outline" onclick="logout()">יציאה</button>
+        </div>
+      </header>
+    </div>
+  </div>
 
-  <div class="page">
+  <!-- Welcome banner — new users only -->
+  <div id="welcome-banner" style="display:none;" class="welcome-banner">
+    <div class="welcome-banner-inner">
+      <span class="welcome-banner-close" onclick="closeWelcome()">✕</span>
+      <h3>ברוך הבא! 🎉</h3>
+      <p>כדי להתחיל — הדבק קישור לכל מוצר אמזון שתרצה לעקוב אחריו. נשלח לך מייל ברגע שיהיה משלוח חינם לישראל.</p>
+      <div class="welcome-steps">
+        <div class="welcome-step"><span>1</span> הדבק קישור מאמזון</div>
+        <div class="welcome-step"><span>2</span> לחץ "הוסף מוצר"</div>
+        <div class="welcome-step"><span>3</span> קבל מייל כשיש משלוח חינם</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" style="padding-top: 90px;">
+
+    <div id="system-banner" style="display:none; background:#fff3cd; border:1px solid #ffc107; border-radius:8px; padding:10px 20px; text-align:center; font-size:0.9rem; color:#856404; direction:rtl; margin-bottom:16px;"></div>
 
     <div class="dashboard-header">
       <div>
@@ -80,10 +107,40 @@
 
   </div>
 
-  <script src="/static/app.js?v=11"></script>
-  <script src="/static/dashboard.js?v=11"></script>
+  <!-- Footer -->
+  <footer class="index-footer">
+    <div class="index-topbar index-footer-topbar">
+      <div class="index-brand">
+        <img src="/static/logo-new.png" alt="logo" class="index-brand-logo" />
+        <span>Amazon Israel Free Ship Alert</span>
+      </div>
+      <div class="index-footer-links">
+        <a href="https://amzfreeil.com/privacy.html">מדיניות פרטיות</a>
+        <a href="https://amzfreeil.com#disclosure">גילוי נאות</a>
+      </div>
+    </div>
+    <p class="index-footer-copy">© 2026 Amazon Israel Free Ship Alert · לא שייך לאמזון בע"מ</p>
+  </footer>
+
+  <script src="/static/app.js?v=12"></script>
+  <script src="/static/dashboard.js?v=12"></script>
   <script>
     requireAuth();
+
+    // Welcome banner for new users
+    if (localStorage.getItem("new_user") === "1") {
+      document.getElementById("welcome-banner").style.display = "block";
+      localStorage.removeItem("new_user");
+    }
+    function closeWelcome() {
+      document.getElementById("welcome-banner").style.display = "none";
+    }
+
+    // Scroll effect
+    window.addEventListener('scroll', () => {
+      const t = document.getElementById('index-topbar');
+      if (t) t.classList.toggle('scrolled', window.scrollY > 20);
+    });
 
     apiFetch("/me").then(async res => {
       if (res && res.ok) {

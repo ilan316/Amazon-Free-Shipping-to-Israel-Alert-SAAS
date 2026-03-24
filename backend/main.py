@@ -96,6 +96,21 @@ async def lifespan(app: FastAPI):
     reschedule_check_job(check_hour, check_minute)
     logger.info(f"Scheduler started — daily check at {check_hour:02d}:{check_minute:02d} Israel time, summary at {daily_hour:02d}:00")
 
+    # Re-apply pause state from DB (survives deployments)
+    try:
+        from backend.database import AsyncSessionLocal
+        from backend.models import SystemSetting
+        from sqlalchemy import select as _select
+        async with AsyncSessionLocal() as _db:
+            _row = (await _db.execute(_select(SystemSetting).where(SystemSetting.key == "system_paused"))).scalar_one_or_none()
+            if _row and _row.value == "true":
+                for job_id in ("global_check", "daily_summary"):
+                    if scheduler.get_job(job_id):
+                        scheduler.pause_job(job_id)
+                logger.info("Checks paused on startup (system_paused=true in DB)")
+    except Exception as e:
+        logger.warning(f"Could not read system_paused from DB: {e}")
+
     yield
 
     # ── Shutdown ─────────────────────────────────────────────────────────────

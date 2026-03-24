@@ -224,7 +224,7 @@ async def get_global_product_limit(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "max_products_per_user"))).scalar_one_or_none()
-    return {"limit": int(row.value) if row else 20}
+    return {"limit": int(row.value) if row else 10}
 
 
 @router.post("/global-product-limit")
@@ -582,30 +582,50 @@ async def verify_email_change(
 
 
 @router.get("/checks-status")
-async def checks_status(admin: Annotated[User, Depends(get_current_admin)]):
-    from backend.main import scheduler
-    job = scheduler.get_job("global_check")
-    paused = job is not None and job.next_run_time is None
+async def checks_status(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "system_paused"))).scalar_one_or_none()
+    paused = row is not None and row.value == "true"
     return {"paused": paused}
 
 
 @router.post("/pause-checks")
-async def pause_checks(admin: Annotated[User, Depends(get_current_admin)]):
+async def pause_checks(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
     from backend.main import scheduler
     for job_id in ("global_check", "daily_summary"):
         job = scheduler.get_job(job_id)
         if job:
             scheduler.pause_job(job_id)
+    row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "system_paused"))).scalar_one_or_none()
+    if row:
+        row.value = "true"
+    else:
+        db.add(SystemSetting(key="system_paused", value="true"))
+    await db.commit()
     return {"paused": True, "message": "הבדיקות הושהו"}
 
 
 @router.post("/resume-checks")
-async def resume_checks(admin: Annotated[User, Depends(get_current_admin)]):
+async def resume_checks(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
     from backend.main import scheduler
     for job_id in ("global_check", "daily_summary"):
         job = scheduler.get_job(job_id)
         if job:
             scheduler.resume_job(job_id)
+    row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "system_paused"))).scalar_one_or_none()
+    if row:
+        row.value = "false"
+    else:
+        db.add(SystemSetting(key="system_paused", value="false"))
+    await db.commit()
     return {"paused": False, "message": "הבדיקות הופעלו מחדש"}
 
 

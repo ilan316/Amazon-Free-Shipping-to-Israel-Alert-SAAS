@@ -302,18 +302,22 @@ function filterUsers(query) {
 }
 
 async function loadUsers() {
-  const res = await apiFetch("/admin/users");
-  if (!res || !res.ok) return;
-  const users = await res.json();
+  const [usersRes, limitRes] = await Promise.all([
+    apiFetch("/admin/users"),
+    apiFetch("/admin/global-product-limit"),
+  ]);
+  if (!usersRes || !usersRes.ok) return;
+  const users = await usersRes.json();
   _allUsers = users;
+  const globalLimit = (limitRes && limitRes.ok) ? (await limitRes.json()).limit : 10;
+  // Keep input in sync
+  const globalLimitEl = document.getElementById("product-limit-input");
+  if (globalLimitEl) globalLimitEl.value = globalLimit;
   const tbody = document.getElementById("users-body");
   if (!users.length) {
     tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">אין משתמשים</td></tr>';
     return;
   }
-  // Read current global limit for display
-  const globalLimitEl = document.getElementById("product-limit-input");
-  const globalLimit = globalLimitEl ? parseInt(globalLimitEl.value) || 20 : 20;
 
   tbody.innerHTML = users.map(u => {
     const isCustom = u.max_products !== null && u.max_products !== undefined;

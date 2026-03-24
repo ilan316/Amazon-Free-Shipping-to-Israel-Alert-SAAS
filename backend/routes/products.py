@@ -14,7 +14,7 @@ from backend.models import User, Product, UserProduct, NotificationLog, SystemSe
 from backend.auth import get_current_user
 from backend.schemas import AddProductRequest, ProductResponse, MessageResponse
 
-DEFAULT_MAX_PRODUCTS = 20
+DEFAULT_MAX_PRODUCTS = 10
 
 
 class RenameRequest(BaseModel):

@@ -89,8 +89,18 @@ async def verify_email(token: str, db: AsyncSession = Depends(get_db)):
     if not user:
         return HTMLResponse("<html><body>User not found</body></html>", status_code=404)
 
+    already_verified = user.is_verified
     user.is_verified = True
     await db.commit()
+
+    # Notify all admins only on first verification (prevents duplicate emails from email-client prefetch)
+    if not already_verified:
+        admins_result = await db.execute(select(User).where(User.is_admin == True, User.is_active == True))
+        admins = admins_result.scalars().all()
+        from backend.notifier import send_admin_new_user_notification
+        for admin in admins:
+            send_admin_new_user_notification(admin.email, user.email)
+
     return HTMLResponse("""<html dir="rtl"><body style="font-family:Arial;text-align:center;padding:60px;background:#fffaf1;">
     <h2 style="color:#2e7d32;">✅ האימייל אומת בהצלחה!</h2>
     <p>כעת תוכל להתחבר לחשבון שלך.</p>
