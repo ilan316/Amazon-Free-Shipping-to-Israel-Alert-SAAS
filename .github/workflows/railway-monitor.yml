@@ -10,26 +10,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check Railway logs and notify Telegram
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python3 << 'EOF'
-          import urllib.request, json, sys
+          python3 - << 'EOF'
+          import urllib.request, json, sys, os
           from datetime import datetime, timezone, timedelta
 
           RAILWAY_URL = "https://backboard.railway.app/graphql/v2"
-          RAILWAY_TOKEN = "${{ secrets.RAILWAY_TOKEN }}"
-          TELEGRAM_TOKEN = "${{ secrets.TELEGRAM_BOT_TOKEN }}"
-          TELEGRAM_CHAT_ID = "${{ secrets.TELEGRAM_CHAT_ID }}"
+          RAILWAY_TOKEN = os.environ["RAILWAY_TOKEN"]
+          TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
+          TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
           PROJECT_ID = "4c3574c6-e57a-48c2-bfe1-c272f0e851de"
           SERVICE_ID = "6364954c-cf2c-4684-8148-c0849501704d"
 
           def railway_query(query):
               data = json.dumps({"query": query}).encode("utf-8")
-              req = urllib.request.Request(RAILWAY_URL, data=data, headers={"Authorization": f"Bearer {RAILWAY_TOKEN}", "Content-Type": "application/json"})
+              req = urllib.request.Request(RAILWAY_URL, data=data, headers={
+                  "Authorization": f"Bearer {RAILWAY_TOKEN}",
+                  "Content-Type": "application/json"
+              })
               return json.loads(urllib.request.urlopen(req, timeout=30).read().decode())
 
           def send_telegram(message):
               data = json.dumps({"chat_id": int(TELEGRAM_CHAT_ID), "text": message}).encode("utf-8")
-              req = urllib.request.Request(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", data=data, headers={"Content-Type": "application/json"})
+              req = urllib.request.Request(
+                  f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                  data=data,
+                  headers={"Content-Type": "application/json"}
+              )
               urllib.request.urlopen(req, timeout=30)
 
           now = datetime.now(timezone.utc)
@@ -37,15 +48,22 @@ jobs:
           current_time = now.strftime("%Y-%m-%d %H:%M UTC")
 
           try:
-              result = railway_query(f'{{ deployments(input: {{ projectId: "{PROJECT_ID}", serviceId: "{SERVICE_ID}" }}) {{ edges {{ node {{ id status createdAt }} }} }} }}')
+              result = railway_query(
+                  '{ deployments(input: { projectId: "' + PROJECT_ID + '", serviceId: "' + SERVICE_ID + '" }) '
+                  '{ edges { node { id status createdAt } } } }'
+              )
               deployments = result["data"]["deployments"]["edges"]
-              recent = [d["node"] for d in deployments if datetime.fromisoformat(d["node"]["createdAt"].replace("Z", "+00:00")) >= since]
+              recent = [d["node"] for d in deployments
+                        if datetime.fromisoformat(d["node"]["createdAt"].replace("Z", "+00:00")) >= since]
               failed = [d for d in recent if d["status"] in ("FAILED", "CRASHED")]
               latest_id = deployments[0]["node"]["id"] if deployments else None
 
               errors_found = []
               if latest_id:
-                  logs_result = railway_query(f'{{ deploymentLogs(deploymentId: "{latest_id}", limit: 500) {{ message severity timestamp }} }}')
+                  logs_result = railway_query(
+                      '{ deploymentLogs(deploymentId: "' + latest_id + '", limit: 500) '
+                      '{ message severity timestamp } }'
+                  )
                   logs = logs_result.get("data", {}).get("deploymentLogs", [])
                   keywords = ["error", "fatal", "crash", "exception", "unhandled", "timeout"]
                   for log in logs:
@@ -53,18 +71,36 @@ jobs:
                           errors_found.append(log.get("message", "")[:120])
 
               if not failed and not errors_found:
-                  message = f"Railway Monitor - aware-wisdom\n\nStatus: OK\nPeriod: Last 24 hours\nDeployments: {len(recent)} total, 0 failed\nErrors in logs: None\nTime: {current_time}"
+                  message = (
+                      "Railway Monitor - aware-wisdom\n\n"
+                      "Status: OK\n"
+                      f"Period: Last 24 hours\n"
+                      f"Deployments: {len(recent)} total, 0 failed\n"
+                      "Errors in logs: None\n"
+                      f"Time: {current_time}"
+                  )
               else:
                   top_errors = "\n".join(errors_found[:5]) if errors_found else "None"
-                  message = f"Railway Monitor - aware-wisdom\n\nStatus: WARNING\nPeriod: Last 24 hours\nDeployments: {len(recent)} total, {len(failed)} failed\nErrors in logs: {len(errors_found)}\nTop issues:\n{top_errors}\nTime: {current_time}"
+                  message = (
+                      "Railway Monitor - aware-wisdom\n\n"
+                      "Status: WARNING\n"
+                      f"Period: Last 24 hours\n"
+                      f"Deployments: {len(recent)} total, {len(failed)} failed\n"
+                      f"Errors in logs: {len(errors_found)}\n"
+                      f"Top issues:\n{top_errors}\n"
+                      f"Time: {current_time}"
+                  )
 
               send_telegram(message)
-              print("Sent:", message)
+              print("Sent successfully:")
+              print(message)
 
           except Exception as e:
-              msg = f"Railway Monitor - aware-wisdom\n\nStatus: ERROR\nFailed to check: {str(e)}\nTime: {current_time}"
-              try: send_telegram(msg)
-              except: pass
+              msg = f"Railway Monitor - aware-wisdom\n\nStatus: ERROR\nFailed: {str(e)}\nTime: {current_time}"
+              try:
+                  send_telegram(msg)
+              except Exception as te:
+                  print(f"Telegram also failed: {te}")
               print(f"Error: {e}")
               sys.exit(1)
           EOF
