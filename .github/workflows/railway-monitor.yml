@@ -8,15 +8,18 @@ on:
 jobs:
   check-logs:
     runs-on: ubuntu-latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
     steps:
+      - name: Install requests
+        run: pip install requests -q
+
       - name: Check Railway logs and notify Telegram
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python3 - << 'EOF'
-          import urllib.request, json, sys, os
+          python3 << 'PYEOF'
+          import requests, os, sys
           from datetime import datetime, timezone, timedelta
 
           RAILWAY_URL = "https://backboard.railway.app/graphql/v2"
@@ -26,22 +29,24 @@ jobs:
           PROJECT_ID = "4c3574c6-e57a-48c2-bfe1-c272f0e851de"
           SERVICE_ID = "6364954c-cf2c-4684-8148-c0849501704d"
 
+          HEADERS = {
+              "Authorization": f"Bearer {RAILWAY_TOKEN}",
+              "Content-Type": "application/json",
+              "User-Agent": "Mozilla/5.0 (compatible; railway-monitor/1.0)"
+          }
+
           def railway_query(query):
-              data = json.dumps({"query": query}).encode("utf-8")
-              req = urllib.request.Request(RAILWAY_URL, data=data, headers={
-                  "Authorization": f"Bearer {RAILWAY_TOKEN}",
-                  "Content-Type": "application/json"
-              })
-              return json.loads(urllib.request.urlopen(req, timeout=30).read().decode())
+              resp = requests.post(RAILWAY_URL, json={"query": query}, headers=HEADERS, timeout=30)
+              resp.raise_for_status()
+              return resp.json()
 
           def send_telegram(message):
-              data = json.dumps({"chat_id": int(TELEGRAM_CHAT_ID), "text": message}).encode("utf-8")
-              req = urllib.request.Request(
+              resp = requests.post(
                   f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-                  data=data,
-                  headers={"Content-Type": "application/json"}
+                  json={"chat_id": int(TELEGRAM_CHAT_ID), "text": message},
+                  timeout=30
               )
-              urllib.request.urlopen(req, timeout=30)
+              resp.raise_for_status()
 
           now = datetime.now(timezone.utc)
           since = now - timedelta(hours=24)
@@ -49,8 +54,8 @@ jobs:
 
           try:
               result = railway_query(
-                  '{ deployments(input: { projectId: "' + PROJECT_ID + '", serviceId: "' + SERVICE_ID + '" }) '
-                  '{ edges { node { id status createdAt } } } }'
+                  '{ deployments(input: { projectId: "' + PROJECT_ID + '", serviceId: "' + SERVICE_ID + '" })'
+                  ' { edges { node { id status createdAt } } } }'
               )
               deployments = result["data"]["deployments"]["edges"]
               recent = [d["node"] for d in deployments
@@ -61,8 +66,8 @@ jobs:
               errors_found = []
               if latest_id:
                   logs_result = railway_query(
-                      '{ deploymentLogs(deploymentId: "' + latest_id + '", limit: 500) '
-                      '{ message severity timestamp } }'
+                      '{ deploymentLogs(deploymentId: "' + latest_id + '", limit: 500)'
+                      ' { message severity timestamp } }'
                   )
                   logs = logs_result.get("data", {}).get("deploymentLogs", [])
                   keywords = ["error", "fatal", "crash", "exception", "unhandled", "timeout"]
@@ -103,4 +108,4 @@ jobs:
                   print(f"Telegram also failed: {te}")
               print(f"Error: {e}")
               sys.exit(1)
-          EOF
+          PYEOF
