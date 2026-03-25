@@ -58,7 +58,7 @@ function updateNextCheckDisplay(nextCheckAt) {
 async function loadProducts(silent = false) {
   const list = document.getElementById("products-list");
   if (!silent) {
-    list.innerHTML = '<div class="skeleton"></div><div class="skeleton" style="margin-top:10px;"></div>';
+    list.innerHTML = ['','',''].map(() => `<div class="skeleton" style="margin-bottom:10px;"></div>`).join('');
   }
 
   const res = await apiFetch("/me/products");
@@ -334,7 +334,7 @@ async function addProduct() {
     checkingAsins.add(newProduct.asin);
     products.unshift(newProduct);
     renderProducts();
-    showAlert(alertEl, `✅ מוצר ${newProduct.asin} נוסף — בודק סטטוס...`, "success");
+    showToast(`✅ מוצר ${newProduct.asin} נוסף — בודק סטטוס...`, "success");
 
     // Trigger immediate check for all unchecked products
     apiFetch("/me/products/check-new", { method: "POST" }).catch(() => {});
@@ -376,7 +376,7 @@ async function addProductsBulk(items, input, btn, alertEl) {
   renderProducts();
 
   if (errors.length === 0) {
-    showAlert(alertEl, `✅ נוספו ${added} מוצרים — בודק סטטוס...`, "success");
+    showToast(`✅ נוספו ${added} מוצרים — בודק סטטוס...`, "success");
   } else {
     showAlert(alertEl,
       `נוספו ${added} מוצרים${errors.length ? `. שגיאות: ${errors.join(' | ')}` : ''}`,

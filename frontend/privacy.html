@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>מדיניות פרטיות · Amazon Israel Alert</title>
+  <title>מדיניות פרטיות · Amazon Israel Free Ship Alert</title>
+  <link rel="icon" type="image/png" href="/static/logo-new.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=10">
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700&family=Rubik:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v=12">
   <style>
     .legal-page { max-width: 760px; margin: 40px auto; padding: 0 24px 60px; }
     .legal-page h1 { font-size: 1.8rem; margin-bottom: 8px; }
@@ -19,16 +20,32 @@
 </head>
 <body>
 
-  <nav class="navbar">
-    <div class="navbar-logo">
-      <img src="/static/logo-new.png" alt="Amazon Israel Alert">
+  <div class="bg-glow bg-glow-a"></div>
+  <div class="bg-glow bg-glow-b"></div>
+  <div id="fixed-header">
+    <div class="index-topbar-outer">
+      <header class="index-topbar" id="index-topbar">
+        <div class="index-brand">
+          <img src="/static/logo-new.png" alt="logo" class="index-brand-logo" />
+          <span>Amazon Israel Free Ship Alert</span>
+        </div>
+        <nav class="index-nav">
+          <a href="https://amzfreeil.com#features">יכולות</a>
+          <a href="https://amzfreeil.com#how">איך זה עובד</a>
+          <a href="https://amzfreeil.com/guide.html">מדריך Windows</a>
+          <a href="https://amzfreeil.com#faq">שאלות נפוצות</a>
+          <a href="https://amzfreeil.com#contact">צרו קשר</a>
+          <a href="https://amzfreeil.com/privacy.html">פרטיות</a>
+        </nav>
+        <div class="index-nav-cta">
+          <a class="index-btn index-btn-primary" href="https://amzfreeil.com">🌐 אתר ראשי</a>
+          <a class="index-btn index-btn-outline" href="https://amzfreeil.com#download">🪟 גרסת Windows</a>
+        </div>
+      </header>
     </div>
-    <div class="navbar-links">
-      <a href="/">חזרה לדף הבית</a>
-    </div>
-  </nav>
+  </div>
 
-  <div class="legal-page">
+  <div class="legal-page" style="padding-top: 90px;">
     <h1>מדיניות פרטיות</h1>
     <p class="updated">עודכן לאחרונה: מרץ 2026</p>
 
@@ -73,5 +90,24 @@
     <p>לכל שאלה בנושא פרטיות ניתן לפנות אלינו בכתובת: <a href="mailto:alerts@amzfreeil.com">alerts@amzfreeil.com</a></p>
   </div>
 
+  <footer class="index-footer">
+    <div class="index-topbar index-footer-topbar">
+      <div class="index-brand">
+        <img src="/static/logo-new.png" alt="logo" class="index-brand-logo" />
+        <span>Amazon Israel Free Ship Alert</span>
+      </div>
+      <div class="index-footer-links">
+        <a href="https://amzfreeil.com/privacy.html">מדיניות פרטיות</a>
+        <a href="https://amzfreeil.com#disclosure">גילוי נאות</a>
+      </div>
+    </div>
+    <p class="index-footer-copy">© 2026 Amazon Israel Free Ship Alert · לא שייך לאמזון בע"מ</p>
+  </footer>
+  <script>
+    window.addEventListener('scroll', () => {
+      const t = document.getElementById('index-topbar');
+      if (t) t.classList.toggle('scrolled', window.scrollY > 20);
+    });
+  </script>
 </body>
 </html>

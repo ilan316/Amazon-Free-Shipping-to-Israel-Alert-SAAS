@@ -3,33 +3,72 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Amazon Free Shipping to Israel Alert</title>
+  <title>Amazon Israel Free Ship Alert - קבל התראה כשיש משלוח חינם לישראל</title>
+  <meta name="description" content="עקוב אחרי מוצרי אמזון וקבל התראה במייל ברגע שמזוהה משלוח חינם לישראל. ללא התקנה, מכל מכשיר." />
+  <meta property="og:title" content="Amazon Israel Free Ship Alert - קבל התראה כשיש משלוח חינם לישראל" />
+  <meta property="og:description" content="עקוב אחרי מוצרי אמזון וקבל התראה במייל ברגע שמזוהה משלוח חינם לישראל." />
+  <meta property="og:image" content="https://amzfreeil.com/logo-new.png" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://app.amzfreeil.com" />
+  <link rel="icon" type="image/png" href="/static/logo-new.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=10">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800&family=Rubik:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v=11">
   <style>
-    .features { display: flex; gap: 20px; max-width: 860px; margin: 32px auto 0; padding: 0 16px; flex-wrap: wrap; }
-    .feature-card { flex: 1; min-width: 200px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-align: center; }
-    .feature-card .icon { font-size: 2rem; margin-bottom: 8px; }
-    .feature-card h3 { font-size: 0.95rem; margin-bottom: 6px; }
-    .feature-card p { font-size: 0.82rem; color: var(--text-muted); }
+    /* index-only overrides */
+    .features { display: flex; gap: 14px; max-width: 860px; margin: 32px auto 0; padding: 0 16px; flex-wrap: wrap; justify-content: center; }
+    .feature-card { flex: 0 1 calc(50% - 8px); min-width: 200px; background: rgba(255,255,255,0.78); border: 1px solid rgba(23,32,51,0.12); border-radius: 16px; padding: 20px 18px; text-align: center; backdrop-filter: blur(12px); transition: transform 200ms ease, box-shadow 200ms ease; }
+    .feature-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(23,32,51,0.1); }
+    .feature-card .icon { font-size: 2rem; margin-bottom: 10px; }
+    .feature-card h3 { font-size: 0.95rem; margin-bottom: 6px; font-family: "Rubik", sans-serif; font-weight: 700; }
+    .feature-card p { font-size: 0.84rem; color: var(--text-muted); line-height: 1.5; }
+    @media (max-width: 600px) { .feature-card { flex: 0 1 100%; } }
   </style>
 </head>
 <body>
 
-  <!-- Navbar -->
-  <nav class="navbar">
-    <div class="navbar-logo">
-      <img src="/static/logo-new.png" alt="Amazon Israel Alert">
+  <div class="bg-glow bg-glow-a"></div>
+  <div class="bg-glow bg-glow-b"></div>
+
+  <!-- Fixed Header -->
+  <div id="fixed-header">
+    <div class="index-urgency-bar">
+      <span class="index-urgency-dot"></span>
+      לא כל מוצר באמזון נשלח חינם לישראל — <strong>קבל התראה ברגע שמוצר מציע משלוח חינם</strong>
     </div>
-    <div class="navbar-links">
-      <a href="https://amzfreeil.com" target="_blank">אתר ראשי</a>
+    <div class="index-topbar-outer">
+      <header class="index-topbar" id="index-topbar">
+        <div class="index-brand">
+          <img src="/static/logo-new.png" alt="logo" class="index-brand-logo" />
+          <span>Amazon Israel Free Ship Alert</span>
+        </div>
+        <nav class="index-nav">
+          <a href="https://amzfreeil.com#features">יכולות</a>
+          <a href="https://amzfreeil.com#how">איך זה עובד</a>
+          <a href="https://amzfreeil.com/guide.html">מדריך Windows</a>
+          <a href="https://amzfreeil.com#faq">שאלות נפוצות</a>
+          <a href="https://amzfreeil.com#contact">צרו קשר</a>
+          <a href="https://amzfreeil.com/privacy.html">פרטיות</a>
+        </nav>
+        <div class="index-nav-cta">
+          <a class="index-btn index-btn-primary" href="https://amzfreeil.com">🌐 אתר ראשי</a>
+          <a class="index-btn index-btn-outline" href="https://amzfreeil.com#download">🪟 גרסת Windows</a>
+        </div>
+      </header>
     </div>
-  </nav>
+  </div>
+
+  <!-- Trust Bar -->
+  <div class="index-trust-bar">
+    <div class="index-trust-item"><span>🔔</span><span>התראה במייל אוטומטית</span></div>
+    <div class="index-trust-item"><span>⚙️</span><span>ניטור 24/7 בשרת</span></div>
+    <div class="index-trust-item"><span>🌐</span><span>ללא התקנה · מכל מכשיר</span></div>
+  </div>
 
   <!-- Hero -->
   <div class="auth-hero">
-    <h1>התראות משלוח חינם לישראל 🚚</h1>
+    <h1>🚚 התראות <span>משלוח חינם</span> לישראל</h1>
     <p>הוסף מוצרים, ואנחנו נעדכן אותך ברגע שיהיה משלוח חינם</p>
   </div>
 
@@ -37,7 +76,7 @@
   <div class="auth-card">
     <div class="auth-tabs">
       <button class="auth-tab active" id="tab-login" onclick="showTab('login')">כניסה</button>
-      <button class="auth-tab" id="tab-register" onclick="showTab('register')">הרשמה</button>
+      <button class="auth-tab" id="tab-register" onclick="showTab('register')"><span class="tab-badge">חינם</span> הרשמה</button>
     </div>
 
     <!-- Login panel -->
@@ -56,6 +95,7 @@
           <input type="password" id="login-password" required placeholder="••••••••">
         </div>
         <button type="submit" class="btn-primary" id="login-btn">כניסה</button>
+        <p class="auth-microcopy">ללא תשלום · בטוח · ניתן לבטל בכל עת</p>
       </form>
     </div>
 
@@ -93,7 +133,26 @@
           </label>
         </div>
         <button type="submit" class="btn-primary" id="register-btn">הרשמה</button>
+        <p class="auth-microcopy">ללא תשלום · בטוח · ניתן לבטל בכל עת</p>
       </form>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="index-stats-row">
+    <div class="index-stat">
+      <div class="index-stat-number"><strong>1500</strong><span>+</span></div>
+      <p>התראות נשלחו</p>
+    </div>
+    <div class="index-stat-divider"></div>
+    <div class="index-stat">
+      <div class="index-stat-number"><strong>₪150</strong><span>+</span></div>
+      <p>חסכון ממוצע לרכישה</p>
+    </div>
+    <div class="index-stat-divider"></div>
+    <div class="index-stat">
+      <div class="index-stat-number"><strong>500</strong><span>+</span></div>
+      <p>משתמשים פעילים</p>
     </div>
   </div>
 
@@ -121,7 +180,22 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=10"></script>
+  <!-- Footer -->
+  <footer class="index-footer">
+    <div class="index-topbar index-footer-topbar">
+      <div class="index-brand">
+        <img src="/static/logo-new.png" alt="logo" class="index-brand-logo" />
+        <span>Amazon Israel Free Ship Alert</span>
+      </div>
+      <div class="index-footer-links">
+        <a href="https://amzfreeil.com/privacy.html">מדיניות פרטיות</a>
+        <a href="https://amzfreeil.com#disclosure">גילוי נאות</a>
+      </div>
+    </div>
+    <p class="index-footer-copy">© 2026 Amazon Israel Free Ship Alert · לא שייך לאמזון בע"מ</p>
+  </footer>
+
+  <script src="/static/app.js?v=11"></script>
 
   <!-- Cookie Consent Banner -->
   <div id="cookie-banner" style="display:none;position:fixed;bottom:0;right:0;left:0;background:#1c2129;border-top:1px solid #30363d;padding:14px 24px;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;z-index:9999;font-size:0.88rem;">
@@ -148,6 +222,12 @@
     });
   </script>
   <script>
+    // Scroll effect on topbar
+    window.addEventListener('scroll', () => {
+      const t = document.getElementById('index-topbar');
+      if (t) t.classList.toggle('scrolled', window.scrollY > 20);
+    });
+
     // Redirect to dashboard if already logged in
     if (getToken()) window.location = "/dashboard";
 
@@ -228,6 +308,7 @@
         });
         if (!res) return;
         if (res.ok) {
+          localStorage.setItem("new_user", "1");
           showAlert(alertEl, "✅ נשלח אימייל אימות לכתובתך — בדוק את תיבת הדואר ואמת את החשבון", "success");
           document.getElementById("register-form").style.display = "none";
         } else {

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1280px;
+    height: 800px;
+    overflow: hidden;
+    background: #f3f3f3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: Arial, sans-serif;
+    direction: rtl;
+  }
+
+  .bg {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #1a233c 0%, #2d3d5e 50%, #1a233c 100%);
+  }
+
+  .center {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+  }
+
+  .tagline {
+    font-size: 22px;
+    color: rgba(255,255,255,0.6);
+    letter-spacing: 0.05em;
+    text-align: center;
+    direction: rtl;
+  }
+  .tagline strong {
+    color: #FFD700;
+  }
+
+  /* popup */
+  .popup {
+    width: 340px;
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,215,0,0.2);
+    direction: rtl;
+  }
+
+  .popup-header {
+    background: #1a233c;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .bell {
+    width: 36px; height: 36px;
+    background: #FFD700;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .title-text {
+    font-size: 14px;
+    font-weight: 700;
+    color: white;
+    line-height: 1.25;
+  }
+  .logout-btn {
+    font-size: 11px;
+    color: rgba(255,255,255,0.45);
+    background: none;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+  }
+
+  .popup-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: #f9f9f9;
+  }
+
+  .product-card {
+    background: #fff;
+    border: 1px solid #e5e5e5;
+    border-radius: 10px;
+    padding: 14px;
+    text-align: right;
+  }
+  .product-name {
+    font-size: 12.5px;
+    color: #111;
+    font-weight: 600;
+    line-height: 1.4;
+    margin-bottom: 8px;
+  }
+  .product-price {
+    font-size: 26px;
+    font-weight: 700;
+    color: #1a233c;
+  }
+  .product-price span {
+    color: #FFD700;
+  }
+
+  .add-btn {
+    width: 100%;
+    padding: 14px;
+    background: #FFD700;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #1a233c;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 4px 16px rgba(255,215,0,0.4);
+  }
+
+  .bottom-label {
+    font-size: 18px;
+    color: rgba(255,255,255,0.5);
+    text-align: center;
+    direction: ltr;
+  }
+  .bottom-label strong { color: white; }
+
+  /* decorative dots */
+  .dots {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size: 32px 32px;
+    z-index: 1;
+  }
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="dots"></div>
+
+<div class="center">
+  <div class="tagline">
+    <strong>הוסף מוצרי אמזון למעקב</strong> ישירות מהדפדפן — קבל התראות על משלוח חינם
+  </div>
+
+  <div class="popup">
+    <div class="popup-header">
+      <div class="header-title">
+        <div class="bell">🔔</div>
+        <div class="title-text">Amazon Israel<br>Free Ship Alert</div>
+      </div>
+      <button class="logout-btn">יציאה</button>
+    </div>
+
+    <div class="popup-body">
+      <div class="product-card">
+        <div class="product-name">acer Nitro V 15.6" FHD IPS 165Hz Gaming Laptop, Intel Core i5-13420H, NVIDIA GeForce RTX 5050 with 8GB GDDR7 VRAM, Win11H</div>
+        <div class="product-price"><span>$</span>764.35</div>
+      </div>
+
+      <button class="add-btn">+ הוסף למעקב</button>
+    </div>
+  </div>
+
+  <div class="bottom-label">
+    <strong>amzfreeil.com</strong> &nbsp;·&nbsp; Free Chrome Extension
+  </div>
+</div>
+</body>
+</html>

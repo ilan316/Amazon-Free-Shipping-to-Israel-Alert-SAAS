@@ -19,7 +19,6 @@
       <img src="/static/logo-new.png" alt="Amazon Israel Free Ship Alert">
     </div>
     <div class="navbar-links">
-      <span id="user-email" style="font-size:0.85rem;color:var(--text-muted);"></span>
       <a href="https://amzfreeil.com">אתר ראשי</a>
       <a href="/settings">הגדרות</a>
       <button class="btn-logout" onclick="logout()">יציאה</button>
@@ -57,7 +56,20 @@
       </div>
     </div>
 
-    <div id="notify-email-bar" style="display:none;"><span id="notify-email-display"></span></div>
+
+    <!-- Chrome Extension Banner -->
+    <div id="ext-banner" class="ext-banner">
+      <div class="ext-banner-inner">
+        <span class="ext-banner-icon">🧩</span>
+        <div class="ext-banner-text">
+          <strong>תוסף כרום חינמי</strong>
+          <span>הוסף מוצרים ישירות מדפי אמזון — בלחיצה אחת, ללא copy-paste</span>
+        </div>
+        <a href="https://chromewebstore.google.com/detail/amazon-israel-free-ship-a/mbickhgdhofaefhibfbgpacejhbelddn"
+           target="_blank" class="btn-ext">הורד לכרום</a>
+        <button class="ext-banner-close" onclick="dismissExtBanner()">✕</button>
+      </div>
+    </div>
 
     <!-- Add product -->
     <div class="add-product-card">
@@ -109,6 +121,15 @@
   <script>
     requireAuth();
 
+    // Extension banner dismissal
+    if (localStorage.getItem('ext_banner_dismissed')) {
+      document.getElementById('ext-banner').style.display = 'none';
+    }
+    function dismissExtBanner() {
+      document.getElementById('ext-banner').style.display = 'none';
+      localStorage.setItem('ext_banner_dismissed', '1');
+    }
+
     // Welcome banner for new users
     if (localStorage.getItem("new_user") === "1") {
       document.getElementById("welcome-banner").style.display = "block";
@@ -127,13 +148,6 @@
     apiFetch("/me").then(async res => {
       if (res && res.ok) {
         const user = await res.json();
-        document.getElementById("user-email").textContent = user.email;
-        const bar = document.getElementById("notify-email-bar");
-        const display = document.getElementById("notify-email-display");
-        if (bar && display && user.notify_email) {
-          display.textContent = user.notify_email;
-          bar.style.display = "flex";
-        }
       }
     });
 

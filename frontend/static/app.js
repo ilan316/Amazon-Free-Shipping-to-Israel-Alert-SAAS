@@ -55,6 +55,25 @@ function hideAlert(el) {
   el.className = "alert";
 }
 
+function showToast(msg, type = "info", duration = 3500) {
+  let container = document.getElementById("toast-container");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toast-container";
+    container.className = "toast-container";
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.textContent = msg;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transition = "opacity 0.3s";
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+
 async function logout() {
   clearToken();
   window.location = "/";
