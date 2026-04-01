@@ -8,18 +8,15 @@ on:
 jobs:
   check-logs:
     runs-on: ubuntu-latest
-    env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
     steps:
-      - name: Install requests
-        run: pip install requests -q
-
       - name: Check Railway logs and notify Telegram
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python3 << 'PYEOF'
-          import requests, os, sys
+          python3 - << 'EOF'
+          import urllib.request, json, sys, os
           from datetime import datetime, timezone, timedelta
 
           RAILWAY_URL = "https://backboard.railway.app/graphql/v2"
@@ -28,58 +25,78 @@ jobs:
           TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"].strip()
           PROJECT_ID = "4c3574c6-e57a-48c2-bfe1-c272f0e851de"
           SERVICE_ID = "6364954c-cf2c-4684-8148-c0849501704d"
-
-          HEADERS = {
-              "Authorization": f"Bearer {RAILWAY_TOKEN}",
-              "Content-Type": "application/json",
-              "User-Agent": "Mozilla/5.0 (compatible; railway-monitor/1.0)"
-          }
+          ENV_ID = "b0e14e4d-b474-4f97-8e08-fdb8a9c15271"
 
           def railway_query(query):
-              resp = requests.post(RAILWAY_URL, json={"query": query}, headers=HEADERS, timeout=30)
-              resp.raise_for_status()
-              return resp.json()
+              data = json.dumps({"query": query}).encode("utf-8")
+              req = urllib.request.Request(RAILWAY_URL, data=data, headers={
+                  "Authorization": f"Bearer {RAILWAY_TOKEN}",
+                  "Content-Type": "application/json"
+              })
+              return json.loads(urllib.request.urlopen(req, timeout=30).read().decode())
 
           def send_telegram(message):
-              resp = requests.post(
+              data = json.dumps({"chat_id": int(TELEGRAM_CHAT_ID), "text": message}).encode("utf-8")
+              req = urllib.request.Request(
                   f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-                  json={"chat_id": int(TELEGRAM_CHAT_ID), "text": message},
-                  timeout=30
+                  data=data, headers={"Content-Type": "application/json"}
               )
-              resp.raise_for_status()
+              urllib.request.urlopen(req, timeout=30)
+
+          def fetch_all_logs(since_str):
+              """Fetch all logs since a date using pagination (500 per page)."""
+              all_logs = []
+              after_date = since_str
+              while True:
+                  result = railway_query(
+                      '{ environmentLogs(environmentId: "' + ENV_ID + '", '
+                      'afterDate: "' + after_date + '", beforeLimit: 500) '
+                      '{ message severity timestamp } }'
+                  )
+                  page = result.get("data", {}).get("environmentLogs", [])
+                  if not page:
+                      break
+                  all_logs.extend(page)
+                  # If less than 500 returned, we have all logs
+                  if len(page) < 500:
+                      break
+                  # Paginate: use last log's timestamp as new afterDate
+                  last_ts = page[-1].get("timestamp", "")
+                  if not last_ts or last_ts == after_date:
+                      break
+                  after_date = last_ts
+              return all_logs
 
           now = datetime.now(timezone.utc)
           since = now - timedelta(hours=24)
+          since_str = since.strftime("%Y-%m-%dT%H:%M:%SZ")
           current_time = now.strftime("%Y-%m-%d %H:%M UTC")
 
           try:
+              # Deployments in last 24h
               result = railway_query(
-                  '{ deployments(input: { projectId: "' + PROJECT_ID + '", serviceId: "' + SERVICE_ID + '" })'
-                  ' { edges { node { id status createdAt } } } }'
+                  '{ deployments(input: { projectId: "' + PROJECT_ID + '", serviceId: "' + SERVICE_ID + '" }) '
+                  '{ edges { node { id status createdAt } } } }'
               )
               deployments = result["data"]["deployments"]["edges"]
               recent = [d["node"] for d in deployments
                         if datetime.fromisoformat(d["node"]["createdAt"].replace("Z", "+00:00")) >= since]
               failed = [d for d in recent if d["status"] in ("FAILED", "CRASHED")]
-              latest_id = deployments[0]["node"]["id"] if deployments else None
 
-              errors_found = []
-              if latest_id:
-                  logs_result = railway_query(
-                      '{ deploymentLogs(deploymentId: "' + latest_id + '", limit: 500)'
-                      ' { message severity timestamp } }'
-                  )
-                  logs = logs_result.get("data", {}).get("deploymentLogs", [])
-                  keywords = ["error", "fatal", "crash", "exception", "unhandled", "timeout"]
-                  for log in logs:
-                      if any(k in log.get("message", "").lower() for k in keywords):
-                          errors_found.append(log.get("message", "")[:120])
+              # All runtime logs via pagination
+              logs = fetch_all_logs(since_str)
+              print(f"Total logs fetched: {len(logs)}")
+
+              keywords = ["error", "fatal", "crash", "exception", "unhandled", "timeout"]
+              errors_found = [l.get("message", "")[:120] for l in logs
+                              if any(k in l.get("message", "").lower() for k in keywords)]
 
               if not failed and not errors_found:
                   message = (
                       "Railway Monitor - aware-wisdom\n\n"
                       "Status: OK\n"
                       f"Period: Last 24 hours\n"
+                      f"Total logs checked: {len(logs)}\n"
                       f"Deployments: {len(recent)} total, 0 failed\n"
                       "Errors in logs: None\n"
                       f"Time: {current_time}"
@@ -90,6 +107,7 @@ jobs:
                       "Railway Monitor - aware-wisdom\n\n"
                       "Status: WARNING\n"
                       f"Period: Last 24 hours\n"
+                      f"Total logs checked: {len(logs)}\n"
                       f"Deployments: {len(recent)} total, {len(failed)} failed\n"
                       f"Errors in logs: {len(errors_found)}\n"
                       f"Top issues:\n{top_errors}\n"
@@ -97,7 +115,7 @@ jobs:
                   )
 
               send_telegram(message)
-              print("Sent successfully:")
+              print("Sent:")
               print(message)
 
           except Exception as e:
@@ -105,7 +123,7 @@ jobs:
               try:
                   send_telegram(msg)
               except Exception as te:
-                  print(f"Telegram also failed: {te}")
+                  print(f"Telegram failed: {te}")
               print(f"Error: {e}")
               sys.exit(1)
-          PYEOF
+          EOF
