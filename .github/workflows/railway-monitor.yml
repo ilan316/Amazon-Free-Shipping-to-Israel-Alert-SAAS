@@ -31,7 +31,8 @@ jobs:
               data = json.dumps({"query": query}).encode("utf-8")
               req = urllib.request.Request(RAILWAY_URL, data=data, headers={
                   "Authorization": f"Bearer {RAILWAY_TOKEN}",
-                  "Content-Type": "application/json"
+                  "Content-Type": "application/json",
+                  "User-Agent": "Mozilla/5.0 (compatible; railway-monitor/1.0)"
               })
               return json.loads(urllib.request.urlopen(req, timeout=30).read().decode())
 
