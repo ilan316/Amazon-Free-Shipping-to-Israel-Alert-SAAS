@@ -994,7 +994,7 @@ body {
 }
 @media (max-width: 680px) {
   .index-topbar { flex-direction: column; gap: 10px; border-radius: 10px; }
-  .index-nav { flex-wrap: wrap; justify-content: center; gap: 8px 14px; }
+  .index-nav { position: static; transform: none; left: auto; flex-wrap: wrap; justify-content: center; gap: 8px 14px; }
   .index-nav a { font-size: 0.85rem; }
   .index-nav-cta { display: none; }
   .index-trust-bar { margin-top: 200px; }
