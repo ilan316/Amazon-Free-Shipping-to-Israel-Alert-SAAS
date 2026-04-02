@@ -66,7 +66,10 @@ async def lifespan(app: FastAPI):
 
     # Start scheduler first so the job store loads from DB — this allows
     # get_job() to correctly find previously persisted jobs.
+    # NOTE: add_job must come AFTER start() to avoid duplicate key errors when
+    # replace_existing=True races with the initial DB load on startup.
     daily_hour = int(os.environ.get("DAILY_SUMMARY_HOUR", "8"))
+    scheduler.start()
     scheduler.add_job(
         run_daily_summary,
         trigger="cron",
@@ -77,7 +80,6 @@ async def lifespan(app: FastAPI):
         misfire_grace_time=600,
         replace_existing=True,
     )
-    scheduler.start()
 
     from backend.scheduler import run_inactivity_check
     scheduler.add_job(
