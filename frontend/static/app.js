@@ -19,6 +19,14 @@ async function apiFetch(path, options = {}) {
     window.location = "/";
     return null;
   }
+  if (res.status === 429) {
+    showToast("יותר מדי ניסיונות — נסה שוב עוד דקה", "error");
+    return null;
+  }
+  if (res.status >= 500) {
+    showToast("שגיאת שרת — נסה שוב מאוחר יותר", "error");
+    return null;
+  }
   return res;
 }
 
