@@ -1098,7 +1098,7 @@ body {
 .testimonials-section {
   width: min(900px, 92vw);
   margin: 40px auto;
-  text-align: center;
+  padding: 0 16px;
 }
 .testimonials-section h2 {
   font-family: "Rubik", sans-serif;
@@ -1106,11 +1106,13 @@ body {
   font-weight: 800;
   margin-bottom: 20px;
   color: var(--text);
+  text-align: center;
 }
 .testimonials-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
+  direction: rtl;
 }
 .testimonial-card {
   background: var(--surface);
@@ -1151,7 +1153,7 @@ body {
   color: #fff;
   flex-shrink: 0;
 }
-@media (max-width: 680px) {
+@media (max-width: 760px) {
   .testimonials-grid { grid-template-columns: 1fr; }
 }
 
