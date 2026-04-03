@@ -194,6 +194,7 @@ a:hover { text-decoration: underline; }
 .form-group select {
   width: 100%;
   padding: 10px 12px;
+  min-height: 44px;
   border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 0.9rem;
@@ -218,6 +219,7 @@ a:hover { text-decoration: underline; }
 .btn-primary {
   width: 100%;
   padding: 12px;
+  min-height: 44px;
   background: var(--brand);
   color: #111;
   border: none;
@@ -234,6 +236,7 @@ a:hover { text-decoration: underline; }
 
 .btn-secondary {
   padding: 9px 18px;
+  min-height: 44px;
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
@@ -249,6 +252,7 @@ a:hover { text-decoration: underline; }
 
 .btn-danger {
   padding: 9px 18px;
+  min-height: 44px;
   background: none;
   color: var(--error);
   border: 1px solid var(--error);
@@ -325,6 +329,7 @@ a:hover { text-decoration: underline; }
 
 .btn-add {
   padding: 10px 20px;
+  min-height: 44px;
   background: var(--brand);
   color: #111;
   border: none;
@@ -451,6 +456,7 @@ a:hover { text-decoration: underline; }
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px 12px;
+  min-height: 44px;
   font-size: 0.8rem;
   color: var(--text-muted);
   cursor: pointer;
@@ -473,6 +479,7 @@ a:hover { text-decoration: underline; }
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 5px 10px;
+  min-height: 44px;
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
@@ -494,6 +501,7 @@ a:hover { text-decoration: underline; }
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px 12px;
+  min-height: 44px;
   font-size: 0.8rem;
   color: var(--text-muted);
   cursor: pointer;
