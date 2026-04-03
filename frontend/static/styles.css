@@ -1001,15 +1001,14 @@ body {
   .index-nav-cta { gap: 6px; }
 }
 @media (max-width: 680px) {
-  .index-topbar { flex-direction: column; gap: 10px; border-radius: 10px; }
-  .index-nav { position: static; transform: none; left: auto; flex-wrap: wrap; justify-content: center; gap: 8px 14px; }
-  .index-nav a { font-size: 0.85rem; }
+  .index-topbar { flex-direction: row; gap: 10px; border-radius: 10px; justify-content: center; }
+  .index-nav { display: none; }
   .index-nav-cta { display: none; }
-  .index-trust-bar { margin-top: 200px; }
-  .auth-hero { padding-top: 0; }
+  .index-trust-bar { display: none; }
+  .auth-hero { padding-top: 0; margin-top: 90px; }
+  .auth-hero h1 { font-size: 1.35rem; }
+  .auth-hero p { font-size: 0.88rem; }
   .index-urgency-bar { font-size: 0.8rem; padding: 8px 14px; }
-  .index-trust-bar { flex-direction: column; }
-  .index-trust-item { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.1); }
   .index-stats-row { flex-direction: column; gap: 12px; }
   .index-stat-divider { width: 80%; height: 1px; }
   .index-footer-topbar { flex-direction: column; gap: 10px; align-items: center; text-align: center; }

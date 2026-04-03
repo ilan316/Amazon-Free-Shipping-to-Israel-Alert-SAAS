@@ -86,12 +86,12 @@
   <!-- Auth card -->
   <div class="auth-card">
     <div class="auth-tabs">
-      <button class="auth-tab active" id="tab-login" onclick="showTab('login')">כניסה</button>
-      <button class="auth-tab" id="tab-register" onclick="showTab('register')"><span class="tab-badge">חינם</span> הרשמה</button>
+      <button class="auth-tab" id="tab-login" onclick="showTab('login')">כניסה</button>
+      <button class="auth-tab active" id="tab-register" onclick="showTab('register')"><span class="tab-badge">חינם</span> הרשמה</button>
     </div>
 
     <!-- Login panel -->
-    <div class="auth-panel active" id="panel-login">
+    <div class="auth-panel" id="panel-login">
       <div id="login-alert" class="alert"></div>
       <div id="resend-verify-link" style="display:none;font-size:0.85rem;text-align:center;margin-bottom:8px;">
         לא קיבלת אימייל אימות? <a href="#" onclick="resendVerification();return false;">לחץ כאן לשליחה מחדש</a>
@@ -111,7 +111,7 @@
     </div>
 
     <!-- Register panel -->
-    <div class="auth-panel" id="panel-register">
+    <div class="auth-panel active" id="panel-register">
       <div id="register-alert" class="alert"></div>
       <form id="register-form" onsubmit="doRegister(event)">
         <div class="form-group">
@@ -148,6 +148,11 @@
       </form>
     </div>
   </div>
+
+  <!-- Contact hint -->
+  <p style="text-align:center;font-size:0.82rem;color:var(--text-muted);margin:8px 0 24px;">
+    שאלות? <a href="https://amzfreeil.com#contact" style="color:var(--brand);">צרו קשר</a>
+  </p>
 
   <!-- Stats -->
   <div class="index-stats-row">
