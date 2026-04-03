@@ -36,21 +36,34 @@ async def _get_check_time() -> tuple:
 def reschedule_check_job(hour: int, minute: int):
     """Schedule the global_check job as a daily cron at the given time (Israel time)."""
     from backend.scheduler import run_global_check_cycle
-    scheduler.add_job(
-        run_global_check_cycle,
-        trigger="cron",
-        hour=hour,
-        minute=minute,
-        timezone="Asia/Jerusalem",
-        id="global_check",
-        misfire_grace_time=300,
-        replace_existing=True,
-    )
+    _upsert_job(run_global_check_cycle, "global_check", dict(
+        trigger="cron", hour=hour, minute=minute, timezone="Asia/Jerusalem", misfire_grace_time=300
+    ))
     logger.info(f"global_check scheduled daily at {hour:02d}:{minute:02d} Israel time")
 
 _db_url = os.environ.get("DATABASE_URL", "")
 _jobstores = {"default": SQLAlchemyJobStore(url=_db_url)} if _db_url else {}
 scheduler = AsyncIOScheduler(timezone="UTC", jobstores=_jobstores)
+
+
+def _upsert_job(func, job_id: str, kwargs: dict):
+    """Add or reschedule a job, avoiding duplicate key errors during rolling deploys.
+
+    During Railway rolling restarts, two processes may run concurrently.
+    Using add_job(replace_existing=True) does DELETE+INSERT which can race.
+    This helper uses reschedule_job (UPDATE) when the job already exists in
+    memory (loaded from DB by scheduler.start()), and add_job (INSERT) only
+    when the job is genuinely new.
+    """
+    if scheduler.get_job(job_id):
+        from apscheduler.triggers.cron import CronTrigger
+        trigger_kwargs = {k: v for k, v in kwargs.items()
+                         if k in ("hour", "minute", "second", "timezone")}
+        scheduler.reschedule_job(job_id, trigger=CronTrigger(**trigger_kwargs))
+        logger.debug(f"Rescheduled existing job: {job_id}")
+    else:
+        scheduler.add_job(func, **kwargs, id=job_id)
+        logger.debug(f"Added new job: {job_id}")
 
 
 @asynccontextmanager
@@ -64,34 +77,22 @@ async def lifespan(app: FastAPI):
 
     await browser_manager.startup()
 
-    # Start scheduler first so the job store loads from DB — this allows
-    # get_job() to correctly find previously persisted jobs.
-    # NOTE: add_job must come AFTER start() to avoid duplicate key errors when
-    # replace_existing=True races with the initial DB load on startup.
+    # Start scheduler first so the job store loads existing jobs from DB into memory.
+    # Then use _upsert_job() which does reschedule_job (UPDATE) if the job already
+    # exists, and add_job (INSERT) only for new jobs. This avoids the duplicate key
+    # error that occurs during Railway rolling restarts when two processes both try
+    # to DELETE+INSERT the same job simultaneously.
     daily_hour = int(os.environ.get("DAILY_SUMMARY_HOUR", "8"))
     scheduler.start()
-    scheduler.add_job(
-        run_daily_summary,
-        trigger="cron",
-        hour=daily_hour,
-        minute=0,
-        timezone="Asia/Jerusalem",
-        id="daily_summary",
-        misfire_grace_time=600,
-        replace_existing=True,
-    )
 
     from backend.scheduler import run_inactivity_check
-    scheduler.add_job(
-        run_inactivity_check,
-        trigger="cron",
-        hour=3,
-        minute=0,
-        timezone="Asia/Jerusalem",
-        id="inactivity_check",
-        misfire_grace_time=600,
-        replace_existing=True,
-    )
+
+    _upsert_job(run_daily_summary, "daily_summary", dict(
+        trigger="cron", hour=daily_hour, minute=0, timezone="Asia/Jerusalem", misfire_grace_time=600
+    ))
+    _upsert_job(run_inactivity_check, "inactivity_check", dict(
+        trigger="cron", hour=3, minute=0, timezone="Asia/Jerusalem", misfire_grace_time=600
+    ))
 
     # Read daily check time from DB (cron trigger — no timer reset on deploy)
     check_hour, check_minute = await _get_check_time()
