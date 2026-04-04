@@ -231,3 +231,7 @@ if os.path.isdir(frontend_dir):
     @app.get("/robots.txt", include_in_schema=False)
     async def serve_robots():
         return FileResponse(os.path.join(frontend_dir, "robots.txt"), media_type="text/plain")
+
+    @app.get("/sitemap.xml", include_in_schema=False)
+    async def serve_sitemap():
+        return FileResponse(os.path.join(frontend_dir, "sitemap.xml"), media_type="application/xml")
