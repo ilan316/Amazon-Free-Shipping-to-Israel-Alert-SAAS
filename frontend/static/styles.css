@@ -1013,6 +1013,9 @@ body {
   .index-stat-divider { width: 80%; height: 1px; }
   .index-footer-topbar { flex-direction: column; gap: 10px; align-items: center; text-align: center; }
   .index-footer-links { justify-content: center; }
+  /* Prevent iOS auto-zoom on input focus */
+  .form-group input,
+  .form-group select { font-size: 16px; }
 }
 
 /* ── Product card status borders ── */

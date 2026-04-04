@@ -1,0 +1,8 @@
+User-agent: *
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /admin
+Disallow: /admin/login
+Allow: /
+
+Sitemap: https://app.amzfreeil.com/sitemap.xml
