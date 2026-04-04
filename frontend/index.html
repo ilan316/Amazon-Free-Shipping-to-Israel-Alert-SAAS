@@ -37,6 +37,8 @@
     .feature-card .icon { font-size: 2rem; margin-bottom: 10px; }
     .feature-card h3 { font-size: 0.95rem; margin-bottom: 6px; font-family: "Rubik", sans-serif; font-weight: 700; }
     .feature-card p { font-size: 0.84rem; color: var(--text-muted); line-height: 1.5; }
+    .feature-card--featured { border-color: rgba(255,153,0,0.5); box-shadow: 0 0 0 2px rgba(255,153,0,0.18); }
+    .feature-card--featured h3 { color: #ff6a00; }
     @media (max-width: 600px) { .feature-card { flex: 0 1 100%; } }
   </style>
 </head>
@@ -82,8 +84,8 @@
 
   <!-- Hero -->
   <div class="auth-hero">
-    <h1>🚚 התראות <span>משלוח חינם</span> לישראל</h1>
-    <p>הוסף מוצרים, ואנחנו נעדכן אותך ברגע שיהיה משלוח חינם</p>
+    <h1>חסוך <span>₪150+</span> על כל הזמנה מאמזון</h1>
+    <p>הוסף מוצר אחד — קבל מייל ברגע שמשלוח חינם לישראל זמין 🚚</p>
   </div>
 
   <!-- Pricing strip -->
@@ -99,6 +101,9 @@
 
   <!-- Auth card -->
   <div class="auth-card">
+    <div class="auth-card-header">
+      <p>הצטרף חינם — קבל התראה כשיש משלוח חינם</p>
+    </div>
     <div class="auth-tabs">
       <button class="auth-tab" id="tab-login" onclick="showTab('login')">כניסה</button>
       <button class="auth-tab active" id="tab-register" onclick="showTab('register')"><span class="tab-badge">חינם</span> הרשמה</button>
@@ -158,7 +163,7 @@
           </label>
         </div>
         <button type="submit" class="btn-primary" id="register-btn">הרשמה</button>
-        <p class="auth-microcopy">🔒 ללא תשלום · SSL מוצפן · ללא כרטיס אשראי</p>
+        <p class="auth-microcopy">🔒 חינמי לחלוטין · 500+ משתמשים פעילים · ללא מחויבות</p>
       </form>
     </div>
   </div>
@@ -188,7 +193,7 @@
 
   <!-- Features -->
   <div class="features">
-    <div class="feature-card">
+    <div class="feature-card feature-card--featured">
       <div class="icon">📦</div>
       <h3>עקוב אחרי מוצרים</h3>
       <p>הוסף כל מוצר מאמזון לפי URL או ASIN</p>

@@ -922,6 +922,20 @@ body {
   max-width: 480px !important;
 }
 
+.auth-card-header {
+  background: linear-gradient(135deg, #ff9900, #ff6a00);
+  padding: 14px 24px;
+  text-align: center;
+  border-radius: 20px 20px 0 0;
+}
+.auth-card-header p {
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-family: "Rubik", sans-serif;
+  margin: 0;
+}
+
 /* Button gradient */
 .btn-primary {
   background: linear-gradient(135deg, #ff9900, #ff6a00) !important;
