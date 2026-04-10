@@ -86,6 +86,9 @@ jobs:
 
               # All runtime logs via pagination
               logs = fetch_all_logs(since_str)
+              # Filter out any logs outside the 24h window (Railway API may return stale logs)
+              logs = [l for l in logs if l.get("timestamp") and
+                      datetime.fromisoformat(l["timestamp"].replace("Z", "+00:00")) >= since]
               print(f"Total logs fetched: {len(logs)}")
 
               keywords = ["error", "fatal", "crash", "exception", "unhandled", "timeout"]
