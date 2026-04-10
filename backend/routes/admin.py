@@ -38,11 +38,13 @@ async def get_stats(
             select(func.count()).select_from(NotificationLog).where(NotificationLog.sent_at >= today)
         )
     ).scalar()
+    unverified = (await db.execute(select(func.count()).select_from(User).where(User.is_admin == False, User.is_verified == False))).scalar()
     return {
         "total_users": total_users,
         "total_admins": total_admins,
         "total_products": total_products,
         "notifications_24h": notifs_today,
+        "unverified_users": unverified,
     }
 
 
@@ -68,6 +70,7 @@ async def list_users(
             "notify_email": u.notify_email,
             "is_active": u.is_active,
             "is_admin": u.is_admin,
+            "is_verified": u.is_verified,
             "created_at": u.created_at.isoformat() if u.created_at else None,
             "product_count": product_count_map.get(u.id, 0),
             "max_products": u.max_products,
