@@ -136,3 +136,77 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
     user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
     return TokenResponse(access_token=create_access_token(user.id))
+
+
+@router.post("/google", response_model=TokenResponse)
+@limiter.limit("10/minute")
+async def google_login(request: Request, db: AsyncSession = Depends(get_db)):
+    """Sign in / sign up with a Google ID token."""
+    body = await request.json()
+    credential = body.get("credential", "").strip()
+    if not credential:
+        raise HTTPException(status_code=400, detail="Missing credential")
+
+    client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+    if not client_id:
+        raise HTTPException(status_code=503, detail="Google login not configured")
+
+    # Verify the ID token with Google
+    import httpx
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(
+            "https://oauth2.googleapis.com/tokeninfo",
+            params={"id_token": credential},
+        )
+    if resp.status_code != 200:
+        raise HTTPException(status_code=401, detail="Invalid Google token")
+
+    info = resp.json()
+    if info.get("aud") != client_id:
+        raise HTTPException(status_code=401, detail="Token audience mismatch")
+
+    google_id = info.get("sub")
+    email = info.get("email", "").lower().strip()
+    if not google_id or not email:
+        raise HTTPException(status_code=400, detail="Missing profile info from Google")
+
+    # Find existing user by google_id or email
+    result = await db.execute(select(User).where(User.google_id == google_id))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        result = await db.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
+
+    if user:
+        if not user.is_active:
+            raise HTTPException(status_code=403, detail="Account disabled")
+        # Link google_id if not already set
+        if not user.google_id:
+            user.google_id = google_id
+        if not user.is_verified:
+            user.is_verified = True
+        user.last_login_at = datetime.now(timezone.utc)
+        await db.commit()
+    else:
+        # Create new user — verified immediately, no password
+        user = User(
+            email=email,
+            password_hash="",
+            notify_email=email,
+            language="he",
+            is_verified=True,
+            google_id=google_id,
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+        # Notify admins
+        admins_result = await db.execute(select(User).where(User.is_admin == True, User.is_active == True))
+        admins = admins_result.scalars().all()
+        from backend.notifier import send_admin_new_user_notification
+        for admin in admins:
+            send_admin_new_user_notification(admin.email, email)
+
+    return TokenResponse(access_token=create_access_token(user.id))

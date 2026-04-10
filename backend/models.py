@@ -18,6 +18,7 @@ class User(Base):
     vacation_mode: Mapped[bool] = mapped_column(Boolean, default=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    google_id: Mapped[str | None] = mapped_column(String(100), nullable=True, unique=True)
     max_products: Mapped[int | None] = mapped_column(Integer, nullable=True)  # None = use global default
 
     user_products: Mapped[list["UserProduct"]] = relationship(back_populates="user", cascade="all, delete-orphan")

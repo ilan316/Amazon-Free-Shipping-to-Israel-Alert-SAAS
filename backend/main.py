@@ -26,11 +26,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "script-src 'self' 'unsafe-inline' https://accounts.google.com; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; "
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: https:; "
-            "connect-src 'self'; "
+            "connect-src 'self' https://oauth2.googleapis.com https://accounts.google.com; "
+            "frame-src https://accounts.google.com; "
             "frame-ancestors 'none'"
         )
         return response
@@ -168,6 +169,11 @@ app.include_router(auth.router)
 app.include_router(products.router)
 app.include_router(settings.router)
 app.include_router(admin_routes.router)
+
+
+@app.get("/api/config")
+async def public_config():
+    return {"google_client_id": os.environ.get("GOOGLE_CLIENT_ID", "")}
 
 
 @app.get("/system-message")

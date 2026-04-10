@@ -25,10 +25,12 @@
   }
   </script>
   <link rel="icon" type="image/png" href="/static/logo-new.png" />
+  <meta name="google-client-id" content="" id="google-meta-client-id">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800&family=Rubik:wght@500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css?v=11">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     /* index-only overrides */
     .features { display: flex; gap: 14px; max-width: 860px; margin: 32px auto 0; padding: 0 16px; flex-wrap: wrap; justify-content: center; }
@@ -115,6 +117,10 @@
       <div id="resend-verify-link" style="display:none;font-size:0.85rem;text-align:center;margin-bottom:8px;">
         לא קיבלת אימייל אימות? <a href="#" onclick="resendVerification();return false;">לחץ כאן לשליחה מחדש</a>
       </div>
+      <div id="google-login-btn" style="display:flex;justify-content:center;margin-bottom:12px;"></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;color:var(--text-muted);font-size:0.82rem;">
+        <div style="flex:1;height:1px;background:#e0e0e0;"></div><span>או עם אימייל וסיסמה</span><div style="flex:1;height:1px;background:#e0e0e0;"></div>
+      </div>
       <form id="login-form" onsubmit="doLogin(event)">
         <div class="form-group">
           <label for="login-email">אימייל</label>
@@ -132,6 +138,10 @@
     <!-- Register panel -->
     <div class="auth-panel active" id="panel-register">
       <div id="register-alert" class="alert"></div>
+      <div id="google-register-btn" style="display:flex;justify-content:center;margin-bottom:12px;"></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;color:var(--text-muted);font-size:0.82rem;">
+        <div style="flex:1;height:1px;background:#e0e0e0;"></div><span>או עם אימייל וסיסמה</span><div style="flex:1;height:1px;background:#e0e0e0;"></div>
+      </div>
       <form id="register-form" onsubmit="doRegister(event)">
         <div class="form-group">
           <label for="reg-email">אימייל להתחברות</label>
@@ -305,6 +315,54 @@
     // Redirect to dashboard if already logged in
     if (getToken()) window.location = "/dashboard";
 
+    // Google Sign-In
+    async function handleGoogleCredential(response) {
+      const alertEl = document.getElementById("login-alert");
+      try {
+        const res = await apiFetch("/auth/google", {
+          method: "POST",
+          body: JSON.stringify({ credential: response.credential }),
+        });
+        if (!res) return;
+        if (res.ok) {
+          const data = await res.json();
+          setToken(data.access_token);
+          window.location = "/dashboard";
+        } else {
+          const err = await res.json();
+          showAlert(alertEl, err.detail || "שגיאה בכניסה עם Google");
+        }
+      } catch {
+        showAlert(alertEl, "שגיאת רשת — נסה שוב");
+      }
+    }
+
+    function _renderGoogleButtons(clientId) {
+      if (!window.google?.accounts?.id || !clientId) return;
+      google.accounts.id.initialize({
+        client_id: clientId,
+        callback: handleGoogleCredential,
+        ux_mode: "popup",
+      });
+      const btnCfg = { theme: "outline", size: "large", width: 280, locale: "he", text: "continue_with" };
+      const loginEl = document.getElementById("google-login-btn");
+      const regEl = document.getElementById("google-register-btn");
+      if (loginEl) google.accounts.id.renderButton(loginEl, btnCfg);
+      if (regEl) google.accounts.id.renderButton(regEl, { ...btnCfg, text: "signup_with" });
+    }
+
+    // Fetch client ID from backend, then init buttons once GSI is ready
+    fetch("/api/config").then(r => r.json()).then(cfg => {
+      if (!cfg.google_client_id) return;
+      const meta = document.getElementById("google-meta-client-id");
+      if (meta) meta.content = cfg.google_client_id;
+      if (window.google?.accounts?.id) {
+        _renderGoogleButtons(cfg.google_client_id);
+      } else {
+        window.addEventListener("load", () => _renderGoogleButtons(cfg.google_client_id));
+      }
+    }).catch(() => {});
+
     function showTab(name) {
       document.querySelectorAll(".auth-tab").forEach(t => t.classList.remove("active"));
       document.querySelectorAll(".auth-panel").forEach(p => p.classList.remove("active"));
@@ -383,7 +441,12 @@
         if (!res) return;
         if (res.ok) {
           localStorage.setItem("new_user", "1");
-          showAlert(alertEl, "✅ נשלח אימייל אימות לכתובתך — בדוק את תיבת הדואר ואמת את החשבון", "success");
+          alertEl.innerHTML = `<div style="background:#f0faf0;border:1.5px solid #3fb950;border-radius:10px;padding:16px 18px;text-align:right;">
+            <p style="margin:0 0 8px;font-weight:700;color:#2e7d32;font-size:1rem;">✅ נשלח אימייל אימות!</p>
+            <p style="margin:0 0 6px;font-size:0.9rem;color:#333;">בדוק את תיבת הדואר שלך ולחץ על הקישור לאימות החשבון.</p>
+            <p style="margin:0;font-size:0.85rem;color:#555;">📂 <strong>לא קיבלת?</strong> בדוק את תיקיית <strong>ספאם / קידומות</strong> — לפעמים המייל מגיע לשם.</p>
+          </div>`;
+          alertEl.style.display = "block";
           document.getElementById("register-form").style.display = "none";
         } else {
           const err = await res.json();

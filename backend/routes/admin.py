@@ -29,7 +29,7 @@ async def get_stats(
     admin: Annotated[User, Depends(get_current_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    total_users = (await db.execute(select(func.count()).select_from(User).where(User.is_admin == False))).scalar()
+    total_users = (await db.execute(select(func.count()).select_from(User).where(User.is_admin == False, User.is_verified == True))).scalar()
     total_admins = (await db.execute(select(func.count()).select_from(User).where(User.is_admin == True))).scalar()
     total_products = (await db.execute(select(func.count()).select_from(Product))).scalar()
     today = datetime.utcnow() - timedelta(hours=24)
@@ -53,7 +53,7 @@ async def list_users(
     admin: Annotated[User, Depends(get_current_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    result = await db.execute(select(User).order_by(User.created_at.desc()))
+    result = await db.execute(select(User).where(User.is_verified == True).order_by(User.created_at.desc()))
     users = result.scalars().all()
 
     # Batch-fetch product counts (one query instead of N)
