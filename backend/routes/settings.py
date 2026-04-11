@@ -51,6 +51,8 @@ async def change_password(
     current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),
 ):
+    if not current_user.password_hash:
+        raise HTTPException(status_code=400, detail="לחשבון זה אין סיסמה — יש להשתמש בכניסה עם Google")
     if not verify_password(body.current_password, current_user.password_hash):
         raise HTTPException(status_code=400, detail="סיסמה נוכחית שגויה")
     if len(body.new_password) < 6:
@@ -103,6 +105,8 @@ async def delete_account(
     current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),
 ):
+    if not current_user.password_hash:
+        raise HTTPException(status_code=400, detail="לחשבון זה אין סיסמה — יש להשתמש בכניסה עם Google")
     if not verify_password(body.password, current_user.password_hash):
         raise HTTPException(status_code=400, detail="Incorrect password")
     await db.delete(current_user)
