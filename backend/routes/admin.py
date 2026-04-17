@@ -728,3 +728,33 @@ async def get_click_analytics(
         "by_asin": [{"asin": r.asin, "count": r.cnt} for r in by_asin_rows],
         "by_day": [{"date": str(r.day), "count": r.cnt} for r in by_day_rows],
     }
+
+
+@router.post("/send-test-click-email")
+async def send_test_click_email(
+    admin: Annotated[User, Depends(get_current_admin)],
+):
+    import os
+    from urllib.parse import urlencode
+    from backend.notifier import _send_via_resend
+
+    test_asin = "B0BG52SJ5N"
+    base = os.environ.get("APP_BASE_URL", "https://app.amzfreeil.com").rstrip("/")
+    affiliate_tag = os.environ.get("AMAZON_AFFILIATE_TAG", "").strip()
+    dest = f"https://www.amazon.com/dp/{test_asin}?tag={affiliate_tag}" if affiliate_tag else f"https://www.amazon.com/dp/{test_asin}"
+    params = urlencode({"u": admin.id, "a": test_asin, "url": dest})
+    tracking = f"{base}/track/click?{params}"
+
+    html = f"""
+    <div dir="rtl" style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px;background:#fffaf1;border-radius:12px;">
+      <h2 style="color:#e47911;">🧪 מייל בדיקה — Click Tracking</h2>
+      <p style="color:#555;">לחץ על הכפתור ובדוק שמופיע click ב-<strong>/admin/clicks</strong></p>
+      <a href="{tracking}"
+         style="display:inline-block;background:#FF9900;color:#111;padding:12px 28px;border-radius:8px;font-weight:bold;text-decoration:none;margin-top:16px;">
+        קנה עכשיו — משלוח חינם (בדיקה)
+      </a>
+      <p style="margin-top:16px;font-size:12px;color:#999;">ASIN: {test_asin} · user_id: {admin.id}</p>
+    </div>"""
+
+    ok = _send_via_resend(admin.notify_email, "🧪 בדיקת Click Tracking — amzfreeil", html, f"לחץ כאן: {tracking}")
+    return {"sent": ok, "to": admin.notify_email, "tracking_url": tracking}
