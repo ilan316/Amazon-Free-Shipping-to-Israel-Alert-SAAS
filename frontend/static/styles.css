@@ -778,8 +778,14 @@ body {
 
 /* Fixed header wrapper */
 #fixed-header {
-  position: static;
+  position: fixed;
+  top: 0; left: 0; right: 0;
   z-index: 9999;
+}
+@media (max-width: 680px) {
+  #fixed-header {
+    position: static;
+  }
 }
 
 /* Urgency bar */
