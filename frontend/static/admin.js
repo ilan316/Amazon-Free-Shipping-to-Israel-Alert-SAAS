@@ -31,7 +31,30 @@ async function loadAdminData() {
     loadCookieStatus(),
     loadInactivityDays(),
     loadChecksStatus(),
+    loadClickStats(),
   ]);
+}
+
+async function loadClickStats() {
+  const days = document.getElementById("clicks-days")?.value || 7;
+  const res = await apiFetch(`/admin/clicks?days=${days}`);
+  const summary = document.getElementById("clicks-summary");
+  const byAsin = document.getElementById("clicks-by-asin");
+  if (!res || !res.ok) { if (summary) summary.textContent = "שגיאה בטעינה"; return; }
+  const data = await res.json();
+  if (summary) summary.innerHTML = `סה"כ <strong>${data.total}</strong> לחיצות ב-${data.days} הימים האחרונים`;
+  if (byAsin) {
+    if (!data.by_asin.length) {
+      byAsin.innerHTML = '<span style="color:var(--text-muted)">אין לחיצות עדיין</span>';
+    } else {
+      byAsin.innerHTML = data.by_asin.map(r =>
+        `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">
+          <a href="https://www.amazon.com/dp/${r.asin}" target="_blank" style="color:var(--brand-dark);font-family:monospace;">${r.asin}</a>
+          <strong>${r.count} לחיצות</strong>
+        </div>`
+      ).join("");
+    }
+  }
 }
 
 async function loadCookieStatus() {
