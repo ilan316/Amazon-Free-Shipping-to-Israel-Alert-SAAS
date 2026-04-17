@@ -181,13 +181,27 @@
     <div class="tab-panel" id="tab-notifications">
       <div class="section">
         <div class="section-header"><h2>לוג התראות אחרונות</h2></div>
+        <!-- Controls row -->
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+          <label style="font-size:0.85rem;color:var(--text-muted);">הצג:</label>
+          <select id="notif-limit" onchange="loadNotificationsLog()"
+            style="padding:5px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.85rem;background:var(--surface);color:var(--text);cursor:pointer;">
+            <option value="50">50 שורות</option>
+            <option value="100" selected>100 שורות</option>
+            <option value="200">200 שורות</option>
+          </select>
+          <button class="filter-btn active" data-notif-filter="ALL" onclick="setNotifFilter('ALL',this)">הכל</button>
+          <button class="filter-btn" data-notif-filter="OK" onclick="setNotifFilter('OK',this)">✅ הצלחות</button>
+          <button class="filter-btn" data-notif-filter="FAIL" onclick="setNotifFilter('FAIL',this)">❌ כישלונות</button>
+          <span id="notif-count" style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:2px 10px;font-size:0.78rem;color:var(--text-muted);"></span>
+        </div>
         <div style="overflow-x:auto;">
           <table class="admin-table">
             <thead>
-              <tr><th>תאריך</th><th>משתמש</th><th>מוצר</th><th>סטטוס</th><th>תוצאה</th></tr>
+              <tr><th>תאריך</th><th>משתמש</th><th>אימייל יעד</th><th>מוצר</th><th>ASIN</th><th>סטטוס</th><th>תוצאה</th></tr>
             </thead>
             <tbody id="notifications-body">
-              <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">טוען...</td></tr>
+              <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">טוען...</td></tr>
             </tbody>
           </table>
         </div>

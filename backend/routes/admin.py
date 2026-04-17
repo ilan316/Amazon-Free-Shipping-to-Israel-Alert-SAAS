@@ -189,6 +189,7 @@ async def notifications_log(
         {
             "sent_at": log.sent_at.isoformat(),
             "user_email": email,
+            "email_to": log.email_to,
             "product_name": name or asin,
             "asin": asin,
             "status": log.status,

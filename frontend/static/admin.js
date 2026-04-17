@@ -245,26 +245,63 @@ async function loadRegistrationsChart() {
   });
 }
 
+let _notifFilter = "ALL";
+
+function setNotifFilter(val, btn) {
+  _notifFilter = val;
+  document.querySelectorAll("[data-notif-filter]").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  _applyNotifFilter();
+}
+
+function _applyNotifFilter() {
+  const rows = document.querySelectorAll("#notifications-body tr[data-ok]");
+  let count = 0;
+  rows.forEach(r => {
+    const ok = r.dataset.ok;
+    const show = _notifFilter === "ALL" || (_notifFilter === "OK" && ok === "1") || (_notifFilter === "FAIL" && ok === "0");
+    r.style.display = show ? "" : "none";
+    if (show) count++;
+  });
+  const countEl = document.getElementById("notif-count");
+  if (countEl) countEl.textContent = count + " רשומות";
+}
+
 async function loadNotificationsLog() {
-  const res = await apiFetch("/admin/notifications-log");
+  const limitEl = document.getElementById("notif-limit");
+  const limit = limitEl ? limitEl.value : 100;
+  const res = await apiFetch(`/admin/notifications-log?limit=${limit}`);
   if (!res || !res.ok) return;
   const logs = await res.json();
   const tbody = document.getElementById("notifications-body");
   if (!logs.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">אין התראות עדיין</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">אין התראות עדיין</td></tr>';
+    const countEl = document.getElementById("notif-count");
+    if (countEl) countEl.textContent = "0 רשומות";
     return;
   }
-  tbody.innerHTML = logs.map(l => `
-    <tr>
-      <td class="ltr">${new Date(l.sent_at).toLocaleString("he-IL")}</td>
-      <td class="ltr truncate">${l.user_email}</td>
-      <td class="truncate">${l.product_name}</td>
+  tbody.innerHTML = logs.map(l => {
+    const emailTo = l.email_to || l.user_email;
+    const sameEmail = emailTo === l.user_email;
+    const emailToHtml = `<span style="display:inline-block;background:#f0f4ff;border:1px solid #c5cfe8;border-radius:12px;padding:2px 8px;font-size:0.75rem;color:#2c3e7a;direction:ltr;">${emailTo}</span>`;
+    const errorHtml = (!l.success && l.error_msg)
+      ? `<span style="display:block;font-size:0.72rem;color:var(--error);margin-top:3px;opacity:0.85;">${l.error_msg}</span>`
+      : "";
+    const asinUrl = `https://www.amazon.com/dp/${l.asin}?tag=amzfreeil-20`;
+    return `
+    <tr data-ok="${l.success ? '1' : '0'}">
+      <td class="ltr" style="white-space:nowrap;">${new Date(l.sent_at).toLocaleString("he-IL")}</td>
+      <td class="ltr truncate" style="max-width:160px;">${l.user_email}</td>
+      <td>${sameEmail ? '<span style="color:var(--text-muted);font-size:0.8rem;">זהה</span>' : emailToHtml}</td>
+      <td class="truncate" style="max-width:200px;">${l.product_name}</td>
+      <td class="ltr"><a href="${asinUrl}" target="_blank" style="color:var(--brand-dark);font-family:monospace;font-size:0.82rem;">${l.asin}</a></td>
       <td><span class="status-badge badge-${l.status}">${statusLabel(l.status)}</span></td>
-      <td style="color:${l.success ? 'var(--success)' : 'var(--error)'}">
-        ${l.success ? '✅ נשלח' : '❌ נכשל'}
+      <td style="color:${l.success ? 'var(--success)' : 'var(--error)'};font-weight:600;">
+        ${l.success ? '✅ נשלח' : '❌ נכשל'}${errorHtml}
       </td>
-    </tr>
-  `).join("");
+    </tr>`;
+  }).join("");
+  _applyNotifFilter();
 }
 
 async function loadSystemMessageAdmin() {
