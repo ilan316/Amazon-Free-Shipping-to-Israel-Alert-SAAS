@@ -264,6 +264,8 @@ async function loadRegistrationsChart() {
     canvas.parentNode.appendChild(msg);
     return;
   }
+  // Destroy existing chart instance if present (prevents "canvas already in use" error)
+  Chart.getChart(canvas)?.destroy();
   new Chart(canvas, {
     type: "line",
     data: {

@@ -742,7 +742,7 @@ async def get_click_analytics(
                 "id": r.EmailClick.id,
                 "user_email": r.email or f"user#{r.EmailClick.user_id}",
                 "asin": r.EmailClick.asin,
-                "clicked_at": r.EmailClick.clicked_at.strftime("%d/%m/%Y %H:%M") if r.EmailClick.clicked_at else "",
+                "clicked_at": (r.EmailClick.clicked_at + timedelta(hours=3)).strftime("%d/%m/%Y %H:%M") if r.EmailClick.clicked_at else "",
                 "ip": r.EmailClick.ip or "—",
             }
             for r in recent_rows
