@@ -750,6 +750,17 @@ async def get_click_analytics(
     }
 
 
+@router.delete("/clicks/{click_id}")
+async def delete_click(
+    click_id: int,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    await db.execute(delete(EmailClick).where(EmailClick.id == click_id))
+    await db.commit()
+    return {"ok": True}
+
+
 @router.post("/send-test-click-email")
 async def send_test_click_email(
     admin: Annotated[User, Depends(get_current_admin)],

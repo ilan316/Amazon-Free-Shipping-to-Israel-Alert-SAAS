@@ -59,11 +59,12 @@ async function loadClickStats() {
           </thead>
           <tbody>
             ${data.recent.map(r => `
-              <tr style="border-bottom:1px solid var(--border);">
+              <tr style="border-bottom:1px solid var(--border);" id="click-row-${r.id}">
                 <td style="padding:6px 8px;">${r.user_email}</td>
                 <td style="padding:6px 8px;"><a href="https://www.amazon.com/dp/${r.asin}" target="_blank" style="color:var(--brand-dark);font-family:monospace;">${r.asin}</a></td>
                 <td style="padding:6px 8px;white-space:nowrap;">${r.clicked_at}</td>
                 <td style="padding:6px 8px;font-family:monospace;color:var(--text-muted);">${r.ip}</td>
+                <td style="padding:6px 8px;"><button onclick="deleteClick(${r.id})" style="background:none;border:none;cursor:pointer;color:var(--error);font-size:1rem;" title="מחק">🗑</button></td>
               </tr>`).join("")}
           </tbody>
         </table>`;
@@ -648,6 +649,13 @@ async function triggerSummary() {
   if (res && res.ok) {
     msg.textContent = "✅ סיכום יומי הופעל!";
     setTimeout(() => { msg.textContent = ""; }, 4000);
+  }
+}
+
+async function deleteClick(id) {
+  const res = await apiFetch(`/admin/clicks/${id}`, { method: "DELETE" });
+  if (res && res.ok) {
+    document.getElementById(`click-row-${id}`)?.remove();
   }
 }
 
