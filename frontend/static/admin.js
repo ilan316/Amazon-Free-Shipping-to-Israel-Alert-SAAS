@@ -241,7 +241,15 @@ async function loadRegistrationsChart() {
   if (!res || !res.ok) return;
   const data = await res.json();
   const canvas = document.getElementById("registrations-chart");
-  if (!canvas || !data.length) return;
+  if (!canvas) return;
+  if (!data.length) {
+    canvas.style.display = "none";
+    const msg = document.createElement("p");
+    msg.textContent = "אין נתונים עדיין";
+    msg.style.cssText = "text-align:center;color:var(--text-muted);padding:24px 0;margin:0;";
+    canvas.parentNode.appendChild(msg);
+    return;
+  }
   new Chart(canvas, {
     type: "line",
     data: {
