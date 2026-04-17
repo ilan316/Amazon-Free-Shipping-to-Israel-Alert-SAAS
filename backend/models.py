@@ -79,3 +79,14 @@ class SystemSetting(Base):
 
     key: Mapped[str] = mapped_column(String(100), primary_key=True)
     value: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+
+class EmailClick(Base):
+    __tablename__ = "email_clicks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    asin: Mapped[str] = mapped_column(String(10), nullable=False)
+    clicked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    dest_url: Mapped[str] = mapped_column(String(512), nullable=False)

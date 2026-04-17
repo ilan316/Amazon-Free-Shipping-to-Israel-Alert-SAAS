@@ -10,6 +10,7 @@ Key changes vs Gmail SMTP version:
 import os
 import logging
 from datetime import datetime
+from urllib.parse import urlencode
 
 import resend as resend_client
 
@@ -112,6 +113,13 @@ def _cta_btn(url: str, label: str, align: str = "left") -> str:
 def _product_url(asin: str) -> str:
     tag = os.environ.get("AMAZON_AFFILIATE_TAG", "").strip()
     return f"https://www.amazon.com/dp/{asin}?tag={tag}" if tag else f"https://www.amazon.com/dp/{asin}"
+
+
+def _tracking_url(user_id: int, asin: str) -> str:
+    dest = _product_url(asin)
+    base = os.environ.get("APP_BASE_URL", "https://app.amzfreeil.com").rstrip("/")
+    params = urlencode({"u": user_id, "a": asin, "url": dest})
+    return f"{base}/track/click?{params}"
 
 
 # ── Resend sender ─────────────────────────────────────────────────────────────
@@ -264,7 +272,7 @@ def send_user_alert(user, product, result) -> bool:
 
     asin = product.asin
     name = _short(product.name or asin, _MAX_NAME_BODY)
-    url = _product_url(asin)
+    url = _tracking_url(user.id, asin)
     found_in_aod = getattr(result, "found_in_aod", False)
 
     is_rtl = lang == "he"
@@ -405,7 +413,7 @@ def send_daily_summary(user, free_products: list) -> bool:
     lines = [_t(lang, "plain_summary_header")]
     for p, custom_name in free_products:
         name = _short(custom_name or p.name or p.asin, _MAX_NAME_BODY)
-        url = _product_url(p.asin)
+        url = _tracking_url(user.id, p.asin)
         lines.append(f"• {name}")
         lines.append(f"  {url}")
         lines.append("")
@@ -425,7 +433,7 @@ def send_daily_summary(user, free_products: list) -> bool:
     product_rows = ""
     for p, custom_name in free_products:
         name = _short(custom_name or p.name or p.asin, _MAX_NAME_BODY)
-        url = _product_url(p.asin)
+        url = _tracking_url(user.id, p.asin)
         product_rows += f"""
         <table width="100%" cellpadding="0" cellspacing="0"
                style="background:#ffffff;border:1px solid #e8e8e8;border-radius:10px;margin-bottom:12px;">

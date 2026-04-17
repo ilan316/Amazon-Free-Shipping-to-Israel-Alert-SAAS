@@ -8,7 +8,7 @@ from sqlalchemy import select, func, delete
 
 from backend.database import get_db
 from sqlalchemy import cast, Date
-from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting
+from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick
 from backend.auth import get_current_admin, hash_password, verify_password, SECRET_KEY, ALGORITHM
 
 
@@ -687,3 +687,44 @@ async def test_cookies(
             }
     except Exception as e:
         return {"error": str(e), "israel_detected": False}
+
+
+@router.get("/clicks")
+async def get_click_analytics(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    days: int = 7,
+):
+    since = datetime.utcnow() - timedelta(days=days)
+
+    total = (
+        await db.execute(
+            select(func.count()).select_from(EmailClick).where(EmailClick.clicked_at >= since)
+        )
+    ).scalar()
+
+    by_asin_rows = (
+        await db.execute(
+            select(EmailClick.asin, func.count().label("cnt"))
+            .where(EmailClick.clicked_at >= since)
+            .group_by(EmailClick.asin)
+            .order_by(func.count().desc())
+            .limit(20)
+        )
+    ).all()
+
+    by_day_rows = (
+        await db.execute(
+            select(cast(EmailClick.clicked_at, Date).label("day"), func.count().label("cnt"))
+            .where(EmailClick.clicked_at >= since)
+            .group_by(cast(EmailClick.clicked_at, Date))
+            .order_by(cast(EmailClick.clicked_at, Date))
+        )
+    ).all()
+
+    return {
+        "total": total,
+        "days": days,
+        "by_asin": [{"asin": r.asin, "count": r.cnt} for r in by_asin_rows],
+        "by_day": [{"date": str(r.day), "count": r.cnt} for r in by_day_rows],
+    }
