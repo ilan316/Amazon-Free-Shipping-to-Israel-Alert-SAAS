@@ -778,8 +778,7 @@ body {
 
 /* Fixed header wrapper */
 #fixed-header {
-  position: fixed;
-  top: 0; left: 0; right: 0;
+  position: static;
   z-index: 9999;
 }
 
@@ -1019,7 +1018,7 @@ body {
   .index-nav { display: none; }
   .index-nav-cta { display: none; }
   .index-trust-bar { display: none; }
-  .auth-hero { padding-top: 0; margin-top: 90px; }
+  .auth-hero { padding-top: 0; margin-top: 0; }
   .auth-hero h1 { font-size: 1.35rem; }
   .auth-hero p { font-size: 0.88rem; }
   .index-urgency-bar { font-size: 0.8rem; padding: 8px 14px; }
