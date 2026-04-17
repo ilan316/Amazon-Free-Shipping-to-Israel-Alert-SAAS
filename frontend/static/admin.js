@@ -44,15 +44,29 @@ async function loadClickStats() {
   const data = await res.json();
   if (summary) summary.innerHTML = `סה"כ <strong>${data.total}</strong> לחיצות ב-${data.days} הימים האחרונים`;
   if (byAsin) {
-    if (!data.by_asin.length) {
+    if (!data.recent || !data.recent.length) {
       byAsin.innerHTML = '<span style="color:var(--text-muted)">אין לחיצות עדיין</span>';
     } else {
-      byAsin.innerHTML = data.by_asin.map(r =>
-        `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">
-          <a href="https://www.amazon.com/dp/${r.asin}" target="_blank" style="color:var(--brand-dark);font-family:monospace;">${r.asin}</a>
-          <strong>${r.count} לחיצות</strong>
-        </div>`
-      ).join("");
+      byAsin.innerHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:0.82rem;margin-top:8px;">
+          <thead>
+            <tr style="border-bottom:2px solid var(--border);color:var(--text-muted);">
+              <th style="text-align:right;padding:6px 8px;">משתמש</th>
+              <th style="text-align:right;padding:6px 8px;">ASIN</th>
+              <th style="text-align:right;padding:6px 8px;">מתי</th>
+              <th style="text-align:right;padding:6px 8px;">IP</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.recent.map(r => `
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:6px 8px;">${r.user_email}</td>
+                <td style="padding:6px 8px;"><a href="https://www.amazon.com/dp/${r.asin}" target="_blank" style="color:var(--brand-dark);font-family:monospace;">${r.asin}</a></td>
+                <td style="padding:6px 8px;white-space:nowrap;">${r.clicked_at}</td>
+                <td style="padding:6px 8px;font-family:monospace;color:var(--text-muted);">${r.ip}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>`;
     }
   }
 }

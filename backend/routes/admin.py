@@ -722,11 +722,31 @@ async def get_click_analytics(
         )
     ).all()
 
+    recent_rows = (
+        await db.execute(
+            select(EmailClick, User.email)
+            .outerjoin(User, EmailClick.user_id == User.id)
+            .where(EmailClick.clicked_at >= since)
+            .order_by(EmailClick.clicked_at.desc())
+            .limit(50)
+        )
+    ).all()
+
     return {
         "total": total,
         "days": days,
         "by_asin": [{"asin": r.asin, "count": r.cnt} for r in by_asin_rows],
         "by_day": [{"date": str(r.day), "count": r.cnt} for r in by_day_rows],
+        "recent": [
+            {
+                "id": r.EmailClick.id,
+                "user_email": r.email or f"user#{r.EmailClick.user_id}",
+                "asin": r.EmailClick.asin,
+                "clicked_at": r.EmailClick.clicked_at.strftime("%d/%m/%Y %H:%M") if r.EmailClick.clicked_at else "",
+                "ip": r.EmailClick.ip or "—",
+            }
+            for r in recent_rows
+        ],
     }
 
 
