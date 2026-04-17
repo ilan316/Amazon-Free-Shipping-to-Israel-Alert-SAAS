@@ -604,6 +604,22 @@ async function triggerSummary() {
   }
 }
 
+async function sendTestClickEmail() {
+  const btn = document.getElementById("run-test-click-btn");
+  const msg = document.getElementById("check-msg");
+  btn.disabled = true; btn.textContent = "שולח...";
+  const res = await apiFetch("/admin/send-test-click-email", { method: "POST" });
+  btn.disabled = false; btn.textContent = "🧪 שלח מייל בדיקת לחיצה";
+  if (res && res.ok) {
+    const data = await res.json().catch(() => ({}));
+    msg.textContent = `✅ מייל בדיקה נשלח ל-${data.to || ""}!`;
+    setTimeout(() => { msg.textContent = ""; }, 6000);
+  } else {
+    msg.textContent = "❌ שגיאה בשליחה";
+    setTimeout(() => { msg.textContent = ""; }, 4000);
+  }
+}
+
 async function changePassword() {
   const current = document.getElementById("pw-current").value;
   const newPw = document.getElementById("pw-new").value;
