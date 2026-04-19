@@ -77,7 +77,12 @@ async def run_global_check_cycle():
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(Product).where(
-                Product.id.in_(select(UserProduct.product_id).distinct())
+                Product.id.in_(
+                    select(UserProduct.product_id)
+                    .join(User, UserProduct.user_id == User.id)
+                    .where(User.is_active == True, User.vacation_mode == False)
+                    .distinct()
+                )
             )
         )
         products = result.scalars().all()
