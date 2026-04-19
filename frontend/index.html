@@ -30,6 +30,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800&family=Rubik:wght@500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css?v=11">
+  <!-- Meta Pixel Code -->
+  <script>
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window, document,'script','https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', '1981109749468001');
+    fbq('track', 'PageView');
+  </script>
+  <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=1981109749468001&ev=PageView&noscript=1" /></noscript>
+  <!-- End Meta Pixel Code -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     /* index-only overrides */
@@ -442,6 +450,7 @@
         });
         if (!res) return;
         if (res.ok) {
+          if (typeof fbq === 'function') fbq('track', 'Lead');
           localStorage.setItem("new_user", "1");
           alertEl.innerHTML = `<div style="background:#f0faf0;border:1.5px solid #3fb950;border-radius:10px;padding:16px 18px;text-align:right;">
             <p style="margin:0 0 8px;font-weight:700;color:#2e7d32;font-size:1rem;">✅ נשלח אימייל אימות!</p>
