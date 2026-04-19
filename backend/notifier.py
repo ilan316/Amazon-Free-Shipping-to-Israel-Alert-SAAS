@@ -11,6 +11,7 @@ import os
 import logging
 from datetime import datetime
 from urllib.parse import urlencode
+from backend.auth import create_pause_token
 
 import resend as resend_client
 
@@ -120,6 +121,12 @@ def _tracking_url(user_id: int, asin: str) -> str:
     base = os.environ.get("APP_BASE_URL", "https://app.amzfreeil.com").rstrip("/")
     params = urlencode({"u": user_id, "a": asin, "url": dest})
     return f"{base}/track/click?{params}"
+
+
+def _pause_url(user_id: int) -> str:
+    base = os.environ.get("APP_BASE_URL", "https://app.amzfreeil.com").rstrip("/")
+    token = create_pause_token(user_id)
+    return f"{base}/pause?token={token}"
 
 
 # ── Resend sender ─────────────────────────────────────────────────────────────
@@ -373,7 +380,8 @@ def send_user_alert(user, product, result) -> bool:
         <tr>
           <td style="background:#f8f8f8;border-radius:0 0 10px 10px;padding:14px 24px;text-align:center;">
             <p style="margin:0 0 6px;color:#888;font-size:12px;" {txt_dir}>{_t(lang, "footer", checked_at=checked_at)}</p>
-            <p style="margin:0;color:#bbb;font-size:11px;">Amazon Free Shipping to Israel Alert</p>
+            <p style="margin:0 0 4px;color:#bbb;font-size:11px;">Amazon Free Shipping to Israel Alert</p>
+            <p style="margin:0;font-size:11px;"><a href="{_pause_url(user.id)}" style="color:#aaa;text-decoration:underline;">הפסק לקבל עדכונים</a></p>
           </td>
         </tr>
       </table>
@@ -495,7 +503,8 @@ def send_daily_summary(user, free_products: list) -> bool:
         <tr>
           <td style="background:#f8f8f8;border-radius:0 0 10px 10px;padding:14px 24px;text-align:center;">
             <p style="margin:0 0 6px;color:#888;font-size:12px;" {txt_dir}>{_t(lang, "footer", checked_at=checked_at)}</p>
-            <p style="margin:0;color:#bbb;font-size:11px;">Amazon Free Shipping to Israel Alert</p>
+            <p style="margin:0 0 4px;color:#bbb;font-size:11px;">Amazon Free Shipping to Israel Alert</p>
+            <p style="margin:0;font-size:11px;"><a href="{_pause_url(user.id)}" style="color:#aaa;text-decoration:underline;">הפסק לקבל עדכונים</a></p>
           </td>
         </tr>
       </table>

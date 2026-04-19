@@ -37,7 +37,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 from backend.database import create_tables
-from backend.routes import auth, products, settings, admin as admin_routes, tracking
+from backend.routes import auth, products, settings, admin as admin_routes, tracking, pause as pause_route
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -170,6 +170,7 @@ app.include_router(products.router)
 app.include_router(settings.router)
 app.include_router(admin_routes.router)
 app.include_router(tracking.router)
+app.include_router(pause_route.router)
 
 
 @app.get("/api/config")
