@@ -227,8 +227,14 @@
     <div class="tab-panel" id="tab-users">
       <div class="section">
         <div class="section-header"><h2>משתמשים</h2></div>
-        <input type="text" id="users-search" placeholder="חיפוש לפי אימייל..." oninput="filterUsers(this.value)"
-          style="width:100%; padding:9px 12px; border:1px solid var(--border); border-radius:8px; font-size:0.9rem; margin-bottom:12px; direction:rtl;">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+          <input type="text" id="users-search" placeholder="חיפוש לפי אימייל..." oninput="filterUsers()"
+            style="flex:1;min-width:180px; padding:9px 12px; border:1px solid var(--border); border-radius:8px; font-size:0.9rem; direction:rtl;">
+          <button class="filter-btn user-filter-btn active" data-uf="ALL" onclick="setUserFilter('ALL',this)">הכל</button>
+          <button class="filter-btn user-filter-btn" data-uf="ACTIVE" onclick="setUserFilter('ACTIVE',this)">✅ פעיל</button>
+          <button class="filter-btn user-filter-btn" data-uf="VACATION" onclick="setUserFilter('VACATION',this)">🏖 חופשה</button>
+          <button class="filter-btn user-filter-btn" data-uf="INACTIVE" onclick="setUserFilter('INACTIVE',this)">⏸ מושהה</button>
+        </div>
 
         <div id="users-alert" class="alert"></div>
         <div style="overflow-x:auto;">
@@ -324,7 +330,7 @@
   </div>
 
   <script src="/static/app.js?v=10"></script>
-  <script src="/static/admin.js?v=10"></script>
+  <script src="/static/admin.js?v=11"></script>
   <script>
     requireAuth();
     loadAdminData();

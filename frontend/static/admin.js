@@ -8,6 +8,7 @@ function switchTab(name, btn) {
 let _allUsers = [];
 let _allAdminProducts = [];
 let _adminFilter = 'ALL';
+let _userFilter = 'ALL';
 
 async function loadAdminData() {
   const meRes = await apiFetch("/me");
@@ -377,12 +378,25 @@ async function saveSystemMessage() {
   setTimeout(() => { statusEl.textContent = ""; }, 3000);
 }
 
-function filterUsers(query) {
-  const q = query.trim().toLowerCase();
-  const rows = document.querySelectorAll("#users-body tr[id^='user-row-']");
-  rows.forEach(row => {
-    const text = row.textContent.toLowerCase();
-    row.style.display = (!q || text.includes(q)) ? "" : "none";
+function setUserFilter(filter, btn) {
+  _userFilter = filter;
+  document.querySelectorAll('.user-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  filterUsers();
+}
+
+function filterUsers() {
+  const q = (document.getElementById('users-search')?.value || '').trim().toLowerCase();
+  _allUsers.forEach(u => {
+    const row = document.getElementById(`user-row-${u.id}`);
+    if (!row) return;
+    const matchText = !q || u.email.toLowerCase().includes(q) || (u.notify_email || '').toLowerCase().includes(q);
+    const matchFilter =
+      _userFilter === 'ALL' ||
+      (_userFilter === 'ACTIVE'   &&  u.is_active && !u.vacation_mode) ||
+      (_userFilter === 'VACATION' &&  u.is_active &&  u.vacation_mode) ||
+      (_userFilter === 'INACTIVE' && !u.is_active);
+    row.style.display = (matchText && matchFilter) ? '' : 'none';
   });
 }
 
@@ -444,6 +458,7 @@ async function loadUsers() {
       </td>
     </tr>`;
   }).join("");
+  filterUsers();
 }
 
 async function loadProducts() {
