@@ -424,9 +424,11 @@ async function loadUsers() {
       </td>
       <td class="ltr">${u.created_at ? new Date(u.created_at).toLocaleDateString("he-IL") : "—"}</td>
       <td>
-        ${u.is_active
-          ? '<span style="color:var(--success);font-weight:600;">פעיל</span>'
-          : '<span class="tag-inactive">מושהה</span>'}
+        ${!u.is_active
+          ? '<span class="tag-inactive">מושהה</span>'
+          : u.vacation_mode
+            ? '<span style="color:var(--warning,#f59e0b);font-weight:600;">🏖 חופשה</span>'
+            : '<span style="color:var(--success);font-weight:600;">פעיל</span>'}
       </td>
       <td>
         <div class="action-btns">

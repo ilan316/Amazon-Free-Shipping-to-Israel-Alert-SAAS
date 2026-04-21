@@ -74,6 +74,7 @@ async def list_users(
             "created_at": u.created_at.isoformat() if u.created_at else None,
             "product_count": product_count_map.get(u.id, 0),
             "max_products": u.max_products,
+            "vacation_mode": u.vacation_mode,
         }
         for u in users
     ]
