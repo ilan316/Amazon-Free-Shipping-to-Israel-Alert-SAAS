@@ -339,7 +339,8 @@
           const data = await res.json();
           setToken(data.access_token);
           if (typeof fbq === 'function') {
-            fbq('track', 'Lead');
+            const eventId = 'reg_google_' + Date.now();
+            fbq('track', 'Lead', {}, { eventID: eventId });
             setTimeout(() => { window.location = "/dashboard"; }, 300);
           } else {
             window.location = "/dashboard";
@@ -456,7 +457,7 @@
         });
         if (!res) return;
         if (res.ok) {
-          if (typeof fbq === 'function') fbq('track', 'Lead');
+          if (typeof fbq === 'function') { const eventId = 'reg_' + Date.now(); fbq('track', 'Lead', {}, { eventID: eventId }); }
           localStorage.setItem("new_user", "1");
           alertEl.innerHTML = `<div style="background:#f0faf0;border:1.5px solid #3fb950;border-radius:10px;padding:16px 18px;text-align:right;">
             <p style="margin:0 0 8px;font-weight:700;color:#2e7d32;font-size:1rem;">✅ נשלח אימייל אימות!</p>
