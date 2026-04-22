@@ -1,8 +1,10 @@
+import hashlib
 import os
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -14,6 +16,36 @@ from backend.auth import hash_password, verify_password, create_access_token, SE
 from backend.schemas import RegisterRequest, LoginRequest, TokenResponse, MessageResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _send_meta_capi_lead(email: str, client_ip: str, user_agent: str):
+    pixel_id = "1981109749468001"
+    capi_token = os.environ.get("META_CAPI_TOKEN", "")
+    if not capi_token:
+        return
+    em_hash = hashlib.sha256(email.lower().strip().encode()).hexdigest()
+    payload = {
+        "data": [{
+            "event_name": "Lead",
+            "event_time": int(time.time()),
+            "action_source": "website",
+            "user_data": {
+                "em": [em_hash],
+                "client_ip_address": client_ip,
+                "client_user_agent": user_agent,
+            },
+        }]
+    }
+    import httpx
+    try:
+        httpx.post(
+            f"https://graph.facebook.com/v19.0/{pixel_id}/events",
+            params={"access_token": capi_token},
+            json=payload,
+            timeout=5,
+        )
+    except Exception:
+        pass
 
 
 def _make_verify_token(user_id: int) -> str:
@@ -51,7 +83,7 @@ def _send_verify_email(user: User, token: str):
 
 @router.post("/register", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
-async def register(request: Request, body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(request: Request, body: RegisterRequest, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     existing = await db.execute(select(User).where(User.email == body.email))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -66,6 +98,13 @@ async def register(request: Request, body: RegisterRequest, db: AsyncSession = D
     db.add(user)
     await db.commit()
     await db.refresh(user)
+
+    background_tasks.add_task(
+        _send_meta_capi_lead,
+        user.email,
+        request.client.host,
+        request.headers.get("user-agent", ""),
+    )
 
     token = _make_verify_token(user.id)
     _send_verify_email(user, token)
@@ -140,7 +179,7 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
 
 @router.post("/google", response_model=TokenResponse)
 @limiter.limit("10/minute")
-async def google_login(request: Request, db: AsyncSession = Depends(get_db)):
+async def google_login(request: Request, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     """Sign in / sign up with a Google ID token."""
     body = await request.json()
     credential = body.get("credential", "").strip()
@@ -201,6 +240,13 @@ async def google_login(request: Request, db: AsyncSession = Depends(get_db)):
         db.add(user)
         await db.commit()
         await db.refresh(user)
+
+        background_tasks.add_task(
+            _send_meta_capi_lead,
+            email,
+            request.client.host,
+            request.headers.get("user-agent", ""),
+        )
 
         # Notify admins
         admins_result = await db.execute(select(User).where(User.is_admin == True, User.is_active == True))

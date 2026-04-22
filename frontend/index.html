@@ -36,13 +36,7 @@
     fbq('init', '1981109749468001');
     fbq('track', 'PageView');
 
-    // *** CONVERSION TRACKING - כשמישהו נרשם ***
-    document.addEventListener('DOMContentLoaded', function() {
-      document.getElementById('register-form').addEventListener('submit', function() {
-        fbq('track', 'Lead');
-      });
-    });
-  </script>
+</script>
   <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=1981109749468001&ev=PageView&noscript=1" /></noscript>
   <!-- End Meta Pixel Code -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -343,9 +337,13 @@
         if (!res) return;
         if (res.ok) {
           const data = await res.json();
-          if (typeof fbq === 'function') fbq('track', 'Lead');
           setToken(data.access_token);
-          window.location = "/dashboard";
+          if (typeof fbq === 'function') {
+            fbq('track', 'Lead');
+            setTimeout(() => { window.location = "/dashboard"; }, 300);
+          } else {
+            window.location = "/dashboard";
+          }
         } else {
           const err = await res.json();
           showAlert(alertEl, err.detail || "שגיאה בכניסה עם Google");
