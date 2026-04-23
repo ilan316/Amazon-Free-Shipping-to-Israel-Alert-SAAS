@@ -36,7 +36,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         )
         return response
 
-from backend.database import create_tables, seed_default_templates
+from backend.database import create_tables
 from backend.routes import auth, products, settings, admin as admin_routes, tracking, pause as pause_route
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -97,7 +97,6 @@ def _upsert_job(func, job_id: str, kwargs: dict):
 async def lifespan(app: FastAPI):
     # ── Startup ──────────────────────────────────────────────────────────────
     await create_tables()
-    await seed_default_templates()
 
     # Import here to avoid circular imports at module level
     from backend.checker import browser_manager
