@@ -800,10 +800,11 @@ class EmailTemplateBody(BaseModel):
     body: str
 
 class EmailTemplateSendBody(BaseModel):
-    audience: str  # "all" | "active" | "vacation" | "inactive" | "single"
+    audience: str  # "all" | "active" | "vacation" | "inactive" | "single" | "custom"
     user_id: int | None = None
     products_min: int | None = None  # include users with >= this many products
     products_max: int | None = None  # include users with <= this many products
+    custom_emails: list[str] | None = None  # for audience="custom"
 
 
 @router.get("/email-templates")
@@ -911,6 +912,14 @@ async def send_email_template(
         if not body.user_id:
             raise HTTPException(status_code=400, detail="חסר user_id")
         q = select(User, product_count_sub.label("pc")).where(User.id == body.user_id)
+    elif body.audience == "custom":
+        if not body.custom_emails:
+            raise HTTPException(status_code=400, detail="חסרה רשימת מיילים")
+        emails_clean = [e.strip().lower() for e in body.custom_emails if e.strip()]
+        q = select(User, product_count_sub.label("pc")).where(
+            User.is_verified == True,
+            func.lower(User.notify_email).in_(emails_clean) | func.lower(User.email).in_(emails_clean)
+        )
 
     # Product count filters
     if body.products_min is not None:

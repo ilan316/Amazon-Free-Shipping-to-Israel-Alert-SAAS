@@ -840,6 +840,15 @@ function openSendPanel(id) {
 function toggleSingleUser() {
   const v = document.getElementById("tpl-audience").value;
   document.getElementById("tpl-single-user-id").style.display = v === "single" ? "" : "none";
+  document.getElementById("tpl-custom-emails-wrap").style.display = v === "custom" ? "" : "none";
+}
+
+function _parseCustomEmails() {
+  const raw = document.getElementById("tpl-custom-emails").value;
+  const emails = raw.split(/[\n,]+/).map(e => e.trim().toLowerCase()).filter(e => e.includes("@"));
+  const countEl = document.getElementById("tpl-custom-count");
+  if (countEl) countEl.textContent = emails.length ? `${emails.length} כתובות` : "";
+  return emails;
 }
 
 async function sendTemplate() {
@@ -849,6 +858,12 @@ async function sendTemplate() {
   const user_id = audience === "single" ? parseInt(document.getElementById("tpl-single-user-id").value) : null;
   if (audience === "single" && !user_id) { alert("יש להזין User ID"); return; }
 
+  let custom_emails = null;
+  if (audience === "custom") {
+    custom_emails = _parseCustomEmails();
+    if (!custom_emails.length) { alert("יש להזין לפחות כתובת מייל אחת"); return; }
+  }
+
   const minVal = document.getElementById("tpl-products-min").value;
   const maxVal = document.getElementById("tpl-products-max").value;
   const products_min = minVal !== "" ? parseInt(minVal) : null;
@@ -857,7 +872,7 @@ async function sendTemplate() {
   const filterDesc = [];
   if (products_min !== null) filterDesc.push(`מינ' ${products_min} מוצרים`);
   if (products_max !== null) filterDesc.push(`מקס' ${products_max} מוצרים`);
-  const label = { all: "כל המשתמשים", active: "הפעילים", vacation: "במצב חופשה", inactive: "המושהים", single: `משתמש #${user_id}` }[audience];
+  const label = { all: "כל המשתמשים", active: "הפעילים", vacation: "במצב חופשה", inactive: "המושהים", single: `משתמש #${user_id}`, custom: `${custom_emails?.length} כתובות מותאמות` }[audience] || audience;
   const filterStr = filterDesc.length ? ` (${filterDesc.join(", ")})` : "";
   if (!confirm(`לשלוח מייל זה ל${label}${filterStr}?`)) return;
 
@@ -867,7 +882,7 @@ async function sendTemplate() {
 
   const res = await apiFetch(`/admin/email-templates/${id}/send`, {
     method: "POST",
-    body: JSON.stringify({ audience, user_id, products_min, products_max }),
+    body: JSON.stringify({ audience, user_id, products_min, products_max, custom_emails }),
   });
   btn.disabled = false; btn.textContent = "📤 שלח עכשיו";
 

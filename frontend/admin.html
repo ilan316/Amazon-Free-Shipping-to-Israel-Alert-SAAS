@@ -389,9 +389,17 @@
                 <option value="vacation">במצב חופשה</option>
                 <option value="inactive">מושהים</option>
                 <option value="single">משתמש בודד</option>
+                <option value="custom">📋 רשימה מותאמת</option>
               </select>
               <input type="number" id="tpl-single-user-id" placeholder="User ID" min="1"
                 style="display:none;width:110px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.88rem;background:var(--bg);color:var(--text);">
+            </div>
+            <div id="tpl-custom-emails-wrap" style="display:none;margin-top:10px;">
+              <label style="font-size:0.82rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:5px;">רשימת מיילים (שורה אחת לכל מייל, או מופרד בפסיקים):</label>
+              <textarea id="tpl-custom-emails" rows="5" dir="ltr"
+                style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.82rem;font-family:monospace;background:var(--bg);color:var(--text);resize:vertical;box-sizing:border-box;"
+                placeholder="user1@gmail.com&#10;user2@gmail.com&#10;user3@gmail.com"></textarea>
+              <div id="tpl-custom-count" style="font-size:0.78rem;color:var(--text-muted);margin-top:3px;"></div>
             </div>
             <!-- Product count filter -->
             <div class="send-row" style="margin-top:10px;">
@@ -458,7 +466,7 @@
   </div>
 
   <script src="/static/app.js?v=10"></script>
-  <script src="/static/admin.js?v=19"></script>
+  <script src="/static/admin.js?v=20"></script>
   <script>
     requireAuth();
     loadAdminData();
