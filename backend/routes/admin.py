@@ -873,6 +873,72 @@ async def delete_email_template(
     return {"message": "תבנית נמחקה"}
 
 
+# In-memory job tracker for send progress
+_send_jobs: dict[str, dict] = {}
+
+
+async def _execute_send_job(
+    job_id: str,
+    template_id: int,
+    tpl_name: str,
+    tpl_subject: str,
+    tpl_body: str,
+    audience: str,
+    base_url: str,
+    user_data: list,  # list of (user_id, email, notify_email, pc)
+):
+    import asyncio
+    from backend.notifier import _send_via_resend, _pause_url
+    from backend.database import AsyncSessionLocal
+
+    job = _send_jobs[job_id]
+    sent = failed = 0
+    recipients_to_save = []
+
+    for i, (uid, email, notify_email, pc) in enumerate(user_data):
+        recipient = notify_email or email
+        subj = tpl_subject.replace("{{email}}", email).replace("{{product_count}}", str(pc))
+        pixel_url = f"{base_url}/track/email-open?uid={uid}&tid={template_id}"
+        pixel = f'<img src="{pixel_url}" width="1" height="1" style="display:none;" alt="">'
+        html_body = (
+            tpl_body
+            .replace("{{email}}", email)
+            .replace("{{notify_email}}", recipient)
+            .replace("{{product_count}}", str(pc))
+            .replace("{{pause_url}}", _pause_url(uid))
+        ) + pixel
+        ok = _send_via_resend(recipient, subj, html_body, "")
+        if ok:
+            sent += 1
+        else:
+            failed += 1
+        recipients_to_save.append((uid, recipient, ok))
+
+        job["sent"] = sent
+        job["failed"] = failed
+        job["remaining"] = len(user_data) - (i + 1)
+
+        await asyncio.sleep(0.55)
+
+    # Persist to DB
+    async with AsyncSessionLocal() as db:
+        log = EmailSendLog(
+            template_id=template_id,
+            template_name=tpl_name,
+            audience=audience,
+            sent_count=sent,
+            failed_count=failed,
+        )
+        db.add(log)
+        await db.flush()
+        for uid, email, ok in recipients_to_save:
+            db.add(EmailSendRecipient(send_log_id=log.id, user_id=uid, email=email, success=ok))
+        await db.commit()
+
+    job["done"] = True
+    job["message"] = f"נשלח ל-{sent} משתמשים" + (f", {failed} נכשלו" if failed else "")
+
+
 @router.post("/email-templates/{template_id}/send")
 async def send_email_template(
     template_id: int,
@@ -880,20 +946,16 @@ async def send_email_template(
     admin: Annotated[User, Depends(get_current_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    from backend.notifier import _send_via_resend, _pause_url
+    import asyncio, uuid, os
 
     t = (await db.execute(select(EmailTemplate).where(EmailTemplate.id == template_id))).scalar_one_or_none()
     if not t:
         raise HTTPException(status_code=404, detail="תבנית לא נמצאה")
 
-    import os
-    from sqlalchemy import func as sqlfunc
-
     base_url = os.environ.get("APP_BASE_URL", "https://app.amzfreeil.com").rstrip("/")
 
-    # Build recipient query with product count
     product_count_sub = (
-        select(sqlfunc.count(UserProduct.id))
+        select(func.count(UserProduct.id))
         .where(UserProduct.user_id == User.id)
         .correlate(User)
         .scalar_subquery()
@@ -921,7 +983,6 @@ async def send_email_template(
             func.lower(User.notify_email).in_(emails_clean) | func.lower(User.email).in_(emails_clean)
         )
 
-    # Product count filters
     if body.products_min is not None:
         q = q.where(product_count_sub >= body.products_min)
     if body.products_max is not None:
@@ -929,49 +990,31 @@ async def send_email_template(
 
     rows = (await db.execute(q)).all()
     if not rows:
-        return {"sent": 0, "failed": 0, "message": "לא נמצאו משתמשים התואמים את הסינון"}
+        return {"job_id": None, "total": 0, "message": "לא נמצאו משתמשים התואמים את הסינון"}
 
-    import asyncio
-    sent = failed = 0
-    recipients_to_save = []
-    for i, row in enumerate(rows):
-        u = row[0]
-        pc = row[1]
-        recipient = u.notify_email or u.email
-        subj = t.subject.replace("{{email}}", u.email).replace("{{product_count}}", str(pc))
-        pixel_url = f"{base_url}/track/email-open?uid={u.id}&tid={template_id}"
-        pixel = f'<img src="{pixel_url}" width="1" height="1" style="display:none;" alt="">'
-        html_body = (
-            t.body
-            .replace("{{email}}", u.email)
-            .replace("{{notify_email}}", recipient)
-            .replace("{{product_count}}", str(pc))
-            .replace("{{pause_url}}", _pause_url(u.id))
-        ) + pixel
-        ok = _send_via_resend(recipient, subj, html_body, "")
-        if ok:
-            sent += 1
-        else:
-            failed += 1
-        recipients_to_save.append((u.id, recipient, ok))
-        # Resend rate limit: 2 req/sec — sleep between every email
-        await asyncio.sleep(0.55)
+    # Extract plain data before session closes
+    user_data = [(r[0].id, r[0].email, r[0].notify_email or r[0].email, r[1]) for r in rows]
 
-    log = EmailSendLog(
-        template_id=template_id,
-        template_name=t.name,
-        audience=body.audience,
-        sent_count=sent,
-        failed_count=failed,
-    )
-    db.add(log)
-    await db.flush()  # get log.id before adding recipients
+    job_id = str(uuid.uuid4())
+    _send_jobs[job_id] = {
+        "total": len(user_data), "sent": 0, "failed": 0,
+        "remaining": len(user_data), "done": False, "message": "",
+    }
+    asyncio.create_task(_execute_send_job(
+        job_id, template_id, t.name, t.subject, t.body, body.audience, base_url, user_data
+    ))
+    return {"job_id": job_id, "total": len(user_data)}
 
-    for uid, email, ok in recipients_to_save:
-        db.add(EmailSendRecipient(send_log_id=log.id, user_id=uid, email=email, success=ok))
-    await db.commit()
 
-    return {"sent": sent, "failed": failed, "message": f"נשלח ל-{sent} משתמשים" + (f", {failed} נכשלו" if failed else "")}
+@router.get("/send-progress/{job_id}")
+async def get_send_progress(
+    job_id: str,
+    admin: Annotated[User, Depends(get_current_admin)],
+):
+    job = _send_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
 
 
 @router.get("/email-send-logs")

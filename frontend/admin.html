@@ -416,6 +416,23 @@
               <button class="btn-run-check" id="tpl-send-btn" onclick="sendTemplate()">📤 שלח עכשיו</button>
               <span id="tpl-send-msg" style="font-size:0.85rem;"></span>
             </div>
+
+            <!-- Progress display -->
+            <div id="tpl-send-progress" style="display:none;margin-top:16px;padding:16px;background:#f8f9fa;border-radius:10px;border:1px solid var(--border);">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <span style="font-weight:700;font-size:0.95rem;">📤 שולח מיילים...</span>
+                <span id="prog-eta" style="font-size:0.82rem;color:var(--text-muted);"></span>
+              </div>
+              <div style="background:#e9ecef;border-radius:99px;height:12px;overflow:hidden;margin-bottom:10px;">
+                <div id="prog-bar" style="height:100%;background:var(--brand);border-radius:99px;width:0%;transition:width 0.4s ease;"></div>
+              </div>
+              <div style="display:flex;gap:20px;font-size:0.88rem;flex-wrap:wrap;">
+                <span>סה"כ: <strong id="prog-total">—</strong></span>
+                <span style="color:var(--success);">✅ נשלח: <strong id="prog-sent">0</strong></span>
+                <span style="color:var(--error);">❌ נכשל: <strong id="prog-failed">0</strong></span>
+                <span style="color:var(--text-muted);">⏳ נשאר: <strong id="prog-remaining">—</strong></span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -466,7 +483,7 @@
   </div>
 
   <script src="/static/app.js?v=10"></script>
-  <script src="/static/admin.js?v=20"></script>
+  <script src="/static/admin.js?v=21"></script>
   <script>
     requireAuth();
     loadAdminData();

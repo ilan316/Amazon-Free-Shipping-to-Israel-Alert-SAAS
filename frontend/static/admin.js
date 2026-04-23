@@ -878,25 +878,66 @@ async function sendTemplate() {
 
   const btn = document.getElementById("tpl-send-btn");
   const msgEl = document.getElementById("tpl-send-msg");
-  btn.disabled = true; btn.textContent = "שולח...";
+  const progressEl = document.getElementById("tpl-send-progress");
+  btn.disabled = true; btn.textContent = "מתחיל...";
+  msgEl.textContent = "";
 
   const res = await apiFetch(`/admin/email-templates/${id}/send`, {
     method: "POST",
     body: JSON.stringify({ audience, user_id, products_min, products_max, custom_emails }),
   });
-  btn.disabled = false; btn.textContent = "📤 שלח עכשיו";
 
-  if (res && res.ok) {
-    const data = await res.json();
-    msgEl.textContent = "✅ " + data.message;
-    msgEl.style.color = "var(--success)";
-    await Promise.all([loadTemplates(), loadSendLogs()]);
-  } else {
+  if (!res || !res.ok) {
+    btn.disabled = false; btn.textContent = "📤 שלח עכשיו";
     const err = res ? await res.json().catch(() => ({})) : {};
     msgEl.textContent = "❌ " + (err.detail || "שגיאה בשליחה");
     msgEl.style.color = "var(--error)";
+    return;
   }
-  setTimeout(() => { msgEl.textContent = ""; }, 5000);
+
+  const data = await res.json();
+  if (!data.job_id) {
+    btn.disabled = false; btn.textContent = "📤 שלח עכשיו";
+    msgEl.textContent = "ℹ️ " + (data.message || "אין משתמשים");
+    msgEl.style.color = "var(--text-muted)";
+    return;
+  }
+
+  // Show progress panel
+  progressEl.style.display = "";
+  document.getElementById("prog-total").textContent = data.total;
+  document.getElementById("prog-sent").textContent = "0";
+  document.getElementById("prog-failed").textContent = "0";
+  document.getElementById("prog-remaining").textContent = data.total;
+  document.getElementById("prog-bar").style.width = "0%";
+  document.getElementById("prog-eta").textContent = `~${Math.round(data.total * 0.55)} שניות`;
+
+  // Poll progress
+  const pollInterval = setInterval(async () => {
+    const pRes = await apiFetch(`/admin/send-progress/${data.job_id}`);
+    if (!pRes || !pRes.ok) return;
+    const p = await pRes.json();
+
+    const done = p.sent + p.failed;
+    const pct = data.total > 0 ? Math.round((done / data.total) * 100) : 0;
+    const etaSec = Math.round(p.remaining * 0.55);
+
+    document.getElementById("prog-bar").style.width = pct + "%";
+    document.getElementById("prog-sent").textContent = p.sent;
+    document.getElementById("prog-failed").textContent = p.failed;
+    document.getElementById("prog-remaining").textContent = p.remaining;
+    document.getElementById("prog-eta").textContent = p.done ? "✅ הושלם" : `~${etaSec} שניות`;
+
+    if (p.done) {
+      clearInterval(pollInterval);
+      btn.disabled = false; btn.textContent = "📤 שלח עכשיו";
+      msgEl.textContent = "✅ " + p.message;
+      msgEl.style.color = "var(--success)";
+      document.getElementById("prog-bar").style.background = p.failed > 0 ? "var(--warning,#f59e0b)" : "var(--success)";
+      await Promise.all([loadTemplates(), loadSendLogs()]);
+      setTimeout(() => { progressEl.style.display = "none"; msgEl.textContent = ""; }, 6000);
+    }
+  }, 500);
 }
 
 async function loadSendLogs() {
