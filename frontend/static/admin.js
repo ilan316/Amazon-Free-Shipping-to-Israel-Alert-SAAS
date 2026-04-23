@@ -1002,36 +1002,39 @@ async function toggleSendLogDetail(logId, templateId, sentAt, clickedRow) {
     return;
   }
 
-  const sent = recipients.filter(r => r.success);
   const failed = recipients.filter(r => !r.success);
 
-  const makeTable = (list, color) => list.length ? `
-    <table style="width:100%;border-collapse:collapse;margin-bottom:4px;">
-      <tbody>
-        ${list.map(r => `<tr style="border-bottom:1px solid var(--border);">
-          <td style="padding:4px 8px;direction:ltr;color:${color};">${r.email}</td>
-        </tr>`).join("")}
-      </tbody>
-    </table>` : "";
+  const rowBg = r => {
+    if (!r.success) return "#fef2f2";
+    if (r.opened) return "#f0fdf4";
+    return "";
+  };
 
   inner.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:4px 0;">
-      <div>
-        <div style="font-weight:700;font-size:0.85rem;color:var(--success);margin-bottom:6px;">✅ נשלח בהצלחה (${sent.length})</div>
-        ${makeTable(sent, "var(--text)")}
-      </div>
-      <div>
-        <div style="font-weight:700;font-size:0.85rem;color:var(--error);margin-bottom:6px;">❌ נכשל (${failed.length})</div>
-        ${makeTable(failed, "var(--text-muted)")}
-        ${failed.length ? `
-          <button class="btn-run-check" id="resend-btn-${logId}" onclick="resendFailed(${logId})"
-            style="margin-top:10px;font-size:0.82rem;padding:7px 16px;">
-            🔄 שלח מחדש לנכשלים (${failed.length})
-          </button>
-          <span id="resend-msg-${logId}" style="font-size:0.82rem;display:block;margin-top:6px;"></span>
-        ` : ""}
-      </div>
-    </div>`;
+    <table style="width:100%;border-collapse:collapse;font-size:0.82rem;margin-bottom:8px;">
+      <thead>
+        <tr style="border-bottom:2px solid var(--border);color:var(--text-muted);font-size:0.75rem;">
+          <th style="text-align:right;padding:4px 8px;font-weight:600;">מייל</th>
+          <th style="text-align:center;padding:4px 8px;font-weight:600;width:60px;">נשלח</th>
+          <th style="text-align:center;padding:4px 8px;font-weight:600;width:60px;">פתח</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${recipients.map(r => `
+          <tr style="border-bottom:1px solid var(--border);background:${rowBg(r)};">
+            <td style="padding:4px 8px;direction:ltr;">${r.email}</td>
+            <td style="text-align:center;padding:4px 8px;">${r.success ? "✅" : "❌"}</td>
+            <td style="text-align:center;padding:4px 8px;">${r.opened ? "✅" : "—"}</td>
+          </tr>`).join("")}
+      </tbody>
+    </table>
+    ${failed.length ? `
+      <button class="btn-run-check" id="resend-btn-${logId}" onclick="resendFailed(${logId})"
+        style="font-size:0.82rem;padding:7px 16px;">
+        🔄 שלח מחדש לנכשלים (${failed.length})
+      </button>
+      <span id="resend-msg-${logId}" style="font-size:0.82rem;display:block;margin-top:6px;"></span>
+    ` : ""}`;
 }
 
 async function resendFailed(logId) {

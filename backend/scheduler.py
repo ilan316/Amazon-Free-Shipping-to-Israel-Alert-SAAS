@@ -23,7 +23,7 @@ from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import AsyncSessionLocal
-from backend.models import Product, User, UserProduct, NotificationLog, EmailTemplate
+from backend.models import Product, User, UserProduct, NotificationLog, EmailTemplate, EmailSendLog, EmailSendRecipient
 from backend.checker import browser_manager, ShippingStatus, CheckResult
 from backend.notifier import send_daily_summary, _send_via_resend
 
@@ -246,6 +246,49 @@ def _auto_substitute(text: str, user: User) -> str:
     return text.replace("{{email}}", user.notify_email).replace("{{pause_url}}", _pause_url(user.id))
 
 
+async def _run_automation_flow(
+    db,
+    tpl: EmailTemplate,
+    audience: str,
+    users: list,
+    sent_at: datetime,
+    mark_sent_fn,
+) -> tuple[int, int]:
+    """Send one automation flow, log to EmailSendLog/EmailSendRecipient. Returns (sent, failed)."""
+    if not users:
+        return 0, 0
+
+    log = EmailSendLog(
+        template_id=tpl.id,
+        template_name=tpl.name,
+        sent_at=sent_at,
+        audience=audience,
+        sent_count=0,
+        failed_count=0,
+    )
+    db.add(log)
+    await db.flush()
+
+    sent = failed = 0
+    for u in users:
+        ok = await _send_via_resend(
+            u.notify_email,
+            _auto_substitute(tpl.subject, u),
+            _auto_substitute(tpl.body, u),
+        )
+        db.add(EmailSendRecipient(send_log_id=log.id, user_id=u.id, email=u.notify_email, success=ok))
+        if ok:
+            mark_sent_fn(u, sent_at)
+            sent += 1
+        else:
+            failed += 1
+        await asyncio.sleep(0.55)
+
+    log.sent_count = sent
+    log.failed_count = failed
+    return sent, failed
+
+
 async def run_automation_emails():
     """Daily automation: activation + reminder for 0-product users, expansion for 1-9 product users."""
     logger.info("=== Automation emails started ===")
@@ -282,16 +325,11 @@ async def run_automation_emails():
                 )
             )).scalars().all()
 
-            for u in users:
-                ok = await _send_via_resend(
-                    u.notify_email,
-                    _auto_substitute(tpl_activation.subject, u),
-                    _auto_substitute(tpl_activation.body, u),
-                )
-                if ok:
-                    u.automation_activation_sent_at = now
-                    activation_sent += 1
-                await asyncio.sleep(0.55)
+            s, _ = await _run_automation_flow(
+                db, tpl_activation, "automation_activation", users, now,
+                lambda u, ts: setattr(u, "automation_activation_sent_at", ts),
+            )
+            activation_sent = s
 
         # --- Reminder: 3 days after activation, still 0 products ---
         if tpl_activation:
@@ -307,16 +345,11 @@ async def run_automation_emails():
                 )
             )).scalars().all()
 
-            for u in users:
-                ok = await _send_via_resend(
-                    u.notify_email,
-                    _auto_substitute(tpl_activation.subject, u),
-                    _auto_substitute(tpl_activation.body, u),
-                )
-                if ok:
-                    u.automation_reminder_sent_at = now
-                    reminder_sent += 1
-                await asyncio.sleep(0.55)
+            s, _ = await _run_automation_flow(
+                db, tpl_activation, "automation_reminder", users, now,
+                lambda u, ts: setattr(u, "automation_reminder_sent_at", ts),
+            )
+            reminder_sent = s
 
         # --- Expansion: 1-9 products, never sent or 30+ days ago ---
         if tpl_expansion:
@@ -334,16 +367,11 @@ async def run_automation_emails():
                 )
             )).scalars().all()
 
-            for u in users:
-                ok = await _send_via_resend(
-                    u.notify_email,
-                    _auto_substitute(tpl_expansion.subject, u),
-                    _auto_substitute(tpl_expansion.body, u),
-                )
-                if ok:
-                    u.automation_expansion_sent_at = now
-                    expansion_sent += 1
-                await asyncio.sleep(0.55)
+            s, _ = await _run_automation_flow(
+                db, tpl_expansion, "automation_expansion", users, now,
+                lambda u, ts: setattr(u, "automation_expansion_sent_at", ts),
+            )
+            expansion_sent = s
 
         await db.commit()
 

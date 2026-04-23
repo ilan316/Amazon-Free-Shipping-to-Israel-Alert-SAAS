@@ -1061,13 +1061,37 @@ async def get_send_log_recipients(
     admin: Annotated[User, Depends(get_current_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    log = (await db.execute(select(EmailSendLog).where(EmailSendLog.id == log_id))).scalar_one_or_none()
+    if not log:
+        raise HTTPException(status_code=404, detail="לוג לא נמצא")
+
     rows = (await db.execute(
         select(EmailSendRecipient)
         .where(EmailSendRecipient.send_log_id == log_id)
         .order_by(EmailSendRecipient.success.desc(), EmailSendRecipient.id)
     )).scalars().all()
+
+    opened_ids: set[int] = set()
+    if log.template_id:
+        success_user_ids = [r.user_id for r in rows if r.user_id and r.success]
+        if success_user_ids:
+            opened_result = await db.execute(
+                select(EmailOpen.user_id)
+                .where(
+                    EmailOpen.template_id == log.template_id,
+                    EmailOpen.opened_at >= log.sent_at,
+                    EmailOpen.user_id.in_(success_user_ids),
+                )
+                .distinct()
+            )
+            opened_ids = {row[0] for row in opened_result.all()}
+
     return [
-        {"id": r.id, "user_id": r.user_id, "email": r.email, "success": r.success}
+        {
+            "id": r.id, "user_id": r.user_id, "email": r.email,
+            "success": r.success,
+            "opened": (r.user_id in opened_ids) if r.success else False,
+        }
         for r in rows
     ]
 
