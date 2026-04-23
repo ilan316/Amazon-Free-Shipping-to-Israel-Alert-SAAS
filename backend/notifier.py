@@ -149,7 +149,15 @@ def _send_via_resend(to: str, subject: str, html: str, text: str) -> bool:
         logger.info(f"Email sent via Resend → {to}: {subject}")
         return True
     except Exception as e:
-        logger.error(f"Resend error: {e}")
+        err_str = str(e)
+        if "rate" in err_str.lower() or "429" in err_str:
+            logger.error(f"Resend RATE LIMIT → {to}: {err_str}")
+        elif "invalid" in err_str.lower() or "400" in err_str:
+            logger.error(f"Resend INVALID ADDRESS → {to}: {err_str}")
+        elif "quota" in err_str.lower() or "limit" in err_str.lower():
+            logger.error(f"Resend QUOTA EXCEEDED → {to}: {err_str}")
+        else:
+            logger.error(f"Resend error → {to}: {err_str}")
         return False
 
 
