@@ -954,9 +954,8 @@ async def send_email_template(
         else:
             failed += 1
         recipients_to_save.append((u.id, recipient, ok))
-        # Resend rate limit: ~10 req/sec — throttle every 5 emails
-        if i > 0 and i % 5 == 0:
-            await asyncio.sleep(0.6)
+        # Resend rate limit: 2 req/sec — sleep between every email
+        await asyncio.sleep(0.55)
 
     log = EmailSendLog(
         template_id=template_id,
@@ -1083,8 +1082,7 @@ async def resend_failed_recipients(
             sent += 1
         else:
             failed += 1
-        if i > 0 and i % 5 == 0:
-            await asyncio.sleep(0.6)
+        await asyncio.sleep(0.55)
 
     # Update log counts
     log.sent_count += sent
