@@ -69,3 +69,100 @@ async def create_tables():
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(100)"
             )
         )
+
+
+async def seed_default_templates():
+    import os
+    from sqlalchemy import select, text
+    from backend.models import EmailTemplate
+
+    base_url = os.environ.get("APP_BASE_URL", "https://app.amzfreeil.com").rstrip("/")
+    dashboard_url = f"{base_url}/dashboard"
+
+    _BRAND = "#FF9900"
+    _BRAND_DARK = "#c97800"
+    _BG = "#fffaf1"
+    _TEXT = "#222222"
+
+    def _wrap(content: str) -> str:
+        return f"""<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {{ margin:0; padding:0; background:#f5f5f5; font-family: 'Segoe UI', Arial, sans-serif; }}
+    .container {{ max-width:520px; margin:32px auto; background:#ffffff; border-radius:14px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,0.08); }}
+    .header {{ background:{_BRAND}; padding:28px 32px 20px; text-align:center; }}
+    .header img {{ height:44px; }}
+    .body {{ padding:32px; color:{_TEXT}; line-height:1.7; font-size:15px; }}
+    .body h2 {{ margin:0 0 16px; font-size:20px; color:{_TEXT}; }}
+    .cta {{ display:block; width:fit-content; margin:24px auto; background:{_BRAND}; color:#111 !important;
+            text-decoration:none; padding:14px 36px; border-radius:10px;
+            font-weight:700; font-size:16px; text-align:center; }}
+    .cta:hover {{ background:{_BRAND_DARK}; }}
+    .footer {{ padding:16px 32px 24px; text-align:center; font-size:12px; color:#999; border-top:1px solid #f0f0f0; }}
+    .step {{ display:flex; gap:12px; align-items:flex-start; margin:12px 0; }}
+    .step-num {{ background:{_BRAND}; color:#111; font-weight:700; border-radius:50%;
+                 width:26px; height:26px; display:flex; align-items:center; justify-content:center;
+                 flex-shrink:0; font-size:13px; }}
+    @media (max-width:560px) {{ .body {{ padding:20px; }} }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://app.amzfreeil.com/static/logo-new.png" alt="AMZFREEIL">
+    </div>
+    {content}
+    <div class="footer">
+      קיבלת מייל זה כי נרשמת ל-<a href="https://amzfreeil.com" style="color:{_BRAND};">AMZFREEIL</a><br>
+      <a href="{dashboard_url}" style="color:{_BRAND};">כניסה לחשבון</a>
+    </div>
+  </div>
+</body>
+</html>"""
+
+    template1_body = _wrap(f"""
+    <div class="body">
+      <h2>היי, עדיין לא הוספת מוצר 👋</h2>
+      <p>נרשמת ל-<strong>AMZFREEIL</strong> — השירות שמתריע כשמוצרי אמזון מציעים <strong>משלוח חינם לישראל</strong>.</p>
+      <p style="margin-bottom:6px;"><strong>איך זה עובד בשלושה שלבים:</strong></p>
+      <div class="step"><div class="step-num">1</div><div>היכנס לאמזון, מצא מוצר שמעניין אותך</div></div>
+      <div class="step"><div class="step-num">2</div><div>העתק את הקישור ● הדבק בדשבורד שלך</div></div>
+      <div class="step"><div class="step-num">3</div><div>ברגע שהמשלוח הופך לחינם — נשלח לך מייל 🎉</div></div>
+      <a href="{dashboard_url}" class="cta">הוסף את המוצר הראשון שלך →</a>
+      <p style="font-size:13px;color:#888;text-align:center;margin-top:8px;">לוקח פחות מ-30 שניות</p>
+    </div>""")
+
+    template2_body = _wrap(f"""
+    <div class="body">
+      <h2>יש לך עוד מקומות פנויים 🛒</h2>
+      <p>עקבת אחרי {{{{product_count}}}} מוצרים — אבל יש לך מקום ליותר.</p>
+      <p>כל מוצר נוסף שתוסיף = עוד הזדמנות לקבל <strong>משלוח חינם לישראל</strong>.</p>
+      <p style="background:{_BG};border-radius:10px;padding:14px 18px;font-size:14px;border-right:4px solid {_BRAND};">
+        💡 <strong>טיפ:</strong> מוצרים שעוקבים אחריהם הרבה אנשים — בדרך כלל מקבלים הנחות ומשלוחים חינם יותר בתדירות גבוהה.
+      </p>
+      <a href="{dashboard_url}" class="cta">הוסף עוד מוצרים →</a>
+    </div>""")
+
+    async with AsyncSessionLocal() as session:
+        defaults = [
+            EmailTemplate(
+                name="הפעלה_אפס_מוצרים",
+                subject="הוספת מוצר ראשון ב-30 שניות ✨",
+                body=template1_body,
+            ),
+            EmailTemplate(
+                name="הוסף_עוד_מוצרים",
+                subject="יש לך עוד מקומות פנויים — הגדל את הסיכויים שלך 🛒",
+                body=template2_body,
+            ),
+        ]
+        for t in defaults:
+            existing = (await session.execute(
+                select(EmailTemplate).where(EmailTemplate.name == t.name)
+            )).scalar_one_or_none()
+            if not existing:
+                session.add(t)
+        await session.commit()

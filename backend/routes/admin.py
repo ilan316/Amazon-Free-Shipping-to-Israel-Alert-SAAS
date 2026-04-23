@@ -899,7 +899,9 @@ async def send_email_template(
     )
     q = select(User, product_count_sub.label("pc")).where(User.is_verified == True, User.is_admin == False)
 
-    if body.audience == "active":
+    if body.audience == "self":
+        q = select(User, product_count_sub.label("pc")).where(User.id == admin.id)
+    elif body.audience == "active":
         q = q.where(User.is_active == True, User.vacation_mode == False)
     elif body.audience == "vacation":
         q = q.where(User.is_active == True, User.vacation_mode == True)

@@ -368,6 +368,7 @@
             <div class="send-row">
               <select id="tpl-audience" onchange="toggleSingleUser()"
                 style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.88rem;background:var(--bg);color:var(--text);">
+                <option value="self">🧪 שלח לעצמי (בדיקה)</option>
                 <option value="all">כל המשתמשים</option>
                 <option value="active">פעילים בלבד</option>
                 <option value="vacation">במצב חופשה</option>
@@ -442,7 +443,7 @@
   </div>
 
   <script src="/static/app.js?v=10"></script>
-  <script src="/static/admin.js?v=14"></script>
+  <script src="/static/admin.js?v=15"></script>
   <script>
     requireAuth();
     loadAdminData();
