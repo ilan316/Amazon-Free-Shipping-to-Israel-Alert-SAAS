@@ -922,8 +922,9 @@ async def send_email_template(
     if not rows:
         return {"sent": 0, "failed": 0, "message": "לא נמצאו משתמשים התואמים את הסינון"}
 
+    import asyncio
     sent = failed = 0
-    for row in rows:
+    for i, row in enumerate(rows):
         u = row[0]
         pc = row[1]
         recipient = u.notify_email or u.email
@@ -942,6 +943,9 @@ async def send_email_template(
             sent += 1
         else:
             failed += 1
+        # Resend rate limit: ~10 req/sec — throttle every 5 emails
+        if i > 0 and i % 5 == 0:
+            await asyncio.sleep(0.6)
 
     log = EmailSendLog(
         template_id=template_id,
