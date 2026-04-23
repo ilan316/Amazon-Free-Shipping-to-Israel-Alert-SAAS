@@ -116,8 +116,8 @@ async def seed_default_templates():
     </div>
     {content}
     <div class="footer">
-      קיבלת מייל זה כי נרשמת ל-<a href="https://amzfreeil.com" style="color:{_BRAND};">AMZFREEIL</a><br>
-      <a href="{dashboard_url}" style="color:{_BRAND};">כניסה לחשבון</a>
+      Amazon Free Shipping to Israel Alert<br>
+      <a href="{{{{pause_url}}}}" style="color:#aaa;">הפסק לקבל עדכונים</a>
     </div>
   </div>
 </body>
@@ -129,7 +129,7 @@ async def seed_default_templates():
       <p>נרשמת ל-<strong>AMZFREEIL</strong> — השירות שמתריע כשמוצרי אמזון מציעים <strong>משלוח חינם לישראל</strong>.</p>
       <p style="margin-bottom:6px;"><strong>איך זה עובד בשלושה שלבים:</strong></p>
       <div class="step"><div class="step-num">1</div><div>היכנס לאמזון, מצא מוצר שמעניין אותך</div></div>
-      <div class="step"><div class="step-num">2</div><div>העתק את הקישור ● הדבק בדשבורד שלך</div></div>
+      <div class="step"><div class="step-num">2</div><div>העתק את הקישור ● הדבק בדשבורד שלך<br><span style="font-size:13px;color:#888;">💡 מהיר יותר? <a href="https://chromewebstore.google.com/detail/amazon-israel-free-ship-a/mbickhgdhofaefhibfbgpacejhbelddn" style="color:{_BRAND};font-weight:600;">התקן את תוסף הכרום</a> — מוסיף מוצרים בלחיצה אחת ישירות מאמזון</span></div></div>
       <div class="step"><div class="step-num">3</div><div>ברגע שהמשלוח הופך לחינם — נשלח לך מייל 🎉</div></div>
       <a href="{dashboard_url}" class="cta">הוסף את המוצר הראשון שלך →</a>
       <p style="font-size:13px;color:#888;text-align:center;margin-top:8px;">לוקח פחות מ-30 שניות</p>
@@ -163,6 +163,9 @@ async def seed_default_templates():
             existing = (await session.execute(
                 select(EmailTemplate).where(EmailTemplate.name == t.name)
             )).scalar_one_or_none()
-            if not existing:
+            if existing:
+                existing.subject = t.subject
+                existing.body = t.body
+            else:
                 session.add(t)
         await session.commit()

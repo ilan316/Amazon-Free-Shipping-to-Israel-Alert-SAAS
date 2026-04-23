@@ -879,7 +879,7 @@ async def send_email_template(
     admin: Annotated[User, Depends(get_current_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    from backend.notifier import _send_via_resend
+    from backend.notifier import _send_via_resend, _pause_url
 
     t = (await db.execute(select(EmailTemplate).where(EmailTemplate.id == template_id))).scalar_one_or_none()
     if not t:
@@ -935,6 +935,7 @@ async def send_email_template(
             .replace("{{email}}", u.email)
             .replace("{{notify_email}}", recipient)
             .replace("{{product_count}}", str(pc))
+            .replace("{{pause_url}}", _pause_url(u.id))
         ) + pixel
         ok = _send_via_resend(recipient, subj, html_body, "")
         if ok:
