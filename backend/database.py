@@ -84,6 +84,19 @@ async def create_tables():
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS automation_expansion_sent_at TIMESTAMP WITH TIME ZONE"
             )
         )
+        # Mark users who already received the activation template manually so automation skips them
+        await conn.execute(
+            __import__("sqlalchemy").text("""
+                UPDATE users u
+                SET automation_activation_sent_at = esl.sent_at
+                FROM email_send_recipients esr
+                JOIN email_send_logs esl ON esr.send_log_id = esl.id
+                WHERE esl.template_name = 'לקוח לא הוסיף מוצרים - אפס מוצרים'
+                  AND esr.user_id = u.id
+                  AND esr.success = true
+                  AND u.automation_activation_sent_at IS NULL
+            """)
+        )
 
 
 async def seed_default_templates():
