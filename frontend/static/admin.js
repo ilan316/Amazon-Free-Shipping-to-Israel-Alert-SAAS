@@ -906,7 +906,12 @@ async function loadSendLogs() {
       </td>
       <td style="font-weight:600;">${l.template_name}</td>
       <td style="font-size:0.82rem;color:var(--text-muted);">${audienceLabel[l.audience] || l.audience}</td>
-      <td style="text-align:center;font-weight:600;">${l.sent_count}${l.failed_count > 0 ? ` <span style="color:var(--error);font-size:0.78rem;">(${l.failed_count} נכשלו)</span>` : ""}</td>
+      <td style="text-align:center;">
+        <span style="font-weight:600;">${l.sent_count + l.failed_count}</span>
+        <span style="font-size:0.78rem;color:var(--text-muted);"> ניסיונות</span><br>
+        <span style="font-size:0.78rem;color:var(--success);">✅ ${l.sent_count}</span>
+        ${l.failed_count > 0 ? `<span style="font-size:0.78rem;color:var(--error);margin-right:6px;">❌ ${l.failed_count}</span>` : ""}
+      </td>
       <td style="text-align:center;">${l.opens}</td>
       <td style="text-align:center;font-weight:600;color:${rateColor};">${l.unique_opens} <span style="font-size:0.75rem;font-weight:400;">(${openRate}%)</span></td>
     </tr>
