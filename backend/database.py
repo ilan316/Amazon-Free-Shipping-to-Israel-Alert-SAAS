@@ -97,6 +97,38 @@ async def create_tables():
                   AND u.automation_activation_sent_at IS NULL
             """)
         )
+        # Backfill by explicit email list (sent under 'הפעלה_אפס_מוצרים' without user_id link)
+        await conn.execute(
+            __import__("sqlalchemy").text("""
+                UPDATE users
+                SET automation_activation_sent_at = NOW()
+                WHERE (
+                    LOWER(email) IN (
+                        'bernard.danino@gmail.com','zevi6796@gmail.com','dcohen99@gmail.com',
+                        'yafitgrau@gmail.com','arieh.grod@gmail.com','bigman270@gmail.com',
+                        'shulman.tal1@gmail.com','gvilighs@gmail.com','djmistere1984@gmail.com',
+                        'eyran333@gmail.com','berlinwood638@gmail.com','talfischer7.tf@gmail.com',
+                        'dorale.kawaz@gmail.com','meirco199@gmail.com','tupe2009@gmail.com',
+                        'giladp1@gmail.com','markmoore000@gmail.com','aviel1cohen@gmail.com',
+                        'dorx80@gmail.com','adversites@gmail.com','yotamlaredo@gmail.com',
+                        'drorz1234@gmail.com','boazroz1@gmail.com','hadad.eyalo@gmail.com',
+                        'noy_919@yahoo.com'
+                    )
+                    OR LOWER(notify_email) IN (
+                        'bernard.danino@gmail.com','zevi6796@gmail.com','dcohen99@gmail.com',
+                        'yafitgrau@gmail.com','arieh.grod@gmail.com','bigman270@gmail.com',
+                        'shulman.tal1@gmail.com','gvilighs@gmail.com','djmistere1984@gmail.com',
+                        'eyran333@gmail.com','berlinwood638@gmail.com','talfischer7.tf@gmail.com',
+                        'dorale.kawaz@gmail.com','meirco199@gmail.com','tupe2009@gmail.com',
+                        'giladp1@gmail.com','markmoore000@gmail.com','aviel1cohen@gmail.com',
+                        'dorx80@gmail.com','adversites@gmail.com','yotamlaredo@gmail.com',
+                        'drorz1234@gmail.com','boazroz1@gmail.com','hadad.eyalo@gmail.com',
+                        'noy_919@yahoo.com'
+                    )
+                )
+                AND automation_activation_sent_at IS NULL
+            """)
+        )
 
 
 async def seed_default_templates():
