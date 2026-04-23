@@ -33,6 +33,7 @@ async function loadAdminData() {
     loadInactivityDays(),
     loadChecksStatus(),
     loadClickStats(),
+    loadTemplates(),
   ]);
 }
 
@@ -704,6 +705,160 @@ async function sendTestClickEmail() {
     msg.textContent = "❌ שגיאה בשליחה";
     setTimeout(() => { msg.textContent = ""; }, 4000);
   }
+}
+
+// ── Email Templates ──────────────────────────────────────────────────────────
+
+let _editingTemplateId = null;
+
+async function loadTemplates() {
+  const res = await apiFetch("/admin/email-templates");
+  const body = document.getElementById("tpl-list-body");
+  if (!res || !res.ok) { body.innerHTML = '<div style="padding:16px;color:var(--error);">שגיאה בטעינה</div>'; return; }
+  const templates = await res.json();
+  if (!templates.length) {
+    body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.85rem;">אין תבניות עדיין</div>';
+    return;
+  }
+  body.innerHTML = templates.map(t => `
+    <div class="tpl-item ${_editingTemplateId === t.id ? 'selected' : ''}" id="tpl-item-${t.id}">
+      <div class="tpl-item-name">${t.name}</div>
+      <div class="tpl-item-subject">${t.subject}</div>
+      <div class="tpl-item-actions">
+        <button class="btn-sm" onclick="editTemplate(${t.id})">✏️ ערוך</button>
+        <button class="btn-sm" onclick="openSendPanel(${t.id})">📤 שלח</button>
+        <button class="btn-sm danger" onclick="deleteTemplate(${t.id})">מחק</button>
+      </div>
+    </div>`).join("");
+}
+
+function newTemplate() {
+  _editingTemplateId = null;
+  document.getElementById("tpl-editing-id").value = "";
+  document.getElementById("tpl-editor-title").textContent = "✏️ תבנית חדשה";
+  document.getElementById("tpl-name").value = "";
+  document.getElementById("tpl-subject").value = "";
+  document.getElementById("tpl-body").value = "";
+  document.getElementById("tpl-save-msg").textContent = "";
+  document.getElementById("tpl-preview-wrap").style.display = "none";
+  document.getElementById("tpl-send-panel").style.display = "none";
+  document.querySelectorAll(".tpl-item").forEach(el => el.classList.remove("selected"));
+}
+
+async function editTemplate(id) {
+  const res = await apiFetch("/admin/email-templates");
+  if (!res || !res.ok) return;
+  const templates = await res.json();
+  const t = templates.find(x => x.id === id);
+  if (!t) return;
+  _editingTemplateId = id;
+  document.getElementById("tpl-editing-id").value = id;
+  document.getElementById("tpl-editor-title").textContent = `✏️ עריכה: ${t.name}`;
+  document.getElementById("tpl-name").value = t.name;
+  document.getElementById("tpl-subject").value = t.subject;
+  document.getElementById("tpl-body").value = t.body;
+  document.getElementById("tpl-save-msg").textContent = "";
+  document.getElementById("tpl-preview-wrap").style.display = "none";
+  document.getElementById("tpl-send-panel").style.display = "none";
+  document.querySelectorAll(".tpl-item").forEach(el => el.classList.remove("selected"));
+  document.getElementById(`tpl-item-${id}`)?.classList.add("selected");
+}
+
+async function saveTemplate() {
+  const id = document.getElementById("tpl-editing-id").value;
+  const name = document.getElementById("tpl-name").value.trim();
+  const subject = document.getElementById("tpl-subject").value.trim();
+  const body = document.getElementById("tpl-body").value;
+  const msgEl = document.getElementById("tpl-save-msg");
+  if (!name || !subject || !body) { msgEl.textContent = "❌ יש למלא שם, נושא ותוכן"; msgEl.style.color = "var(--error)"; return; }
+
+  const method = id ? "PUT" : "POST";
+  const url = id ? `/admin/email-templates/${id}` : "/admin/email-templates";
+  const res = await apiFetch(url, { method, body: JSON.stringify({ name, subject, body }) });
+  if (res && res.ok) {
+    const data = await res.json();
+    if (!id) {
+      _editingTemplateId = data.id;
+      document.getElementById("tpl-editing-id").value = data.id;
+      document.getElementById("tpl-editor-title").textContent = `✏️ עריכה: ${name}`;
+    }
+    msgEl.textContent = "✅ נשמר בהצלחה";
+    msgEl.style.color = "var(--success)";
+    await loadTemplates();
+  } else {
+    const err = res ? await res.json().catch(() => ({})) : {};
+    msgEl.textContent = "❌ " + (err.detail || "שגיאה");
+    msgEl.style.color = "var(--error)";
+  }
+  setTimeout(() => { msgEl.textContent = ""; }, 3000);
+}
+
+async function deleteTemplate(id) {
+  if (!confirm("למחוק תבנית זו לצמיתות?")) return;
+  const res = await apiFetch(`/admin/email-templates/${id}`, { method: "DELETE" });
+  if (res && res.ok) {
+    if (_editingTemplateId === id) newTemplate();
+    await loadTemplates();
+  } else {
+    const err = res ? await res.json().catch(() => ({})) : {};
+    alert(err.detail || "שגיאה במחיקה");
+  }
+}
+
+function previewTemplate() {
+  const html = document.getElementById("tpl-body").value;
+  const wrap = document.getElementById("tpl-preview-wrap");
+  const frame = document.getElementById("tpl-preview-frame");
+  wrap.style.display = html ? "" : "none";
+  if (!html) return;
+  const doc = frame.contentDocument || frame.contentWindow.document;
+  doc.open(); doc.write(html); doc.close();
+}
+
+function openSendPanel(id) {
+  editTemplate(id).then(() => {
+    document.getElementById("tpl-send-panel").style.display = "";
+    document.getElementById("tpl-audience").value = "all";
+    document.getElementById("tpl-single-user-id").style.display = "none";
+    document.getElementById("tpl-send-msg").textContent = "";
+  });
+}
+
+function toggleSingleUser() {
+  const v = document.getElementById("tpl-audience").value;
+  document.getElementById("tpl-single-user-id").style.display = v === "single" ? "" : "none";
+}
+
+async function sendTemplate() {
+  const id = document.getElementById("tpl-editing-id").value;
+  if (!id) { alert("יש לשמור את התבנית תחילה"); return; }
+  const audience = document.getElementById("tpl-audience").value;
+  const user_id = audience === "single" ? parseInt(document.getElementById("tpl-single-user-id").value) : null;
+  if (audience === "single" && !user_id) { alert("יש להזין User ID"); return; }
+
+  const label = { all: "כל המשתמשים", active: "הפעילים", vacation: "במצב חופשה", inactive: "המושהים", single: `משתמש #${user_id}` }[audience];
+  if (!confirm(`לשלוח מייל זה ל${label}?`)) return;
+
+  const btn = document.getElementById("tpl-send-btn");
+  const msgEl = document.getElementById("tpl-send-msg");
+  btn.disabled = true; btn.textContent = "שולח...";
+
+  const res = await apiFetch(`/admin/email-templates/${id}/send`, {
+    method: "POST",
+    body: JSON.stringify({ audience, user_id }),
+  });
+  btn.disabled = false; btn.textContent = "📤 שלח עכשיו";
+
+  if (res && res.ok) {
+    const data = await res.json();
+    msgEl.textContent = "✅ " + data.message;
+    msgEl.style.color = "var(--success)";
+  } else {
+    const err = res ? await res.json().catch(() => ({})) : {};
+    msgEl.textContent = "❌ " + (err.detail || "שגיאה בשליחה");
+    msgEl.style.color = "var(--error)";
+  }
+  setTimeout(() => { msgEl.textContent = ""; }, 5000);
 }
 
 async function changePassword() {

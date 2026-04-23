@@ -90,3 +90,13 @@ class EmailClick(Base):
     clicked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
     dest_url: Mapped[str] = mapped_column(String(512), nullable=False)
+
+
+class EmailTemplate(Base):
+    __tablename__ = "email_templates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)

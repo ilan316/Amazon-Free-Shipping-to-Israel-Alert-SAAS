@@ -8,7 +8,7 @@ from sqlalchemy import select, func, delete
 
 from backend.database import get_db
 from sqlalchemy import cast, Date
-from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick
+from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate
 from backend.auth import get_current_admin, hash_password, verify_password, SECRET_KEY, ALGORITHM
 
 
@@ -790,3 +790,126 @@ async def send_test_click_email(
 
     ok = _send_via_resend(admin.notify_email, "🧪 בדיקת Click Tracking — amzfreeil", html, f"לחץ כאן: {tracking}")
     return {"sent": ok, "to": admin.notify_email, "tracking_url": tracking}
+
+
+# ── Email Templates ───────────────────────────────────────────────────────────
+
+class EmailTemplateBody(BaseModel):
+    name: str
+    subject: str
+    body: str
+
+class EmailTemplateSendBody(BaseModel):
+    audience: str  # "all" | "active" | "vacation" | "single"
+    user_id: int | None = None
+
+
+@router.get("/email-templates")
+async def list_email_templates(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    result = await db.execute(select(EmailTemplate).order_by(EmailTemplate.created_at.desc()))
+    templates = result.scalars().all()
+    return [
+        {"id": t.id, "name": t.name, "subject": t.subject, "body": t.body,
+         "created_at": t.created_at.isoformat() if t.created_at else None}
+        for t in templates
+    ]
+
+
+@router.post("/email-templates")
+async def create_email_template(
+    body: EmailTemplateBody,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    existing = (await db.execute(select(EmailTemplate).where(EmailTemplate.name == body.name))).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=400, detail="שם תבנית כבר קיים")
+    t = EmailTemplate(name=body.name.strip(), subject=body.subject.strip(), body=body.body)
+    db.add(t)
+    await db.commit()
+    await db.refresh(t)
+    return {"id": t.id, "message": "תבנית נשמרה"}
+
+
+@router.put("/email-templates/{template_id}")
+async def update_email_template(
+    template_id: int,
+    body: EmailTemplateBody,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    t = (await db.execute(select(EmailTemplate).where(EmailTemplate.id == template_id))).scalar_one_or_none()
+    if not t:
+        raise HTTPException(status_code=404, detail="תבנית לא נמצאה")
+    # Check name uniqueness if changed
+    if body.name.strip() != t.name:
+        dup = (await db.execute(select(EmailTemplate).where(EmailTemplate.name == body.name.strip()))).scalar_one_or_none()
+        if dup:
+            raise HTTPException(status_code=400, detail="שם תבנית כבר קיים")
+    t.name = body.name.strip()
+    t.subject = body.subject.strip()
+    t.body = body.body
+    await db.commit()
+    return {"message": "תבנית עודכנה"}
+
+
+@router.delete("/email-templates/{template_id}")
+async def delete_email_template(
+    template_id: int,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    t = (await db.execute(select(EmailTemplate).where(EmailTemplate.id == template_id))).scalar_one_or_none()
+    if not t:
+        raise HTTPException(status_code=404, detail="תבנית לא נמצאה")
+    await db.delete(t)
+    await db.commit()
+    return {"message": "תבנית נמחקה"}
+
+
+@router.post("/email-templates/{template_id}/send")
+async def send_email_template(
+    template_id: int,
+    body: EmailTemplateSendBody,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    from backend.notifier import _send_via_resend
+
+    t = (await db.execute(select(EmailTemplate).where(EmailTemplate.id == template_id))).scalar_one_or_none()
+    if not t:
+        raise HTTPException(status_code=404, detail="תבנית לא נמצאה")
+
+    # Build recipient query
+    q = select(User).where(User.is_verified == True, User.is_admin == False)
+    if body.audience == "active":
+        q = q.where(User.is_active == True, User.vacation_mode == False)
+    elif body.audience == "vacation":
+        q = q.where(User.is_active == True, User.vacation_mode == True)
+    elif body.audience == "inactive":
+        q = q.where(User.is_active == False)
+    elif body.audience == "single":
+        if not body.user_id:
+            raise HTTPException(status_code=400, detail="חסר user_id")
+        q = select(User).where(User.id == body.user_id)
+    # "all" → no extra filter
+
+    users = (await db.execute(q)).scalars().all()
+    if not users:
+        return {"sent": 0, "failed": 0, "message": "לא נמצאו משתמשים"}
+
+    sent = failed = 0
+    for u in users:
+        recipient = u.notify_email or u.email
+        subj = t.subject.replace("{{email}}", u.email)
+        html = t.body.replace("{{email}}", u.email).replace("{{notify_email}}", recipient)
+        ok = _send_via_resend(recipient, subj, html, "")
+        if ok:
+            sent += 1
+        else:
+            failed += 1
+
+    return {"sent": sent, "failed": failed, "message": f"נשלח ל-{sent} משתמשים" + (f", {failed} נכשלו" if failed else "")}

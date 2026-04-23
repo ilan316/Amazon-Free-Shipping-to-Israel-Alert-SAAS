@@ -77,3 +77,26 @@ class ProductResponse(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+# ── Email Templates ───────────────────────────────────────────────────────────
+
+class EmailTemplateCreate(BaseModel):
+    name: str
+    subject: str
+    body: str
+
+
+class EmailTemplateResponse(BaseModel):
+    id: int
+    name: str
+    subject: str
+    body: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class EmailTemplateSendRequest(BaseModel):
+    audience: str  # "all" | "active" | "vacation" | "single"
+    user_id: int | None = None
