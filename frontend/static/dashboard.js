@@ -127,7 +127,7 @@ function renderProducts() {
     list.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">📦</div>
-        <p>עדיין לא הוספת מוצרים לעקיבה</p>
+        <p>עדיין לא הוספת מוצרים למעקב</p>
         <p style="font-size:0.85rem; margin-top:8px;">הדבק URL של מוצר אמזון או ASIN בתיבה למעלה</p>
       </div>`;
     return;
