@@ -97,7 +97,7 @@ async def create_tables():
                   AND u.automation_activation_sent_at IS NULL
             """)
         )
-        # Backfill by explicit email list (sent under 'הפעלה_אפס_מוצרים' without user_id link)
+        # Backfill by explicit email list — all 44 users who already received activation email
         await conn.execute(
             __import__("sqlalchemy").text("""
                 UPDATE users
@@ -105,25 +105,37 @@ async def create_tables():
                 WHERE (
                     LOWER(email) IN (
                         'bernard.danino@gmail.com','zevi6796@gmail.com','dcohen99@gmail.com',
-                        'yafitgrau@gmail.com','arieh.grod@gmail.com','bigman270@gmail.com',
-                        'shulman.tal1@gmail.com','gvilighs@gmail.com','djmistere1984@gmail.com',
-                        'eyran333@gmail.com','berlinwood638@gmail.com','talfischer7.tf@gmail.com',
-                        'dorale.kawaz@gmail.com','meirco199@gmail.com','tupe2009@gmail.com',
-                        'giladp1@gmail.com','markmoore000@gmail.com','aviel1cohen@gmail.com',
-                        'dorx80@gmail.com','adversites@gmail.com','yotamlaredo@gmail.com',
+                        'a0525304001@gmail.com','yafitgrau@gmail.com','arieh.grod@gmail.com',
+                        'djyaron.s2@gmail.com','sinnreichalicia@gmail.com','bigman270@gmail.com',
+                        'bayder.ilanit@gmail.com','shulman.tal1@gmail.com','zeev.piatkovskiy@gmail.com',
+                        'efrat1maymon@gmail.com','gvilighs@gmail.com','djmistere1984@gmail.com',
+                        'eyran333@gmail.com','berlinwood638@gmail.com','dudiatar2@gmail.com',
+                        'aliexpress3d3d@gmail.com','talfischer7.tf@gmail.com','dorale.kawaz@gmail.com',
+                        'meirco199@gmail.com','peledidit@gmail.com','shlomiarbel@gmail.com',
+                        'roiattia.1@gmail.com','tupe2009@gmail.com','giladp1@gmail.com',
+                        'roy.daklon@gmail.com','markmoore000@gmail.com','nirdahan13@gmail.com',
+                        'aviel1cohen@gmail.com','strul86@gmail.com','avidary@gmail.com',
+                        'dorx80@gmail.com','adversites@gmail.com','asafmailbox@yahoo.com',
+                        'yotamlaredo@gmail.com','weis2323@gmail.com','tamarguy29@gmail.com',
                         'drorz1234@gmail.com','boazroz1@gmail.com','hadad.eyalo@gmail.com',
-                        'noy_919@yahoo.com'
+                        'roniteemo@gmail.com','noy_919@yahoo.com'
                     )
                     OR LOWER(notify_email) IN (
                         'bernard.danino@gmail.com','zevi6796@gmail.com','dcohen99@gmail.com',
-                        'yafitgrau@gmail.com','arieh.grod@gmail.com','bigman270@gmail.com',
-                        'shulman.tal1@gmail.com','gvilighs@gmail.com','djmistere1984@gmail.com',
-                        'eyran333@gmail.com','berlinwood638@gmail.com','talfischer7.tf@gmail.com',
-                        'dorale.kawaz@gmail.com','meirco199@gmail.com','tupe2009@gmail.com',
-                        'giladp1@gmail.com','markmoore000@gmail.com','aviel1cohen@gmail.com',
-                        'dorx80@gmail.com','adversites@gmail.com','yotamlaredo@gmail.com',
+                        'a0525304001@gmail.com','yafitgrau@gmail.com','arieh.grod@gmail.com',
+                        'djyaron.s2@gmail.com','sinnreichalicia@gmail.com','bigman270@gmail.com',
+                        'bayder.ilanit@gmail.com','shulman.tal1@gmail.com','zeev.piatkovskiy@gmail.com',
+                        'efrat1maymon@gmail.com','gvilighs@gmail.com','djmistere1984@gmail.com',
+                        'eyran333@gmail.com','berlinwood638@gmail.com','dudiatar2@gmail.com',
+                        'aliexpress3d3d@gmail.com','talfischer7.tf@gmail.com','dorale.kawaz@gmail.com',
+                        'meirco199@gmail.com','peledidit@gmail.com','shlomiarbel@gmail.com',
+                        'roiattia.1@gmail.com','tupe2009@gmail.com','giladp1@gmail.com',
+                        'roy.daklon@gmail.com','markmoore000@gmail.com','nirdahan13@gmail.com',
+                        'aviel1cohen@gmail.com','strul86@gmail.com','avidary@gmail.com',
+                        'dorx80@gmail.com','adversites@gmail.com','asafmailbox@yahoo.com',
+                        'yotamlaredo@gmail.com','weis2323@gmail.com','tamarguy29@gmail.com',
                         'drorz1234@gmail.com','boazroz1@gmail.com','hadad.eyalo@gmail.com',
-                        'noy_919@yahoo.com'
+                        'roniteemo@gmail.com','noy_919@yahoo.com'
                     )
                 )
                 AND automation_activation_sent_at IS NULL
