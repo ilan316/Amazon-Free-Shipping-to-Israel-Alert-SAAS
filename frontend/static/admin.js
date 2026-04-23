@@ -937,59 +937,63 @@ async function toggleSendLogDetail(logId, templateId, sentAt, clickedRow) {
   if (arrow) arrow.textContent = "▼";
   inner.textContent = "טוען...";
 
-  if (!templateId) {
-    inner.innerHTML = '<span style="color:var(--text-muted);">התבנית נמחקה — אין נתוני פתיחות</span>';
-    return;
-  }
-
-  const res = await apiFetch(`/admin/email-templates/${templateId}/opens`);
+  const res = await apiFetch(`/admin/email-send-logs/${logId}/recipients`);
   if (!res || !res.ok) { inner.textContent = "שגיאה בטעינה"; return; }
-  const data = await res.json();
+  const recipients = await res.json();
 
-  const sendTime = new Date(sentAt);
-  // Filter opens that happened after this send event
-  const relevantOpens = data.opens.filter(o => new Date(o.opened_at) >= sendTime);
-
-  if (!relevantOpens.length) {
-    inner.innerHTML = '<span style="color:var(--text-muted);">אין פתיחות מאומתות לשליחה זו</span>';
+  if (!recipients.length) {
+    inner.innerHTML = '<span style="color:var(--text-muted);">אין נתוני נמענים לשליחה זו (נשלחה לפני שמירת נמענים)</span>';
     return;
   }
+
+  const sent = recipients.filter(r => r.success);
+  const failed = recipients.filter(r => !r.success);
+
+  const makeTable = (list, color) => list.length ? `
+    <table style="width:100%;border-collapse:collapse;margin-bottom:4px;">
+      <tbody>
+        ${list.map(r => `<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:4px 8px;direction:ltr;color:${color};">${r.email}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>` : "";
 
   inner.innerHTML = `
-    <div style="font-weight:600;margin-bottom:8px;color:var(--text-muted);">
-      👁 ${relevantOpens.length} פתיחות לשליחה זו (מ-${new Date(sentAt).toLocaleString("he-IL")})
-    </div>
-    <table style="width:100%;border-collapse:collapse;">
-      <thead>
-        <tr style="color:var(--text-muted);border-bottom:1px solid var(--border);">
-          <th style="text-align:right;padding:4px 8px;font-weight:600;">אימייל</th>
-          <th style="text-align:right;padding:4px 8px;font-weight:600;">זמן פתיחה</th>
-          <th style="text-align:right;padding:4px 8px;font-weight:600;">IP</th>
-          <th style="text-align:right;padding:4px 8px;font-weight:600;">פיגור מהשליחה</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${relevantOpens.map(o => {
-          const openTime = new Date(o.opened_at);
-          const diffMs = openTime - sendTime;
-          const diffMin = Math.round(diffMs / 60000);
-          const isSuspect = diffMs < 120000; // less than 2 minutes = suspicious
-          const lagColor = isSuspect ? "var(--error)" : "var(--success)";
-          const lagText = diffMs < 60000
-            ? `${Math.round(diffMs/1000)} שניות ⚠️`
-            : diffMin < 60
-              ? `${diffMin} דקות`
-              : `${Math.round(diffMin/60)} שעות`;
-          return `<tr style="border-bottom:1px solid var(--border);">
-            <td style="padding:5px 8px;direction:ltr;">${o.email}</td>
-            <td style="padding:5px 8px;white-space:nowrap;">${openTime.toLocaleString("he-IL")}</td>
-            <td style="padding:5px 8px;font-family:monospace;color:var(--text-muted);">${o.ip || "—"}</td>
-            <td style="padding:5px 8px;font-weight:600;color:${lagColor};">${lagText}</td>
-          </tr>`;
-        }).join("")}
-      </tbody>
-    </table>
-    <div style="margin-top:8px;font-size:0.75rem;color:var(--text-muted);">⚠️ פתיחה תוך פחות מ-2 דקות = חשד לסורק אוטומטי</div>`;
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:4px 0;">
+      <div>
+        <div style="font-weight:700;font-size:0.85rem;color:var(--success);margin-bottom:6px;">✅ נשלח בהצלחה (${sent.length})</div>
+        ${makeTable(sent, "var(--text)")}
+      </div>
+      <div>
+        <div style="font-weight:700;font-size:0.85rem;color:var(--error);margin-bottom:6px;">❌ נכשל (${failed.length})</div>
+        ${makeTable(failed, "var(--text-muted)")}
+        ${failed.length ? `
+          <button class="btn-run-check" id="resend-btn-${logId}" onclick="resendFailed(${logId})"
+            style="margin-top:10px;font-size:0.82rem;padding:7px 16px;">
+            🔄 שלח מחדש לנכשלים (${failed.length})
+          </button>
+          <span id="resend-msg-${logId}" style="font-size:0.82rem;display:block;margin-top:6px;"></span>
+        ` : ""}
+      </div>
+    </div>`;
+}
+
+async function resendFailed(logId) {
+  const btn = document.getElementById(`resend-btn-${logId}`);
+  const msg = document.getElementById(`resend-msg-${logId}`);
+  btn.disabled = true; btn.textContent = "שולח...";
+  const res = await apiFetch(`/admin/email-send-logs/${logId}/resend-failed`, { method: "POST" });
+  btn.disabled = false; btn.textContent = `🔄 שלח מחדש`;
+  if (res && res.ok) {
+    const data = await res.json();
+    msg.textContent = "✅ " + data.message;
+    msg.style.color = "var(--success)";
+    await loadSendLogs();
+  } else {
+    const err = res ? await res.json().catch(() => ({})) : {};
+    msg.textContent = "❌ " + (err.detail || "שגיאה");
+    msg.style.color = "var(--error)";
+  }
 }
 
 async function loadTemplateOpens(templateId) {

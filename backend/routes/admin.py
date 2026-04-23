@@ -8,7 +8,7 @@ from sqlalchemy import select, func, delete
 
 from backend.database import get_db
 from sqlalchemy import cast, Date
-from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen, EmailSendLog
+from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen, EmailSendLog, EmailSendRecipient
 from backend.auth import get_current_admin, hash_password, verify_password, SECRET_KEY, ALGORITHM
 
 
@@ -924,6 +924,7 @@ async def send_email_template(
 
     import asyncio
     sent = failed = 0
+    recipients_to_save = []
     for i, row in enumerate(rows):
         u = row[0]
         pc = row[1]
@@ -943,6 +944,7 @@ async def send_email_template(
             sent += 1
         else:
             failed += 1
+        recipients_to_save.append((u.id, recipient, ok))
         # Resend rate limit: ~10 req/sec — throttle every 5 emails
         if i > 0 and i % 5 == 0:
             await asyncio.sleep(0.6)
@@ -955,6 +957,10 @@ async def send_email_template(
         failed_count=failed,
     )
     db.add(log)
+    await db.flush()  # get log.id before adding recipients
+
+    for uid, email, ok in recipients_to_save:
+        db.add(EmailSendRecipient(send_log_id=log.id, user_id=uid, email=email, success=ok))
     await db.commit()
 
     return {"sent": sent, "failed": failed, "message": f"נשלח ל-{sent} משתמשים" + (f", {failed} נכשלו" if failed else "")}
@@ -990,6 +996,92 @@ async def list_send_logs(
         }
         for r in rows
     ]
+
+
+@router.get("/email-send-logs/{log_id}/recipients")
+async def get_send_log_recipients(
+    log_id: int,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    rows = (await db.execute(
+        select(EmailSendRecipient)
+        .where(EmailSendRecipient.send_log_id == log_id)
+        .order_by(EmailSendRecipient.success.desc(), EmailSendRecipient.id)
+    )).scalars().all()
+    return [
+        {"id": r.id, "user_id": r.user_id, "email": r.email, "success": r.success}
+        for r in rows
+    ]
+
+
+@router.post("/email-send-logs/{log_id}/resend-failed")
+async def resend_failed_recipients(
+    log_id: int,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    from backend.notifier import _send_via_resend, _pause_url
+
+    log = (await db.execute(select(EmailSendLog).where(EmailSendLog.id == log_id))).scalar_one_or_none()
+    if not log:
+        raise HTTPException(status_code=404, detail="לוג לא נמצא")
+    if not log.template_id:
+        raise HTTPException(status_code=400, detail="התבנית נמחקה — לא ניתן לשלוח מחדש")
+
+    t = (await db.execute(select(EmailTemplate).where(EmailTemplate.id == log.template_id))).scalar_one_or_none()
+    if not t:
+        raise HTTPException(status_code=404, detail="תבנית לא נמצאה")
+
+    failed_rows = (await db.execute(
+        select(EmailSendRecipient)
+        .where(EmailSendRecipient.send_log_id == log_id, EmailSendRecipient.success == False)
+    )).scalars().all()
+
+    if not failed_rows:
+        return {"sent": 0, "failed": 0, "message": "אין נכשלים לשליחה מחדש"}
+
+    import os, asyncio
+    base_url = os.environ.get("APP_BASE_URL", "https://app.amzfreeil.com").rstrip("/")
+
+    product_count_sub = (
+        select(func.count(UserProduct.id))
+        .where(UserProduct.user_id == User.id)
+        .correlate(User)
+        .scalar_subquery()
+    )
+
+    sent = failed = 0
+    for i, r in enumerate(failed_rows):
+        u = (await db.execute(select(User, product_count_sub.label("pc")).where(User.id == r.user_id))).first() if r.user_id else None
+        recipient = r.email
+        pc = u[1] if u else 0
+        user_obj = u[0] if u else None
+        subj = t.subject.replace("{{email}}", recipient).replace("{{product_count}}", str(pc))
+        pixel_url = f"{base_url}/track/email-open?uid={r.user_id or 0}&tid={t.id}"
+        pixel = f'<img src="{pixel_url}" width="1" height="1" style="display:none;" alt="">'
+        pause = _pause_url(r.user_id) if r.user_id else "#"
+        html_body = (
+            t.body
+            .replace("{{email}}", recipient)
+            .replace("{{notify_email}}", recipient)
+            .replace("{{product_count}}", str(pc))
+            .replace("{{pause_url}}", pause)
+        ) + pixel
+        ok = _send_via_resend(recipient, subj, html_body, "")
+        r.success = ok
+        if ok:
+            sent += 1
+        else:
+            failed += 1
+        if i > 0 and i % 5 == 0:
+            await asyncio.sleep(0.6)
+
+    # Update log counts
+    log.sent_count += sent
+    log.failed_count -= sent  # sent successfully this time
+    await db.commit()
+    return {"sent": sent, "failed": failed, "message": f"נשלח מחדש ל-{sent} משתמשים" + (f", {failed} נכשלו שוב" if failed else "")}
 
 
 @router.get("/email-templates/{template_id}/opens")

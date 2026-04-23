@@ -122,3 +122,13 @@ class EmailSendLog(Base):
     audience: Mapped[str] = mapped_column(String(50), nullable=False)
     sent_count: Mapped[int] = mapped_column(Integer, default=0)
     failed_count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class EmailSendRecipient(Base):
+    __tablename__ = "email_send_recipients"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    send_log_id: Mapped[int] = mapped_column(Integer, ForeignKey("email_send_logs.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    success: Mapped[bool] = mapped_column(Boolean, default=True)
