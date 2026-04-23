@@ -34,6 +34,7 @@ async function loadAdminData() {
     loadChecksStatus(),
     loadClickStats(),
     loadTemplates(),
+    loadSendLogs(),
   ]);
 }
 
@@ -725,9 +726,6 @@ async function loadTemplates() {
       <td style="font-weight:600;">${t.name}</td>
       <td style="color:var(--text-muted);font-size:0.85rem;">${t.subject}</td>
       <td class="ltr" style="font-size:0.82rem;color:var(--text-muted);white-space:nowrap;">${t.created_at ? new Date(t.created_at).toLocaleDateString("he-IL") : "—"}</td>
-      <td id="tpl-opens-cell-${t.id}" style="font-size:0.82rem;color:var(--text-muted);">
-        <button class="btn-sm" onclick="loadTemplateOpens(${t.id})">📊 פתיחות</button>
-      </td>
       <td>
         <div class="action-btns">
           <button class="btn-sm" onclick="editTemplate(${t.id})">✏️ ערוך</button>
@@ -822,10 +820,8 @@ async function deleteTemplate(id) {
 
 function previewTemplate() {
   const html = document.getElementById("tpl-body").value;
-  const wrap = document.getElementById("tpl-preview-wrap");
   const frame = document.getElementById("tpl-preview-frame");
-  wrap.style.display = html ? "" : "none";
-  if (!html) return;
+  if (!html || !frame) return;
   const doc = frame.contentDocument || frame.contentWindow.document;
   doc.open(); doc.write(html); doc.close();
 }
@@ -879,13 +875,38 @@ async function sendTemplate() {
     const data = await res.json();
     msgEl.textContent = "✅ " + data.message;
     msgEl.style.color = "var(--success)";
-    await loadTemplates();
+    await Promise.all([loadTemplates(), loadSendLogs()]);
   } else {
     const err = res ? await res.json().catch(() => ({})) : {};
     msgEl.textContent = "❌ " + (err.detail || "שגיאה בשליחה");
     msgEl.style.color = "var(--error)";
   }
   setTimeout(() => { msgEl.textContent = ""; }, 5000);
+}
+
+async function loadSendLogs() {
+  const tbody = document.getElementById("send-log-body");
+  if (!tbody) return;
+  const res = await apiFetch("/admin/email-send-logs");
+  if (!res || !res.ok) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--error);padding:16px;">שגיאה בטעינה</td></tr>'; return; }
+  const logs = await res.json();
+  if (!logs.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">לא נשלחו מיילים עדיין</td></tr>';
+    return;
+  }
+  const audienceLabel = { all: "כל המשתמשים", active: "פעילים", vacation: "חופשה", inactive: "מושהים", single: "בודד", self: "בדיקה" };
+  tbody.innerHTML = logs.map(l => {
+    const openRate = l.sent_count > 0 ? Math.round((l.unique_opens / l.sent_count) * 100) : 0;
+    const rateColor = openRate >= 30 ? "var(--success)" : openRate >= 10 ? "var(--warning,#f59e0b)" : "var(--text-muted)";
+    return `<tr>
+      <td class="ltr" style="white-space:nowrap;font-size:0.82rem;">${new Date(l.sent_at).toLocaleString("he-IL", { day:"2-digit", month:"2-digit", year:"2-digit", hour:"2-digit", minute:"2-digit" })}</td>
+      <td style="font-weight:600;">${l.template_name}</td>
+      <td style="font-size:0.82rem;color:var(--text-muted);">${audienceLabel[l.audience] || l.audience}</td>
+      <td style="text-align:center;font-weight:600;">${l.sent_count}${l.failed_count > 0 ? ` <span style="color:var(--error);font-size:0.78rem;">(${l.failed_count} נכשלו)</span>` : ""}</td>
+      <td style="text-align:center;">${l.opens}</td>
+      <td style="text-align:center;font-weight:600;color:${rateColor};">${l.unique_opens} <span style="font-size:0.75rem;font-weight:400;">(${openRate}%)</span></td>
+    </tr>`;
+  }).join("");
 }
 
 async function loadTemplateOpens(templateId) {

@@ -110,3 +110,15 @@ class EmailOpen(Base):
     template_id: Mapped[int] = mapped_column(Integer, ForeignKey("email_templates.id", ondelete="CASCADE"), nullable=False)
     opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class EmailSendLog(Base):
+    __tablename__ = "email_send_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    template_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("email_templates.id", ondelete="SET NULL"), nullable=True)
+    template_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    audience: Mapped[str] = mapped_column(String(50), nullable=False)
+    sent_count: Mapped[int] = mapped_column(Integer, default=0)
+    failed_count: Mapped[int] = mapped_column(Integer, default=0)

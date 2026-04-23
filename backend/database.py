@@ -142,7 +142,7 @@ async def seed_default_templates():
       <p style="background:{_BG};border-radius:10px;padding:14px 18px;font-size:14px;border-right:4px solid {_BRAND};">
         💡 <strong>טיפ:</strong> מוצרים שעוקבים אחריהם הרבה אנשים — בדרך כלל מקבלים הנחות ומשלוחים חינם יותר בתדירות גבוהה.
       </p>
-      <a href="{dashboard_url}" class="cta">הוסף עוד מוצרים →</a>
+      <a href="{dashboard_url}" class="cta">← הוסף עוד מוצרים</a>
     </div>""")
 
     async with AsyncSessionLocal() as session:

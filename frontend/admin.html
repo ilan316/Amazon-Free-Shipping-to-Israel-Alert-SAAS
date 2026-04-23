@@ -320,12 +320,27 @@
         <div style="overflow-x:auto;">
           <table class="admin-table">
             <thead>
-              <tr><th>שם תבנית</th><th>נושא</th><th>נוצר</th><th>פתיחות</th><th>פעולות</th></tr>
+              <tr><th>שם תבנית</th><th>נושא</th><th>נוצר</th><th>פעולות</th></tr>
             </thead>
             <tbody id="tpl-list-body">
               <tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px;">טוען...</td></tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Outbox: send history -->
+        <div style="margin-top:28px;">
+          <h2 style="font-size:1.05rem;margin-bottom:12px;">📬 מיילים שנשלחו</h2>
+          <div style="overflow-x:auto;">
+            <table class="admin-table">
+              <thead>
+                <tr><th>תאריך</th><th>תבנית</th><th>קהל יעד</th><th style="text-align:center;">נשלח</th><th style="text-align:center;">פתיחות</th><th style="text-align:center;">ייחודיות</th></tr>
+              </thead>
+              <tbody id="send-log-body">
+                <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">טוען...</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Editor (shown below table when creating/editing) -->
@@ -443,7 +458,7 @@
   </div>
 
   <script src="/static/app.js?v=10"></script>
-  <script src="/static/admin.js?v=15"></script>
+  <script src="/static/admin.js?v=16"></script>
   <script>
     requireAuth();
     loadAdminData();

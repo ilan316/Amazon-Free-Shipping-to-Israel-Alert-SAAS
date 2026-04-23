@@ -8,7 +8,7 @@ from sqlalchemy import select, func, delete
 
 from backend.database import get_db
 from sqlalchemy import cast, Date
-from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen
+from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen, EmailSendLog
 from backend.auth import get_current_admin, hash_password, verify_password, SECRET_KEY, ALGORITHM
 
 
@@ -943,7 +943,49 @@ async def send_email_template(
         else:
             failed += 1
 
+    log = EmailSendLog(
+        template_id=template_id,
+        template_name=t.name,
+        audience=body.audience,
+        sent_count=sent,
+        failed_count=failed,
+    )
+    db.add(log)
+    await db.commit()
+
     return {"sent": sent, "failed": failed, "message": f"נשלח ל-{sent} משתמשים" + (f", {failed} נכשלו" if failed else "")}
+
+
+@router.get("/email-send-logs")
+async def list_send_logs(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    rows = (await db.execute(
+        select(
+            EmailSendLog,
+            func.count(EmailOpen.id).label("opens"),
+            func.count(func.distinct(EmailOpen.user_id)).label("unique_opens"),
+        )
+        .outerjoin(EmailOpen, EmailOpen.template_id == EmailSendLog.template_id)
+        .group_by(EmailSendLog.id)
+        .order_by(EmailSendLog.sent_at.desc())
+        .limit(200)
+    )).all()
+    return [
+        {
+            "id": r.EmailSendLog.id,
+            "template_id": r.EmailSendLog.template_id,
+            "template_name": r.EmailSendLog.template_name,
+            "sent_at": r.EmailSendLog.sent_at.isoformat(),
+            "audience": r.EmailSendLog.audience,
+            "sent_count": r.EmailSendLog.sent_count,
+            "failed_count": r.EmailSendLog.failed_count,
+            "opens": r.opens,
+            "unique_opens": r.unique_opens,
+        }
+        for r in rows
+    ]
 
 
 @router.get("/email-templates/{template_id}/opens")
