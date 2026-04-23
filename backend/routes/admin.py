@@ -1028,7 +1028,13 @@ async def list_send_logs(
             func.count(EmailOpen.id).label("opens"),
             func.count(func.distinct(EmailOpen.user_id)).label("unique_opens"),
         )
-        .outerjoin(EmailOpen, EmailOpen.template_id == EmailSendLog.template_id)
+        .outerjoin(EmailOpen, (EmailOpen.template_id == EmailSendLog.template_id) &
+                               (EmailOpen.opened_at >= EmailSendLog.sent_at) &
+                               (EmailOpen.user_id.in_(
+                                   select(EmailSendRecipient.user_id)
+                                   .where(EmailSendRecipient.send_log_id == EmailSendLog.id,
+                                          EmailSendRecipient.success == True)
+                               )))
         .group_by(EmailSendLog.id)
         .order_by(EmailSendLog.sent_at.desc())
         .limit(200)
