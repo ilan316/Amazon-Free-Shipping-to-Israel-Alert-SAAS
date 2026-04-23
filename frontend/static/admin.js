@@ -713,23 +713,29 @@ let _editingTemplateId = null;
 
 async function loadTemplates() {
   const res = await apiFetch("/admin/email-templates");
-  const body = document.getElementById("tpl-list-body");
-  if (!res || !res.ok) { body.innerHTML = '<div style="padding:16px;color:var(--error);">שגיאה בטעינה</div>'; return; }
+  const tbody = document.getElementById("tpl-list-body");
+  if (!res || !res.ok) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--error);padding:20px;">שגיאה בטעינה</td></tr>'; return; }
   const templates = await res.json();
   if (!templates.length) {
-    body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.85rem;">אין תבניות עדיין</div>';
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px;">אין תבניות עדיין — לחץ "+ תבנית חדשה"</td></tr>';
     return;
   }
-  body.innerHTML = templates.map(t => `
-    <div class="tpl-item ${_editingTemplateId === t.id ? 'selected' : ''}" id="tpl-item-${t.id}">
-      <div class="tpl-item-name">${t.name}</div>
-      <div class="tpl-item-subject">${t.subject}</div>
-      <div class="tpl-item-actions">
-        <button class="btn-sm" onclick="editTemplate(${t.id})">✏️ ערוך</button>
-        <button class="btn-sm" onclick="openSendPanel(${t.id})">📤 שלח</button>
-        <button class="btn-sm danger" onclick="deleteTemplate(${t.id})">מחק</button>
-      </div>
-    </div>`).join("");
+  tbody.innerHTML = templates.map(t => `
+    <tr id="tpl-row-${t.id}" class="${_editingTemplateId === t.id ? 'selected' : ''}">
+      <td style="font-weight:600;">${t.name}</td>
+      <td style="color:var(--text-muted);font-size:0.85rem;">${t.subject}</td>
+      <td class="ltr" style="font-size:0.82rem;color:var(--text-muted);white-space:nowrap;">${t.created_at ? new Date(t.created_at).toLocaleDateString("he-IL") : "—"}</td>
+      <td id="tpl-opens-cell-${t.id}" style="font-size:0.82rem;color:var(--text-muted);">
+        <button class="btn-sm" onclick="loadTemplateOpens(${t.id})">📊 פתיחות</button>
+      </td>
+      <td>
+        <div class="action-btns">
+          <button class="btn-sm" onclick="editTemplate(${t.id})">✏️ ערוך</button>
+          <button class="btn-sm active-toggle" onclick="editTemplate(${t.id}, true)">📤 שלח</button>
+          <button class="btn-sm danger" onclick="deleteTemplate(${t.id})">מחק</button>
+        </div>
+      </td>
+    </tr>`).join("");
 }
 
 function newTemplate() {
@@ -740,12 +746,12 @@ function newTemplate() {
   document.getElementById("tpl-subject").value = "";
   document.getElementById("tpl-body").value = "";
   document.getElementById("tpl-save-msg").textContent = "";
-  document.getElementById("tpl-preview-wrap").style.display = "none";
   document.getElementById("tpl-send-panel").style.display = "none";
-  document.querySelectorAll(".tpl-item").forEach(el => el.classList.remove("selected"));
+  document.getElementById("tpl-open-send-btn").style.display = "none";
+  document.getElementById("tpl-editor-wrap").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-async function editTemplate(id) {
+async function editTemplate(id, openSend = false) {
   const res = await apiFetch("/admin/email-templates");
   if (!res || !res.ok) return;
   const templates = await res.json();
@@ -758,10 +764,18 @@ async function editTemplate(id) {
   document.getElementById("tpl-subject").value = t.subject;
   document.getElementById("tpl-body").value = t.body;
   document.getElementById("tpl-save-msg").textContent = "";
-  document.getElementById("tpl-preview-wrap").style.display = "none";
-  document.getElementById("tpl-send-panel").style.display = "none";
-  document.querySelectorAll(".tpl-item").forEach(el => el.classList.remove("selected"));
-  document.getElementById(`tpl-item-${id}`)?.classList.add("selected");
+  document.getElementById("tpl-open-send-btn").style.display = "";
+  document.querySelectorAll("#tpl-list-body tr").forEach(el => el.classList.remove("selected"));
+  document.getElementById(`tpl-row-${id}`)?.classList.add("selected");
+  if (openSend) {
+    document.getElementById("tpl-send-panel").style.display = "";
+    document.getElementById("tpl-audience").value = "all";
+    document.getElementById("tpl-single-user-id").style.display = "none";
+    document.getElementById("tpl-send-msg").textContent = "";
+  } else {
+    document.getElementById("tpl-send-panel").style.display = "none";
+  }
+  document.getElementById("tpl-editor-wrap").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 async function saveTemplate() {
@@ -782,6 +796,7 @@ async function saveTemplate() {
       document.getElementById("tpl-editing-id").value = data.id;
       document.getElementById("tpl-editor-title").textContent = `✏️ עריכה: ${name}`;
     }
+    document.getElementById("tpl-open-send-btn").style.display = "";
     msgEl.textContent = "✅ נשמר בהצלחה";
     msgEl.style.color = "var(--success)";
     await loadTemplates();
@@ -816,12 +831,14 @@ function previewTemplate() {
 }
 
 function openSendPanel(id) {
-  editTemplate(id).then(() => {
+  if (id) {
+    editTemplate(id, true);
+  } else {
     document.getElementById("tpl-send-panel").style.display = "";
     document.getElementById("tpl-audience").value = "all";
     document.getElementById("tpl-single-user-id").style.display = "none";
     document.getElementById("tpl-send-msg").textContent = "";
-  });
+  }
 }
 
 function toggleSingleUser() {
@@ -836,8 +853,17 @@ async function sendTemplate() {
   const user_id = audience === "single" ? parseInt(document.getElementById("tpl-single-user-id").value) : null;
   if (audience === "single" && !user_id) { alert("יש להזין User ID"); return; }
 
+  const minVal = document.getElementById("tpl-products-min").value;
+  const maxVal = document.getElementById("tpl-products-max").value;
+  const products_min = minVal !== "" ? parseInt(minVal) : null;
+  const products_max = maxVal !== "" ? parseInt(maxVal) : null;
+
+  const filterDesc = [];
+  if (products_min !== null) filterDesc.push(`מינ' ${products_min} מוצרים`);
+  if (products_max !== null) filterDesc.push(`מקס' ${products_max} מוצרים`);
   const label = { all: "כל המשתמשים", active: "הפעילים", vacation: "במצב חופשה", inactive: "המושהים", single: `משתמש #${user_id}` }[audience];
-  if (!confirm(`לשלוח מייל זה ל${label}?`)) return;
+  const filterStr = filterDesc.length ? ` (${filterDesc.join(", ")})` : "";
+  if (!confirm(`לשלוח מייל זה ל${label}${filterStr}?`)) return;
 
   const btn = document.getElementById("tpl-send-btn");
   const msgEl = document.getElementById("tpl-send-msg");
@@ -845,7 +871,7 @@ async function sendTemplate() {
 
   const res = await apiFetch(`/admin/email-templates/${id}/send`, {
     method: "POST",
-    body: JSON.stringify({ audience, user_id }),
+    body: JSON.stringify({ audience, user_id, products_min, products_max }),
   });
   btn.disabled = false; btn.textContent = "📤 שלח עכשיו";
 
@@ -853,12 +879,33 @@ async function sendTemplate() {
     const data = await res.json();
     msgEl.textContent = "✅ " + data.message;
     msgEl.style.color = "var(--success)";
+    await loadTemplates();
   } else {
     const err = res ? await res.json().catch(() => ({})) : {};
     msgEl.textContent = "❌ " + (err.detail || "שגיאה בשליחה");
     msgEl.style.color = "var(--error)";
   }
   setTimeout(() => { msgEl.textContent = ""; }, 5000);
+}
+
+async function loadTemplateOpens(templateId) {
+  const cell = document.getElementById(`tpl-opens-cell-${templateId}`);
+  if (!cell) return;
+  cell.textContent = "טוען...";
+  const res = await apiFetch(`/admin/email-templates/${templateId}/opens`);
+  if (!res || !res.ok) { cell.textContent = "שגיאה"; return; }
+  const data = await res.json();
+  if (!data.total_opens) {
+    cell.innerHTML = '<span style="color:var(--text-muted);">0 פתיחות</span>';
+    return;
+  }
+  const list = data.opens.slice(0, 5).map(o =>
+    `<div style="font-size:0.75rem;color:var(--text-muted);">${o.email} · ${new Date(o.opened_at).toLocaleString("he-IL")}</div>`
+  ).join("");
+  const more = data.total_opens > 5 ? `<div style="font-size:0.72rem;color:var(--text-muted);">+${data.total_opens - 5} נוספים</div>` : "";
+  cell.innerHTML = `
+    <div style="font-weight:600;font-size:0.85rem;">👁 ${data.total_opens} פתיחות · ${data.unique_openers} ייחודיות</div>
+    ${list}${more}`;
 }
 
 async function changePassword() {

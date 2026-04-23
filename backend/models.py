@@ -100,3 +100,13 @@ class EmailTemplate(Base):
     subject: Mapped[str] = mapped_column(String(255), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class EmailOpen(Base):
+    __tablename__ = "email_opens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    template_id: Mapped[int] = mapped_column(Integer, ForeignKey("email_templates.id", ondelete="CASCADE"), nullable=False)
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True)

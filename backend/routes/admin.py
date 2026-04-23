@@ -8,7 +8,7 @@ from sqlalchemy import select, func, delete
 
 from backend.database import get_db
 from sqlalchemy import cast, Date
-from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate
+from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen
 from backend.auth import get_current_admin, hash_password, verify_password, SECRET_KEY, ALGORITHM
 
 
@@ -800,8 +800,10 @@ class EmailTemplateBody(BaseModel):
     body: str
 
 class EmailTemplateSendBody(BaseModel):
-    audience: str  # "all" | "active" | "vacation" | "single"
+    audience: str  # "all" | "active" | "vacation" | "inactive" | "single"
     user_id: int | None = None
+    products_min: int | None = None  # include users with >= this many products
+    products_max: int | None = None  # include users with <= this many products
 
 
 @router.get("/email-templates")
@@ -883,8 +885,20 @@ async def send_email_template(
     if not t:
         raise HTTPException(status_code=404, detail="תבנית לא נמצאה")
 
-    # Build recipient query
-    q = select(User).where(User.is_verified == True, User.is_admin == False)
+    import os
+    from sqlalchemy import func as sqlfunc
+
+    base_url = os.environ.get("APP_BASE_URL", "https://app.amzfreeil.com").rstrip("/")
+
+    # Build recipient query with product count
+    product_count_sub = (
+        select(sqlfunc.count(UserProduct.id))
+        .where(UserProduct.user_id == User.id)
+        .correlate(User)
+        .scalar_subquery()
+    )
+    q = select(User, product_count_sub.label("pc")).where(User.is_verified == True, User.is_admin == False)
+
     if body.audience == "active":
         q = q.where(User.is_active == True, User.vacation_mode == False)
     elif body.audience == "vacation":
@@ -894,22 +908,59 @@ async def send_email_template(
     elif body.audience == "single":
         if not body.user_id:
             raise HTTPException(status_code=400, detail="חסר user_id")
-        q = select(User).where(User.id == body.user_id)
-    # "all" → no extra filter
+        q = select(User, product_count_sub.label("pc")).where(User.id == body.user_id)
 
-    users = (await db.execute(q)).scalars().all()
-    if not users:
-        return {"sent": 0, "failed": 0, "message": "לא נמצאו משתמשים"}
+    # Product count filters
+    if body.products_min is not None:
+        q = q.where(product_count_sub >= body.products_min)
+    if body.products_max is not None:
+        q = q.where(product_count_sub <= body.products_max)
+
+    rows = (await db.execute(q)).all()
+    if not rows:
+        return {"sent": 0, "failed": 0, "message": "לא נמצאו משתמשים התואמים את הסינון"}
 
     sent = failed = 0
-    for u in users:
+    for row in rows:
+        u = row[0]
+        pc = row[1]
         recipient = u.notify_email or u.email
-        subj = t.subject.replace("{{email}}", u.email)
-        html = t.body.replace("{{email}}", u.email).replace("{{notify_email}}", recipient)
-        ok = _send_via_resend(recipient, subj, html, "")
+        subj = t.subject.replace("{{email}}", u.email).replace("{{product_count}}", str(pc))
+        pixel_url = f"{base_url}/track/email-open?uid={u.id}&tid={template_id}"
+        pixel = f'<img src="{pixel_url}" width="1" height="1" style="display:none;" alt="">'
+        html_body = (
+            t.body
+            .replace("{{email}}", u.email)
+            .replace("{{notify_email}}", recipient)
+            .replace("{{product_count}}", str(pc))
+        ) + pixel
+        ok = _send_via_resend(recipient, subj, html_body, "")
         if ok:
             sent += 1
         else:
             failed += 1
 
     return {"sent": sent, "failed": failed, "message": f"נשלח ל-{sent} משתמשים" + (f", {failed} נכשלו" if failed else "")}
+
+
+@router.get("/email-templates/{template_id}/opens")
+async def get_template_opens(
+    template_id: int,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    rows = (await db.execute(
+        select(EmailOpen, User.email)
+        .join(User, User.id == EmailOpen.user_id)
+        .where(EmailOpen.template_id == template_id)
+        .order_by(EmailOpen.opened_at.desc())
+    )).all()
+    total_unique = len({r[0].user_id for r in rows})
+    return {
+        "total_opens": len(rows),
+        "unique_openers": total_unique,
+        "opens": [
+            {"email": r[1], "opened_at": r[0].opened_at.isoformat(), "ip": r[0].ip}
+            for r in rows
+        ]
+    }

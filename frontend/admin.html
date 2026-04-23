@@ -77,27 +77,19 @@
     #check-msg { font-size: 0.85rem; color: var(--success); }
     .ltr { direction: ltr; text-align: left; }
     /* Templates */
-    .tpl-layout { display: grid; grid-template-columns: 280px 1fr; gap: 20px; }
-    @media (max-width: 768px) { .tpl-layout { grid-template-columns: 1fr; } }
-    .tpl-list { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-    .tpl-list-header { padding: 12px 14px; font-weight: 700; font-size: 0.9rem; border-bottom: 1px solid var(--border); background: #fdf3e1; display: flex; align-items: center; justify-content: space-between; }
-    .tpl-item { padding: 10px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
-    .tpl-item:last-child { border-bottom: none; }
-    .tpl-item:hover, .tpl-item.selected { background: var(--bg); }
-    .tpl-item-name { font-weight: 600; font-size: 0.88rem; }
-    .tpl-item-subject { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .tpl-item-actions { display: flex; gap: 4px; margin-top: 6px; }
-    .tpl-editor { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+    .tpl-editor { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-top: 20px; }
     .tpl-editor h3 { font-size: 1rem; margin-bottom: 16px; }
+    .tpl-editor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 700px) { .tpl-editor-grid { grid-template-columns: 1fr; } }
     .form-row { margin-bottom: 14px; }
     .form-row label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin-bottom: 5px; }
     .form-row input, .form-row textarea { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.9rem; font-family: inherit; background: var(--bg); color: var(--text); box-sizing: border-box; }
-    .form-row textarea { resize: vertical; min-height: 220px; font-family: monospace; font-size: 0.82rem; }
+    .form-row textarea { resize: vertical; min-height: 260px; font-family: monospace; font-size: 0.82rem; }
     .tpl-vars { font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
     .tpl-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 16px; }
     /* Send dialog */
-    .send-panel { margin-top: 20px; padding: 16px; background: #fffaf1; border: 1px solid var(--border); border-radius: var(--radius); }
-    .send-panel h4 { font-size: 0.92rem; font-weight: 700; margin-bottom: 12px; }
+    .send-panel { margin-top: 16px; padding: 14px 16px; background: #fffaf1; border: 1px solid var(--border); border-radius: var(--radius); }
+    .send-panel h4 { font-size: 0.92rem; font-weight: 700; margin-bottom: 10px; }
     .send-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     /* Preview */
     .tpl-preview { margin-top: 16px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
@@ -318,72 +310,89 @@
     <!-- Tab: Email Templates -->
     <div class="tab-panel" id="tab-templates">
       <div class="section">
-        <div class="section-header"><h2>תבניות מייל</h2></div>
-        <div class="tpl-layout">
+        <!-- Header row -->
+        <div class="section-header">
+          <h2>תבניות מייל</h2>
+          <button class="btn-run-check" onclick="newTemplate()" style="font-size:0.88rem;padding:8px 16px;">+ תבנית חדשה</button>
+        </div>
 
-          <!-- List -->
-          <div>
-            <div class="tpl-list">
-              <div class="tpl-list-header">
-                <span>תבניות שמורות</span>
-                <button class="btn-sm" onclick="newTemplate()" style="background:var(--brand);border:none;color:#111;">+ חדשה</button>
-              </div>
-              <div id="tpl-list-body">
-                <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.85rem;">טוען...</div>
-              </div>
-            </div>
+        <!-- Templates table -->
+        <div style="overflow-x:auto;">
+          <table class="admin-table">
+            <thead>
+              <tr><th>שם תבנית</th><th>נושא</th><th>נוצר</th><th>פתיחות</th><th>פעולות</th></tr>
+            </thead>
+            <tbody id="tpl-list-body">
+              <tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px;">טוען...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Editor (shown below table when creating/editing) -->
+        <div class="tpl-editor" id="tpl-editor-wrap">
+          <h3 id="tpl-editor-title">✏️ תבנית חדשה</h3>
+          <div class="form-row">
+            <label>שם תבנית (פנימי)</label>
+            <input type="text" id="tpl-name" placeholder="לדוגמה: תזכורת_חזרה">
           </div>
-
-          <!-- Editor -->
-          <div class="tpl-editor">
-            <h3 id="tpl-editor-title">✏️ תבנית חדשה</h3>
-            <div class="form-row">
-              <label>שם תבנית (פנימי)</label>
-              <input type="text" id="tpl-name" placeholder="לדוגמה: תזכורת_חזרה">
-            </div>
-            <div class="form-row">
-              <label>נושא המייל</label>
-              <input type="text" id="tpl-subject" placeholder="לדוגמה: חזרנו עם עדכונים חשובים 🚀">
-              <div class="tpl-vars">משתנים: <code>{{email}}</code></div>
-            </div>
-            <div class="form-row">
+          <div class="form-row">
+            <label>נושא המייל</label>
+            <input type="text" id="tpl-subject" placeholder="לדוגמה: חזרנו עם עדכונים חשובים 🚀">
+            <div class="tpl-vars">משתנים: <code>{{email}}</code></div>
+          </div>
+          <div class="tpl-editor-grid">
+            <div class="form-row" style="margin-bottom:0;">
               <label>תוכן HTML</label>
               <textarea id="tpl-body" placeholder="<div dir='rtl'>שלום {{email}},<br>...</div>"></textarea>
               <div class="tpl-vars">משתנים: <code>{{email}}</code>, <code>{{notify_email}}</code></div>
             </div>
-            <div class="tpl-actions">
-              <button class="btn-run-check" onclick="saveTemplate()">💾 שמור תבנית</button>
-              <button class="btn-outline" onclick="previewTemplate()">👁 תצוגה מקדימה</button>
-              <button class="btn-outline" onclick="newTemplate()">+ תבנית חדשה</button>
-              <span id="tpl-save-msg" style="font-size:0.85rem;"></span>
-            </div>
-            <input type="hidden" id="tpl-editing-id" value="">
-
-            <!-- Preview -->
-            <div id="tpl-preview-wrap" class="tpl-preview" style="display:none;">
-              <iframe id="tpl-preview-frame"></iframe>
-            </div>
-
-            <!-- Send panel -->
-            <div id="tpl-send-panel" class="send-panel" style="display:none;">
-              <h4>📤 שלח תבנית זו</h4>
-              <div class="send-row">
-                <select id="tpl-audience" onchange="toggleSingleUser()"
-                  style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.88rem;background:var(--bg);color:var(--text);">
-                  <option value="all">כל המשתמשים</option>
-                  <option value="active">פעילים בלבד</option>
-                  <option value="vacation">במצב חופשה</option>
-                  <option value="inactive">מושהים</option>
-                  <option value="single">משתמש בודד</option>
-                </select>
-                <input type="number" id="tpl-single-user-id" placeholder="User ID" min="1"
-                  style="display:none;width:110px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.88rem;background:var(--bg);color:var(--text);">
-                <button class="btn-run-check" id="tpl-send-btn" onclick="sendTemplate()">📤 שלח עכשיו</button>
-                <span id="tpl-send-msg" style="font-size:0.85rem;"></span>
+            <div>
+              <div style="font-size:0.82rem;font-weight:600;color:var(--text-muted);margin-bottom:5px;">תצוגה מקדימה</div>
+              <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;height:260px;">
+                <iframe id="tpl-preview-frame" style="width:100%;height:100%;border:none;"></iframe>
               </div>
+              <button class="btn-outline" onclick="previewTemplate()" style="margin-top:8px;width:100%;font-size:0.82rem;">🔄 עדכן תצוגה מקדימה</button>
             </div>
           </div>
 
+          <div class="tpl-actions">
+            <button class="btn-run-check" onclick="saveTemplate()">💾 שמור תבנית</button>
+            <button class="btn-outline" onclick="openSendPanel(null)" id="tpl-open-send-btn" style="display:none;">📤 שלח למשתמשים</button>
+            <span id="tpl-save-msg" style="font-size:0.85rem;"></span>
+          </div>
+          <input type="hidden" id="tpl-editing-id" value="">
+
+          <!-- Send panel -->
+          <div id="tpl-send-panel" class="send-panel" style="display:none;">
+            <h4>📤 שלח תבנית זו</h4>
+            <div class="send-row">
+              <select id="tpl-audience" onchange="toggleSingleUser()"
+                style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.88rem;background:var(--bg);color:var(--text);">
+                <option value="all">כל המשתמשים</option>
+                <option value="active">פעילים בלבד</option>
+                <option value="vacation">במצב חופשה</option>
+                <option value="inactive">מושהים</option>
+                <option value="single">משתמש בודד</option>
+              </select>
+              <input type="number" id="tpl-single-user-id" placeholder="User ID" min="1"
+                style="display:none;width:110px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.88rem;background:var(--bg);color:var(--text);">
+            </div>
+            <!-- Product count filter -->
+            <div class="send-row" style="margin-top:10px;">
+              <span style="font-size:0.82rem;color:var(--text-muted);font-weight:600;">סינון לפי מוצרים:</span>
+              <span style="font-size:0.82rem;color:var(--text-muted);">מינימום</span>
+              <input type="number" id="tpl-products-min" placeholder="0" min="0"
+                style="width:70px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;background:var(--bg);color:var(--text);">
+              <span style="font-size:0.82rem;color:var(--text-muted);">מקסימום</span>
+              <input type="number" id="tpl-products-max" placeholder="ללא הגבלה" min="0"
+                style="width:110px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;background:var(--bg);color:var(--text);">
+              <span style="font-size:0.78rem;color:var(--text-muted);">· השאר ריק = ללא סינון</span>
+            </div>
+            <div class="send-row" style="margin-top:10px;">
+              <button class="btn-run-check" id="tpl-send-btn" onclick="sendTemplate()">📤 שלח עכשיו</button>
+              <span id="tpl-send-msg" style="font-size:0.85rem;"></span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -433,7 +442,7 @@
   </div>
 
   <script src="/static/app.js?v=10"></script>
-  <script src="/static/admin.js?v=13"></script>
+  <script src="/static/admin.js?v=14"></script>
   <script>
     requireAuth();
     loadAdminData();
