@@ -20,6 +20,9 @@ class User(Base):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     google_id: Mapped[str | None] = mapped_column(String(100), nullable=True, unique=True)
     max_products: Mapped[int | None] = mapped_column(Integer, nullable=True)  # None = use global default
+    automation_activation_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    automation_reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    automation_expansion_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user_products: Mapped[list["UserProduct"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     notifications: Mapped[list["NotificationLog"]] = relationship(back_populates="user", cascade="all, delete-orphan")

@@ -19,13 +19,13 @@ import os
 from datetime import datetime, timedelta, timezone
 from backend.models import SystemSetting
 
-from sqlalchemy import select
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import AsyncSessionLocal
-from backend.models import Product, User, UserProduct, NotificationLog
+from backend.models import Product, User, UserProduct, NotificationLog, EmailTemplate
 from backend.checker import browser_manager, ShippingStatus, CheckResult
-from backend.notifier import send_daily_summary
+from backend.notifier import send_daily_summary, _send_via_resend
 
 logger = logging.getLogger(__name__)
 
@@ -239,6 +239,118 @@ async def run_inactivity_check():
             logger.info(f"[inactivity] User {user.id} → vacation_mode (inactive {days}+ days)")
         await db.commit()
         logger.info(f"=== Inactivity check: {len(users)} user(s) moved to vacation mode ===")
+
+
+def _auto_substitute(text: str, user: User) -> str:
+    from backend.routes.admin import _pause_url
+    return text.replace("{{email}}", user.notify_email).replace("{{pause_url}}", _pause_url(user.id))
+
+
+async def run_automation_emails():
+    """Daily automation: activation + reminder for 0-product users, expansion for 1-9 product users."""
+    logger.info("=== Automation emails started ===")
+    async with AsyncSessionLocal() as db:
+        now = datetime.now(timezone.utc)
+
+        tpl_activation = (await db.execute(
+            select(EmailTemplate).where(EmailTemplate.name == "לקוח לא הוסיף מוצרים - אפס מוצרים")
+        )).scalar_one_or_none()
+
+        tpl_expansion = (await db.execute(
+            select(EmailTemplate).where(EmailTemplate.name == "לקוח - הוסף עוד מוצרים למעקב")
+        )).scalar_one_or_none()
+
+        product_count = (
+            select(func.count(UserProduct.id))
+            .where(UserProduct.user_id == User.id)
+            .correlate(User)
+            .scalar_subquery()
+        )
+
+        activation_sent = reminder_sent = expansion_sent = 0
+
+        # --- Activation: 24h after signup, 0 products, not yet sent ---
+        if tpl_activation:
+            users = (await db.execute(
+                select(User).where(
+                    User.is_active == True,
+                    User.is_verified == True,
+                    User.vacation_mode == False,
+                    User.created_at <= now - timedelta(hours=24),
+                    User.automation_activation_sent_at == None,
+                    product_count == 0,
+                )
+            )).scalars().all()
+
+            for u in users:
+                ok = await _send_via_resend(
+                    u.notify_email,
+                    _auto_substitute(tpl_activation.subject, u),
+                    _auto_substitute(tpl_activation.body, u),
+                )
+                if ok:
+                    u.automation_activation_sent_at = now
+                    activation_sent += 1
+                await asyncio.sleep(0.55)
+
+        # --- Reminder: 3 days after activation, still 0 products ---
+        if tpl_activation:
+            users = (await db.execute(
+                select(User).where(
+                    User.is_active == True,
+                    User.is_verified == True,
+                    User.vacation_mode == False,
+                    User.automation_activation_sent_at != None,
+                    User.automation_activation_sent_at <= now - timedelta(days=3),
+                    User.automation_reminder_sent_at == None,
+                    product_count == 0,
+                )
+            )).scalars().all()
+
+            for u in users:
+                ok = await _send_via_resend(
+                    u.notify_email,
+                    _auto_substitute(tpl_activation.subject, u),
+                    _auto_substitute(tpl_activation.body, u),
+                )
+                if ok:
+                    u.automation_reminder_sent_at = now
+                    reminder_sent += 1
+                await asyncio.sleep(0.55)
+
+        # --- Expansion: 1-9 products, never sent or 30+ days ago ---
+        if tpl_expansion:
+            users = (await db.execute(
+                select(User).where(
+                    User.is_active == True,
+                    User.is_verified == True,
+                    User.vacation_mode == False,
+                    product_count >= 1,
+                    product_count <= 9,
+                    or_(
+                        User.automation_expansion_sent_at == None,
+                        User.automation_expansion_sent_at <= now - timedelta(days=30),
+                    ),
+                )
+            )).scalars().all()
+
+            for u in users:
+                ok = await _send_via_resend(
+                    u.notify_email,
+                    _auto_substitute(tpl_expansion.subject, u),
+                    _auto_substitute(tpl_expansion.body, u),
+                )
+                if ok:
+                    u.automation_expansion_sent_at = now
+                    expansion_sent += 1
+                await asyncio.sleep(0.55)
+
+        await db.commit()
+
+    logger.info(
+        f"=== Automation emails complete — activation: {activation_sent}, "
+        f"reminder: {reminder_sent}, expansion: {expansion_sent} ==="
+    )
 
 
 async def check_single_product(asin: str, url: str):

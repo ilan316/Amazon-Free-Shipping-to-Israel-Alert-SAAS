@@ -113,13 +113,16 @@ async def lifespan(app: FastAPI):
     daily_hour = int(os.environ.get("DAILY_SUMMARY_HOUR", "8"))
     scheduler.start()
 
-    from backend.scheduler import run_inactivity_check
+    from backend.scheduler import run_inactivity_check, run_automation_emails
 
     _upsert_job(run_daily_summary, "daily_summary", dict(
         trigger="cron", hour=daily_hour, minute=0, timezone="Asia/Jerusalem", misfire_grace_time=600
     ))
     _upsert_job(run_inactivity_check, "inactivity_check", dict(
         trigger="cron", hour=3, minute=0, timezone="Asia/Jerusalem", misfire_grace_time=600
+    ))
+    _upsert_job(run_automation_emails, "automation_emails", dict(
+        trigger="cron", hour=9, minute=0, timezone="Asia/Jerusalem", misfire_grace_time=600
     ))
 
     # Read daily check time from DB (cron trigger — no timer reset on deploy)
