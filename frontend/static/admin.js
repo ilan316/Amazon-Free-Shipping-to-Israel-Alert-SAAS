@@ -898,15 +898,93 @@ async function loadSendLogs() {
   tbody.innerHTML = logs.map(l => {
     const openRate = l.sent_count > 0 ? Math.round((l.unique_opens / l.sent_count) * 100) : 0;
     const rateColor = openRate >= 30 ? "var(--success)" : openRate >= 10 ? "var(--warning,#f59e0b)" : "var(--text-muted)";
-    return `<tr>
-      <td class="ltr" style="white-space:nowrap;font-size:0.82rem;">${new Date(l.sent_at).toLocaleString("he-IL", { day:"2-digit", month:"2-digit", year:"2-digit", hour:"2-digit", minute:"2-digit" })}</td>
+    return `
+    <tr style="cursor:pointer;" onclick="toggleSendLogDetail(${l.id}, ${l.template_id}, '${new Date(l.sent_at).toISOString()}', this)">
+      <td class="ltr" style="white-space:nowrap;font-size:0.82rem;">
+        <span style="font-size:0.75rem;color:var(--text-muted);margin-left:4px;">▶</span>
+        ${new Date(l.sent_at).toLocaleString("he-IL", { day:"2-digit", month:"2-digit", year:"2-digit", hour:"2-digit", minute:"2-digit" })}
+      </td>
       <td style="font-weight:600;">${l.template_name}</td>
       <td style="font-size:0.82rem;color:var(--text-muted);">${audienceLabel[l.audience] || l.audience}</td>
       <td style="text-align:center;font-weight:600;">${l.sent_count}${l.failed_count > 0 ? ` <span style="color:var(--error);font-size:0.78rem;">(${l.failed_count} נכשלו)</span>` : ""}</td>
       <td style="text-align:center;">${l.opens}</td>
       <td style="text-align:center;font-weight:600;color:${rateColor};">${l.unique_opens} <span style="font-size:0.75rem;font-weight:400;">(${openRate}%)</span></td>
+    </tr>
+    <tr id="send-log-detail-${l.id}" style="display:none;">
+      <td colspan="6" style="padding:0;background:var(--bg);">
+        <div id="send-log-detail-inner-${l.id}" style="padding:12px 20px;font-size:0.82rem;"></div>
+      </td>
     </tr>`;
   }).join("");
+}
+
+async function toggleSendLogDetail(logId, templateId, sentAt, clickedRow) {
+  const detailRow = document.getElementById(`send-log-detail-${logId}`);
+  const inner = document.getElementById(`send-log-detail-inner-${logId}`);
+  const arrow = clickedRow.querySelector("span");
+
+  if (detailRow.style.display !== "none") {
+    detailRow.style.display = "none";
+    if (arrow) arrow.textContent = "▶";
+    return;
+  }
+  detailRow.style.display = "";
+  if (arrow) arrow.textContent = "▼";
+  inner.textContent = "טוען...";
+
+  if (!templateId) {
+    inner.innerHTML = '<span style="color:var(--text-muted);">התבנית נמחקה — אין נתוני פתיחות</span>';
+    return;
+  }
+
+  const res = await apiFetch(`/admin/email-templates/${templateId}/opens`);
+  if (!res || !res.ok) { inner.textContent = "שגיאה בטעינה"; return; }
+  const data = await res.json();
+
+  const sendTime = new Date(sentAt);
+  // Filter opens that happened after this send event
+  const relevantOpens = data.opens.filter(o => new Date(o.opened_at) >= sendTime);
+
+  if (!relevantOpens.length) {
+    inner.innerHTML = '<span style="color:var(--text-muted);">אין פתיחות מאומתות לשליחה זו</span>';
+    return;
+  }
+
+  inner.innerHTML = `
+    <div style="font-weight:600;margin-bottom:8px;color:var(--text-muted);">
+      👁 ${relevantOpens.length} פתיחות לשליחה זו (מ-${new Date(sentAt).toLocaleString("he-IL")})
+    </div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead>
+        <tr style="color:var(--text-muted);border-bottom:1px solid var(--border);">
+          <th style="text-align:right;padding:4px 8px;font-weight:600;">אימייל</th>
+          <th style="text-align:right;padding:4px 8px;font-weight:600;">זמן פתיחה</th>
+          <th style="text-align:right;padding:4px 8px;font-weight:600;">IP</th>
+          <th style="text-align:right;padding:4px 8px;font-weight:600;">פיגור מהשליחה</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${relevantOpens.map(o => {
+          const openTime = new Date(o.opened_at);
+          const diffMs = openTime - sendTime;
+          const diffMin = Math.round(diffMs / 60000);
+          const isSuspect = diffMs < 120000; // less than 2 minutes = suspicious
+          const lagColor = isSuspect ? "var(--error)" : "var(--success)";
+          const lagText = diffMs < 60000
+            ? `${Math.round(diffMs/1000)} שניות ⚠️`
+            : diffMin < 60
+              ? `${diffMin} דקות`
+              : `${Math.round(diffMin/60)} שעות`;
+          return `<tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:5px 8px;direction:ltr;">${o.email}</td>
+            <td style="padding:5px 8px;white-space:nowrap;">${openTime.toLocaleString("he-IL")}</td>
+            <td style="padding:5px 8px;font-family:monospace;color:var(--text-muted);">${o.ip || "—"}</td>
+            <td style="padding:5px 8px;font-weight:600;color:${lagColor};">${lagText}</td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table>
+    <div style="margin-top:8px;font-size:0.75rem;color:var(--text-muted);">⚠️ פתיחה תוך פחות מ-2 דקות = חשד לסורק אוטומטי</div>`;
 }
 
 async function loadTemplateOpens(templateId) {
