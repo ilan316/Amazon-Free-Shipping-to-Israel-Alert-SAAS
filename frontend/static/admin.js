@@ -525,6 +525,20 @@ function renderAdminProducts() {
   `).join("");
 }
 
+function exportUsersCSV() {
+  if (!_allUsers.length) return;
+  const headers = ['#', 'אימייל', 'אימייל התראה', 'מוצרים', 'סטטוס', 'נרשם'];
+  const rows = _allUsers.map(u => [
+    u.id,
+    u.email,
+    u.notify_email || '',
+    u.product_count,
+    !u.is_active ? 'מושהה' : u.vacation_mode ? 'חופשה' : 'פעיל',
+    u.created_at ? new Date(u.created_at).toLocaleDateString('he-IL') : '',
+  ]);
+  _downloadCSV('users.csv', headers, rows);
+}
+
 function exportAdminCSV() {
   if (!_allAdminProducts.length) return;
   const headers = ['ASIN', 'שם', 'סטטוס', 'עוקבים', 'בדיקה אחרונה', 'שגיאות רצופות', 'קישור'];

@@ -47,7 +47,7 @@
     .admin-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
     .admin-table tr:last-child td { border-bottom: none; }
     .admin-table tr:hover td { background: var(--bg); }
-    .action-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .action-btns { display: flex; gap: 6px; flex-wrap: nowrap; align-items: center; }
     .btn-sm {
       padding: 4px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 600;
       cursor: pointer; border: 1px solid var(--border); background: none;
@@ -226,7 +226,10 @@
     <!-- Tab: Users -->
     <div class="tab-panel" id="tab-users">
       <div class="section">
-        <div class="section-header"><h2>משתמשים</h2></div>
+        <div class="section-header">
+          <h2>משתמשים</h2>
+          <button class="btn-outline" onclick="exportUsersCSV()">⬇ הורד CSV</button>
+        </div>
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
           <input type="text" id="users-search" placeholder="חיפוש לפי אימייל..." oninput="filterUsers()"
             style="flex:1;min-width:180px; padding:9px 12px; border:1px solid var(--border); border-radius:8px; font-size:0.9rem; direction:rtl;">
