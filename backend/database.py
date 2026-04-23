@@ -69,6 +69,21 @@ async def create_tables():
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(100)"
             )
         )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS automation_activation_sent_at TIMESTAMP WITH TIME ZONE"
+            )
+        )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS automation_reminder_sent_at TIMESTAMP WITH TIME ZONE"
+            )
+        )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS automation_expansion_sent_at TIMESTAMP WITH TIME ZONE"
+            )
+        )
 
 
 async def seed_default_templates():
