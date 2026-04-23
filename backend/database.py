@@ -91,7 +91,7 @@ async def create_tables():
                 SET automation_activation_sent_at = esl.sent_at
                 FROM email_send_recipients esr
                 JOIN email_send_logs esl ON esr.send_log_id = esl.id
-                WHERE esl.template_name = 'לקוח לא הוסיף מוצרים - אפס מוצרים'
+                WHERE esl.template_name IN ('לקוח לא הוסיף מוצרים - אפס מוצרים', 'הפעלה_אפס_מוצרים')
                   AND esr.user_id = u.id
                   AND esr.success = true
                   AND u.automation_activation_sent_at IS NULL
