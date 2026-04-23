@@ -93,8 +93,8 @@ async def seed_default_templates():
   <style>
     body {{ margin:0; padding:0; background:#f5f5f5; font-family: 'Segoe UI', Arial, sans-serif; }}
     .container {{ max-width:520px; margin:32px auto; background:#ffffff; border-radius:14px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,0.08); }}
-    .header {{ background:{_BRAND}; padding:28px 32px 20px; text-align:center; }}
-    .header img {{ height:44px; }}
+    .header {{ background:#fef5e4; padding:28px 32px 20px; text-align:center; }}
+    .header img {{ height:80px; }}
     .body {{ padding:32px; color:{_TEXT}; line-height:1.7; font-size:15px; }}
     .body h2 {{ margin:0 0 16px; font-size:20px; color:{_TEXT}; }}
     .cta {{ display:block; width:fit-content; margin:24px auto; background:{_BRAND}; color:#111 !important;
@@ -131,7 +131,7 @@ async def seed_default_templates():
       <div class="step"><div class="step-num">1</div><div>היכנס לאמזון, מצא מוצר שמעניין אותך</div></div>
       <div class="step"><div class="step-num">2</div><div>העתק את הקישור ● הדבק בדשבורד שלך<br><span style="font-size:13px;color:#888;">💡 מהיר יותר? <a href="https://chromewebstore.google.com/detail/amazon-israel-free-ship-a/mbickhgdhofaefhibfbgpacejhbelddn" style="color:{_BRAND};font-weight:600;">התקן את תוסף הכרום</a> — מוסיף מוצרים בלחיצה אחת ישירות מאמזון</span></div></div>
       <div class="step"><div class="step-num">3</div><div>ברגע שהמשלוח הופך לחינם — נשלח לך מייל 🎉</div></div>
-      <a href="{dashboard_url}" class="cta">→ הוסף את המוצר הראשון שלך<br><span style="font-size:13px;font-weight:400;opacity:0.8;">לוקח פחות מ-30 שניות</span></a>
+      <a href="{dashboard_url}" class="cta">← הוסף את המוצר הראשון שלך<br><span style="font-size:13px;font-weight:400;opacity:0.8;">לוקח פחות מ-30 שניות</span></a>
     </div>""")
 
     template2_body = _wrap(f"""
