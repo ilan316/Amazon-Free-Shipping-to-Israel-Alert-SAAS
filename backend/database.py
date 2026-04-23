@@ -131,8 +131,7 @@ async def seed_default_templates():
       <div class="step"><div class="step-num">1</div><div>היכנס לאמזון, מצא מוצר שמעניין אותך</div></div>
       <div class="step"><div class="step-num">2</div><div>העתק את הקישור ● הדבק בדשבורד שלך<br><span style="font-size:13px;color:#888;">💡 מהיר יותר? <a href="https://chromewebstore.google.com/detail/amazon-israel-free-ship-a/mbickhgdhofaefhibfbgpacejhbelddn" style="color:{_BRAND};font-weight:600;">התקן את תוסף הכרום</a> — מוסיף מוצרים בלחיצה אחת ישירות מאמזון</span></div></div>
       <div class="step"><div class="step-num">3</div><div>ברגע שהמשלוח הופך לחינם — נשלח לך מייל 🎉</div></div>
-      <a href="{dashboard_url}" class="cta">הוסף את המוצר הראשון שלך →</a>
-      <p style="font-size:13px;color:#888;text-align:center;margin-top:8px;">לוקח פחות מ-30 שניות</p>
+      <a href="{dashboard_url}" class="cta">→ הוסף את המוצר הראשון שלך<br><span style="font-size:13px;font-weight:400;opacity:0.8;">לוקח פחות מ-30 שניות</span></a>
     </div>""")
 
     template2_body = _wrap(f"""
