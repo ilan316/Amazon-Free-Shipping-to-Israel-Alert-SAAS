@@ -1034,7 +1034,7 @@ async function toggleSendLogDetail(logId, templateId, sentAt, clickedRow) {
   };
 
   inner.innerHTML = `
-    <div style="display:flex;justify-content:flex-end;">
+    <div style="display:flex;justify-content:center;">
     <table style="border-collapse:collapse;font-size:0.82rem;margin-bottom:8px;min-width:320px;max-width:520px;width:auto;">
       <thead>
         <tr style="border-bottom:2px solid var(--border);color:var(--text-muted);font-size:0.75rem;">
