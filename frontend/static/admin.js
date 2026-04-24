@@ -679,9 +679,10 @@ async function triggerSummary() {
   btn.disabled = true; btn.textContent = "שולח...";
   const res = await apiFetch("/admin/trigger-summary", { method: "POST" });
   btn.disabled = false; btn.textContent = "📧 שלח סיכום עכשיו";
-  if (res && res.ok) {
-    msg.textContent = "✅ סיכום יומי הופעל!";
-    setTimeout(() => { msg.textContent = ""; }, 4000);
+  if (res) {
+    const data = await res.json().catch(() => ({}));
+    msg.textContent = data.message || (res.ok ? "✅ נשלח!" : "❌ שגיאה");
+    setTimeout(() => { msg.textContent = ""; }, 5000);
   }
 }
 

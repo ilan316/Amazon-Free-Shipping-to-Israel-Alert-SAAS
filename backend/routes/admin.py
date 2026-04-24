@@ -306,25 +306,20 @@ async def trigger_summary(
     admin: Annotated[User, Depends(get_current_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Send daily summary only to the calling admin (for testing)."""
-    from backend.checker import ShippingStatus
+    """Send daily summary only to the calling admin (for testing). Uses all tracked products regardless of status."""
     from backend.models import Product, UserProduct
     from backend.notifier import send_daily_summary
 
-    free_products_result = await db.execute(
+    products_result = await db.execute(
         select(Product, UserProduct.custom_name)
         .join(UserProduct, Product.id == UserProduct.product_id)
-        .where(
-            UserProduct.user_id == admin.id,
-            UserProduct.is_paused == False,
-            Product.last_status == ShippingStatus.FREE.value,
-        )
+        .where(UserProduct.user_id == admin.id, UserProduct.is_paused == False)
     )
-    free_products = free_products_result.all()
-    if not free_products:
-        return {"message": "אין מוצרים חינמיים במעקב שלך כרגע"}
-    send_daily_summary(admin, free_products)
-    return {"message": f"סיכום נשלח אליך ({len(free_products)} מוצרים)"}
+    products = products_result.all()
+    if not products:
+        return {"message": "אין מוצרים במעקב בחשבון שלך"}
+    send_daily_summary(admin, products)
+    return {"message": f"✅ סיכום נשלח אליך ({len(products)} מוצרים)"}
 
 
 @router.get("/get-check-time")
