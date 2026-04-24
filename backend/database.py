@@ -168,8 +168,57 @@ async def create_tables():
         )
 
 
+def _apply_rtl_to_html(body: str) -> str:
+    """Add dir=rtl/lang=he to <html>, direction:rtl to <body>, and force RTL on content divs."""
+    import re
+
+    # 1. <html> tag — add dir="rtl" lang="he" if missing
+    def fix_html_tag(m):
+        attrs = m.group(1)
+        if 'dir=' not in attrs:
+            attrs += ' dir="rtl"'
+        if 'lang=' not in attrs:
+            attrs += ' lang="he"'
+        return f'<html{attrs}>'
+    body = re.sub(r'<html([^>]*)>', fix_html_tag, body, count=1)
+
+    # 2. <body> tag — add direction:rtl if missing
+    def fix_body_tag(m):
+        attrs = m.group(1)
+        if 'direction' not in attrs:
+            if 'style=' in attrs:
+                attrs = re.sub(r'style="', 'style="direction:rtl;text-align:right;', attrs, count=1)
+            else:
+                attrs += ' style="direction:rtl;text-align:right;"'
+        return f'<body{attrs}>'
+    body = re.sub(r'<body([^>]*)>', fix_body_tag, body, count=1)
+
+    # 3. .body and .footer divs — ensure direction:rtl inline
+    body = re.sub(
+        r'<div class="body">',
+        '<div class="body" style="direction:rtl;text-align:right;">',
+        body,
+    )
+    body = re.sub(
+        r'<div class="footer">',
+        '<div class="footer" style="direction:rtl;text-align:center;">',
+        body,
+    )
+
+    # 4. Inline <p> tags without direction — add it
+    body = re.sub(
+        r'<p style="([^"]*?)">',
+        lambda m: f'<p style="{m.group(1)}">' if 'direction' in m.group(1) else f'<p style="direction:rtl;text-align:right;{m.group(1)}">',
+        body,
+    )
+    # bare <p> tags
+    body = re.sub(r'<p>', '<p style="direction:rtl;text-align:right;">', body)
+
+    return body
+
+
 async def fix_gmail_template():
-    """Ensure step layout is Gmail-compatible and RTL for Hebrew. Idempotent."""
+    """Ensure all automation templates are Gmail-compatible and RTL for Hebrew. Idempotent."""
     import re
     from sqlalchemy import select
     from backend.models import EmailTemplate
@@ -180,55 +229,61 @@ async def fix_gmail_template():
     _TD_CONTENT_NEW = '<td valign="top" style="text-align:right;direction:rtl;">'
 
     async with AsyncSessionLocal() as session:
-        tpl = (await session.execute(
-            select(EmailTemplate).where(EmailTemplate.name == "לקוח לא הוסיף מוצרים - אפס מוצרים")
-        )).scalar_one_or_none()
-        if not tpl:
-            return
+        for tpl_name in [
+            "לקוח לא הוסיף מוצרים - אפס מוצרים",
+            "לקוח - הוסף עוד מוצרים למעקב",
+        ]:
+            tpl = (await session.execute(
+                select(EmailTemplate).where(EmailTemplate.name == tpl_name)
+            )).scalar_one_or_none()
+            if not tpl:
+                continue
 
-        body = tpl.body
-        original = body
+            body = tpl.body
+            original = body
 
-        # Step 1: CSS flex → block (no-op if already fixed)
-        body = re.sub(
-            r'\.step\s*\{[^}]*display\s*:\s*flex[^}]*\}',
-            '.step { margin:12px 0; }',
-            body,
-        )
-        body = re.sub(
-            r'\.step-num\s*\{[^}]*\}',
-            '.step-num { display:inline-block; vertical-align:top; background:#FF9900; color:#111; font-weight:700; border-radius:50%; width:26px; height:26px; line-height:26px; text-align:center; font-size:13px; }',
-            body,
-        )
+            # Apply global RTL fixes
+            body = _apply_rtl_to_html(body)
 
-        # Step 2: Convert <div class="step"> → RTL table (no-op if already converted)
-        def replace_step(m):
-            num = m.group(1)
-            content = m.group(2)
-            return (
-                f'{_STEP_TABLE_RTL}'
-                f'<tr>'
-                f'<td width="34" valign="top" style="padding-left:8px;">'
-                f'<div style="background:#FF9900;color:#111;font-weight:700;border-radius:50%;width:26px;height:26px;line-height:26px;text-align:center;font-size:13px;">{num}</div>'
-                f'</td>'
-                f'<td valign="top" style="text-align:right;direction:rtl;">{content}</td>'
-                f'</tr></table>'
-            )
+            # Activation template only: fix flex step layout → Gmail table
+            if tpl_name == "לקוח לא הוסיף מוצרים - אפס מוצרים":
+                body = re.sub(
+                    r'\.step\s*\{[^}]*display\s*:\s*flex[^}]*\}',
+                    '.step { margin:12px 0; }',
+                    body,
+                )
+                body = re.sub(
+                    r'\.step-num\s*\{[^}]*\}',
+                    '.step-num { display:inline-block; vertical-align:top; background:#FF9900; color:#111; font-weight:700; border-radius:50%; width:26px; height:26px; line-height:26px; text-align:center; font-size:13px; }',
+                    body,
+                )
 
-        body = re.sub(
-            r'<div class="step"><div[^>]*>(\d)</div><div>(.*?)</div></div>',
-            replace_step,
-            body,
-            flags=re.DOTALL,
-        )
+                def replace_step(m):
+                    num = m.group(1)
+                    content = m.group(2)
+                    return (
+                        f'{_STEP_TABLE_RTL}'
+                        f'<tr>'
+                        f'<td width="34" valign="top" style="padding-left:8px;">'
+                        f'<div style="background:#FF9900;color:#111;font-weight:700;border-radius:50%;width:26px;height:26px;line-height:26px;text-align:center;font-size:13px;">{num}</div>'
+                        f'</td>'
+                        f'<td valign="top" style="text-align:right;direction:rtl;">{content}</td>'
+                        f'</tr></table>'
+                    )
 
-        # Step 3: Upgrade already-converted LTR tables → RTL (no-op if already RTL)
-        body = body.replace(_STEP_TABLE_LTR, _STEP_TABLE_RTL)
-        body = body.replace(_TD_CONTENT_OLD, _TD_CONTENT_NEW)
+                body = re.sub(
+                    r'<div class="step"><div[^>]*>(\d)</div><div>(.*?)</div></div>',
+                    replace_step,
+                    body,
+                    flags=re.DOTALL,
+                )
+                body = body.replace(_STEP_TABLE_LTR, _STEP_TABLE_RTL)
+                body = body.replace(_TD_CONTENT_OLD, _TD_CONTENT_NEW)
 
-        if body != original:
-            tpl.body = body
-            await session.commit()
+            if body != original:
+                tpl.body = body
+
+        await session.commit()
 
 
 async def seed_default_templates():
