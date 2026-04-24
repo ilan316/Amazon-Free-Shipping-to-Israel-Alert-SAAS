@@ -358,6 +358,23 @@ async def trigger_automation(
     return {"message": "Automation emails triggered"}
 
 
+@router.post("/users/{user_id}/reset-automation")
+async def reset_user_automation(
+    user_id: int,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Reset automation flags for a user (for testing)."""
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.automation_activation_sent_at = None
+    user.automation_reminder_sent_at = None
+    user.automation_expansion_sent_at = None
+    await db.commit()
+    return {"message": f"Automation flags reset for user {user_id}"}
+
+
 @router.post("/trigger-check")
 async def trigger_check(
     admin: Annotated[User, Depends(get_current_admin)],
