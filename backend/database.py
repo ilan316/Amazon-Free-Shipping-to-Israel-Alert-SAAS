@@ -169,21 +169,27 @@ async def create_tables():
 
 
 async def fix_gmail_template():
-    """Replace flex-based step layout with Gmail-compatible table layout."""
+    """Ensure step layout is Gmail-compatible and RTL for Hebrew. Idempotent."""
     import re
     from sqlalchemy import select
     from backend.models import EmailTemplate
+
+    _STEP_TABLE_LTR = '<table width="100%" cellpadding="0" cellspacing="0" style="margin:12px 0;border-collapse:collapse;">'
+    _STEP_TABLE_RTL = '<table width="100%" cellpadding="0" cellspacing="0" dir="rtl" style="margin:12px 0;border-collapse:collapse;">'
+    _TD_CONTENT_OLD = '<td valign="top">'
+    _TD_CONTENT_NEW = '<td valign="top" style="text-align:right;direction:rtl;">'
 
     async with AsyncSessionLocal() as session:
         tpl = (await session.execute(
             select(EmailTemplate).where(EmailTemplate.name == "לקוח לא הוסיף מוצרים - אפס מוצרים")
         )).scalar_one_or_none()
-        if not tpl or "display:flex" not in tpl.body:
+        if not tpl:
             return
 
         body = tpl.body
+        original = body
 
-        # Replace CSS
+        # Step 1: CSS flex → block (no-op if already fixed)
         body = re.sub(
             r'\.step\s*\{[^}]*display\s*:\s*flex[^}]*\}',
             '.step { margin:12px 0; }',
@@ -191,21 +197,21 @@ async def fix_gmail_template():
         )
         body = re.sub(
             r'\.step-num\s*\{[^}]*\}',
-            '.step-num { display:inline-block; vertical-align:top; background:#FF9900; color:#111; font-weight:700; border-radius:50%; width:26px; height:26px; line-height:26px; text-align:center; font-size:13px; flex-shrink:0; }',
+            '.step-num { display:inline-block; vertical-align:top; background:#FF9900; color:#111; font-weight:700; border-radius:50%; width:26px; height:26px; line-height:26px; text-align:center; font-size:13px; }',
             body,
         )
 
-        # Replace step HTML: <div class="step"><div class="step-num">N</div><div>TEXT</div></div>
+        # Step 2: Convert <div class="step"> → RTL table (no-op if already converted)
         def replace_step(m):
             num = m.group(1)
             content = m.group(2)
             return (
-                f'<table width="100%" cellpadding="0" cellspacing="0" style="margin:12px 0;border-collapse:collapse;">'
+                f'{_STEP_TABLE_RTL}'
                 f'<tr>'
-                f'<td width="34" valign="top" style="padding-left:6px;">'
+                f'<td width="34" valign="top" style="padding-left:8px;">'
                 f'<div style="background:#FF9900;color:#111;font-weight:700;border-radius:50%;width:26px;height:26px;line-height:26px;text-align:center;font-size:13px;">{num}</div>'
                 f'</td>'
-                f'<td valign="top">{content}</td>'
+                f'<td valign="top" style="text-align:right;direction:rtl;">{content}</td>'
                 f'</tr></table>'
             )
 
@@ -216,8 +222,13 @@ async def fix_gmail_template():
             flags=re.DOTALL,
         )
 
-        tpl.body = body
-        await session.commit()
+        # Step 3: Upgrade already-converted LTR tables → RTL (no-op if already RTL)
+        body = body.replace(_STEP_TABLE_LTR, _STEP_TABLE_RTL)
+        body = body.replace(_TD_CONTENT_OLD, _TD_CONTENT_NEW)
+
+        if body != original:
+            tpl.body = body
+            await session.commit()
 
 
 async def seed_default_templates():

@@ -35,7 +35,11 @@ def _is_bot(ua: str) -> bool:
     lower = ua.lower()
     return any(frag in lower for frag in _BOT_UA_FRAGMENTS)
 
-_ALLOWED_PREFIXES = ("https://www.amazon.com/",)
+_ALLOWED_PREFIXES = (
+    "https://www.amazon.com/",
+    "https://app.amzfreeil.com/",
+    "https://amzfreeil.com/",
+)
 
 
 @router.get("/track/click", include_in_schema=False)
