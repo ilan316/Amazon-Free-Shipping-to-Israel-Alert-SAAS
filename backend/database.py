@@ -168,6 +168,58 @@ async def create_tables():
         )
 
 
+async def fix_gmail_template():
+    """Replace flex-based step layout with Gmail-compatible table layout."""
+    import re
+    from sqlalchemy import select
+    from backend.models import EmailTemplate
+
+    async with AsyncSessionLocal() as session:
+        tpl = (await session.execute(
+            select(EmailTemplate).where(EmailTemplate.name == "לקוח לא הוסיף מוצרים - אפס מוצרים")
+        )).scalar_one_or_none()
+        if not tpl or "display:flex" not in tpl.body:
+            return
+
+        body = tpl.body
+
+        # Replace CSS
+        body = re.sub(
+            r'\.step\s*\{[^}]*display\s*:\s*flex[^}]*\}',
+            '.step { margin:12px 0; }',
+            body,
+        )
+        body = re.sub(
+            r'\.step-num\s*\{[^}]*\}',
+            '.step-num { display:inline-block; vertical-align:top; background:#FF9900; color:#111; font-weight:700; border-radius:50%; width:26px; height:26px; line-height:26px; text-align:center; font-size:13px; flex-shrink:0; }',
+            body,
+        )
+
+        # Replace step HTML: <div class="step"><div class="step-num">N</div><div>TEXT</div></div>
+        def replace_step(m):
+            num = m.group(1)
+            content = m.group(2)
+            return (
+                f'<table width="100%" cellpadding="0" cellspacing="0" style="margin:12px 0;border-collapse:collapse;">'
+                f'<tr>'
+                f'<td width="34" valign="top" style="padding-left:6px;">'
+                f'<div style="background:#FF9900;color:#111;font-weight:700;border-radius:50%;width:26px;height:26px;line-height:26px;text-align:center;font-size:13px;">{num}</div>'
+                f'</td>'
+                f'<td valign="top">{content}</td>'
+                f'</tr></table>'
+            )
+
+        body = re.sub(
+            r'<div class="step"><div[^>]*>(\d)</div><div>(.*?)</div></div>',
+            replace_step,
+            body,
+            flags=re.DOTALL,
+        )
+
+        tpl.body = body
+        await session.commit()
+
+
 async def seed_default_templates():
     import os
     from sqlalchemy import select, text

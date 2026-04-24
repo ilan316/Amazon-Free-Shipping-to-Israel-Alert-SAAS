@@ -243,10 +243,14 @@ async def run_inactivity_check():
 
 def _auto_substitute(text: str, user: User, product_count: int = 0) -> str:
     from backend.notifier import _pause_url
+    base_url = os.environ.get("APP_BASE_URL", "https://app.amzfreeil.com").rstrip("/")
+    dashboard_url = f"{base_url}/dashboard"
+    tracked_dashboard = f"{base_url}/track/click?u={user.id}&a=cta&url={dashboard_url}"
     return (text
         .replace("{{email}}", user.notify_email)
         .replace("{{pause_url}}", _pause_url(user.id))
         .replace("{{product_count}}", str(product_count))
+        .replace(f'href="{dashboard_url}"', f'href="{tracked_dashboard}"')
     )
 
 
