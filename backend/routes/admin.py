@@ -927,15 +927,13 @@ async def _execute_send_job(
     for i, (uid, email, notify_email, pc) in enumerate(user_data):
         recipient = notify_email or email
         subj = tpl_subject.replace("{{email}}", email).replace("{{product_count}}", str(pc))
-        pixel_url = f"{base_url}/track/email-open?uid={uid}&tid={template_id}&ts={int(datetime.utcnow().timestamp())}"
-        pixel = f'<img src="{pixel_url}" width="1" height="1" style="display:none;" alt="">'
         html_body = (
             tpl_body
             .replace("{{email}}", email)
             .replace("{{notify_email}}", recipient)
             .replace("{{product_count}}", str(pc))
             .replace("{{pause_url}}", _pause_url(uid))
-        ) + pixel
+        )
         ok = _send_via_resend(recipient, subj, html_body, "")
         if ok:
             sent += 1
@@ -1054,16 +1052,14 @@ async def list_send_logs(
     rows = (await db.execute(
         select(
             EmailSendLog,
-            func.count(EmailOpen.id).label("opens"),
-            func.count(func.distinct(EmailOpen.user_id)).label("unique_opens"),
+            func.count(func.distinct(EmailClick.user_id)).label("clicks"),
         )
-        .outerjoin(EmailOpen, (EmailOpen.template_id == EmailSendLog.template_id) &
-                               (EmailOpen.opened_at >= EmailSendLog.sent_at) &
-                               (EmailOpen.user_id.in_(
+        .outerjoin(EmailClick, (EmailClick.user_id.in_(
                                    select(EmailSendRecipient.user_id)
                                    .where(EmailSendRecipient.send_log_id == EmailSendLog.id,
                                           EmailSendRecipient.success == True)
-                               )))
+                               )) &
+                               (EmailClick.clicked_at >= EmailSendLog.sent_at))
         .group_by(EmailSendLog.id)
         .order_by(EmailSendLog.sent_at.desc())
         .limit(200)
@@ -1077,8 +1073,7 @@ async def list_send_logs(
             "audience": r.EmailSendLog.audience,
             "sent_count": r.EmailSendLog.sent_count,
             "failed_count": r.EmailSendLog.failed_count,
-            "opens": r.opens,
-            "unique_opens": r.unique_opens,
+            "clicks": r.clicks,
         }
         for r in rows
     ]
@@ -1100,26 +1095,24 @@ async def get_send_log_recipients(
         .order_by(EmailSendRecipient.success.desc(), EmailSendRecipient.id)
     )).scalars().all()
 
-    opened_ids: set[int] = set()
-    if log.template_id:
-        success_user_ids = [r.user_id for r in rows if r.user_id and r.success]
-        if success_user_ids:
-            opened_result = await db.execute(
-                select(EmailOpen.user_id)
-                .where(
-                    EmailOpen.template_id == log.template_id,
-                    EmailOpen.opened_at >= log.sent_at,
-                    EmailOpen.user_id.in_(success_user_ids),
-                )
-                .distinct()
+    success_user_ids = [r.user_id for r in rows if r.user_id and r.success]
+    clicked_ids: set[int] = set()
+    if success_user_ids:
+        clicked_result = await db.execute(
+            select(EmailClick.user_id)
+            .where(
+                EmailClick.user_id.in_(success_user_ids),
+                EmailClick.clicked_at >= log.sent_at,
             )
-            opened_ids = {row[0] for row in opened_result.all()}
+            .distinct()
+        )
+        clicked_ids = {row[0] for row in clicked_result.all()}
 
     return [
         {
             "id": r.id, "user_id": r.user_id, "email": r.email,
             "success": r.success,
-            "opened": (r.user_id in opened_ids) if r.success else False,
+            "clicked": (r.user_id in clicked_ids) if r.success else False,
         }
         for r in rows
     ]

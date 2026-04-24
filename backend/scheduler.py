@@ -273,17 +273,15 @@ async def _run_automation_flow(
     db.add(log)
     await db.flush()
 
-    base_url = os.environ.get("APP_BASE_URL", "https://app.amzfreeil.com").rstrip("/")
     sent = failed = 0
     for u in users:
         count = (await db.execute(
             select(func.count(UserProduct.id)).where(UserProduct.user_id == u.id)
         )).scalar() or 0
-        pixel = f'<img src="{base_url}/track/email-open?uid={u.id}&tid={tpl.id}&ts={int(sent_at.timestamp())}" width="1" height="1" style="display:none;" alt="">'
         ok = _send_via_resend(
             u.notify_email,
             _auto_substitute(tpl.subject, u, count),
-            _auto_substitute(tpl.body, u, count) + pixel,
+            _auto_substitute(tpl.body, u, count),
             "",
         )
         db.add(EmailSendRecipient(send_log_id=log.id, user_id=u.id, email=u.notify_email, success=ok))

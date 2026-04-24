@@ -964,8 +964,6 @@ async function loadSendLogs() {
   }
   const audienceLabel = { all: "כל המשתמשים", active: "פעילים", vacation: "חופשה", inactive: "מושהים", single: "בודד", self: "בדיקה" };
   tbody.innerHTML = logs.map(l => {
-    const openRate = l.sent_count > 0 ? Math.round((l.unique_opens / l.sent_count) * 100) : 0;
-    const rateColor = openRate >= 30 ? "var(--success)" : openRate >= 10 ? "var(--warning,#f59e0b)" : "var(--text-muted)";
     return `
     <tr style="cursor:pointer;" onclick="toggleSendLogDetail(${l.id}, ${l.template_id}, '${new Date(l.sent_at).toISOString()}', this)">
       <td class="ltr" style="white-space:nowrap;font-size:0.82rem;">
@@ -980,8 +978,7 @@ async function loadSendLogs() {
         <span style="font-size:0.78rem;color:var(--success);">✅ ${l.sent_count}</span>
         ${l.failed_count > 0 ? `<span style="font-size:0.78rem;color:var(--error);margin-right:6px;">❌ ${l.failed_count}</span>` : ""}
       </td>
-      <td style="text-align:center;">${l.opens}</td>
-      <td style="text-align:center;font-weight:600;color:${rateColor};">${l.unique_opens} <span style="font-size:0.75rem;font-weight:400;">(${openRate}%)</span></td>
+      <td style="text-align:center;font-weight:600;">${l.clicks > 0 ? `🖱 ${l.clicks}` : "—"}</td>
     </tr>
     <tr id="send-log-detail-${l.id}" style="display:none;">
       <td colspan="6" style="padding:0;background:var(--bg);">
@@ -1018,7 +1015,7 @@ async function toggleSendLogDetail(logId, templateId, sentAt, clickedRow) {
 
   const rowBg = r => {
     if (!r.success) return "#fef2f2";
-    if (r.opened) return "#f0fdf4";
+    if (r.clicked) return "#f0fdf4";
     return "";
   };
 
@@ -1028,7 +1025,7 @@ async function toggleSendLogDetail(logId, templateId, sentAt, clickedRow) {
         <tr style="border-bottom:2px solid var(--border);color:var(--text-muted);font-size:0.75rem;">
           <th style="text-align:right;padding:4px 8px;font-weight:600;">מייל</th>
           <th style="text-align:center;padding:4px 8px;font-weight:600;width:60px;">נשלח</th>
-          <th style="text-align:center;padding:4px 8px;font-weight:600;width:60px;">פתח</th>
+          <th style="text-align:center;padding:4px 8px;font-weight:600;width:60px;">לחץ</th>
         </tr>
       </thead>
       <tbody>
@@ -1036,7 +1033,7 @@ async function toggleSendLogDetail(logId, templateId, sentAt, clickedRow) {
           <tr style="border-bottom:1px solid var(--border);background:${rowBg(r)};">
             <td style="padding:4px 8px;direction:ltr;">${r.email}</td>
             <td style="text-align:center;padding:4px 8px;">${r.success ? "✅" : "❌"}</td>
-            <td style="text-align:center;padding:4px 8px;">${r.opened ? "✅" : "—"}</td>
+            <td style="text-align:center;padding:4px 8px;">${r.clicked ? "✅" : "—"}</td>
           </tr>`).join("")}
       </tbody>
     </table>
