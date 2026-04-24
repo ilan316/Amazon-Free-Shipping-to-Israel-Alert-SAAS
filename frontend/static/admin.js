@@ -1022,23 +1022,25 @@ async function toggleSendLogDetail(logId, templateId, sentAt, clickedRow) {
   };
 
   inner.innerHTML = `
-    <table style="width:100%;border-collapse:collapse;font-size:0.82rem;margin-bottom:8px;">
+    <div style="display:flex;justify-content:flex-end;">
+    <table style="border-collapse:collapse;font-size:0.82rem;margin-bottom:8px;min-width:320px;max-width:520px;width:auto;">
       <thead>
         <tr style="border-bottom:2px solid var(--border);color:var(--text-muted);font-size:0.75rem;">
-          <th style="text-align:right;padding:4px 8px;font-weight:600;">מייל</th>
-          <th style="text-align:center;padding:4px 8px;font-weight:600;width:60px;">נשלח</th>
-          <th style="text-align:center;padding:4px 8px;font-weight:600;width:60px;">לחץ</th>
+          <th style="text-align:right;padding:4px 10px;font-weight:600;">מייל</th>
+          <th style="text-align:center;padding:4px 10px;font-weight:600;width:56px;">נשלח</th>
+          <th style="text-align:center;padding:4px 10px;font-weight:600;width:56px;">לחץ</th>
         </tr>
       </thead>
       <tbody>
         ${recipients.map(r => `
           <tr style="border-bottom:1px solid var(--border);background:${rowBg(r)};">
-            <td style="padding:4px 8px;direction:ltr;">${r.email}</td>
-            <td style="text-align:center;padding:4px 8px;">${r.success ? "✅" : "❌"}</td>
-            <td style="text-align:center;padding:4px 8px;">${r.clicked ? "✅" : "—"}</td>
+            <td style="padding:4px 10px;direction:ltr;text-align:left;">${r.email}</td>
+            <td style="text-align:center;padding:4px 10px;">${r.success ? "✅" : "❌"}</td>
+            <td style="text-align:center;padding:4px 10px;">${r.clicked ? "✅" : "—"}</td>
           </tr>`).join("")}
       </tbody>
     </table>
+    </div>
     ${failed.length ? `
       <button class="btn-run-check" id="resend-btn-${logId}" onclick="resendFailed(${logId})"
         style="font-size:0.82rem;padding:7px 16px;">
