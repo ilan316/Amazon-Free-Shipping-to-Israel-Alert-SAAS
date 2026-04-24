@@ -141,6 +141,21 @@ async def create_tables():
                 AND automation_activation_sent_at IS NULL
             """)
         )
+        # Fix Gmail-incompatible flex CSS in activation template
+        await conn.execute(
+            __import__("sqlalchemy").text(r"""
+                UPDATE email_templates
+                SET body = REPLACE(REPLACE(REPLACE(body,
+                    '.step { display:flex; gap:12px; align-items:flex-start; margin:12px 0; }',
+                    '.step { margin:12px 0; overflow:hidden; }'),
+                    'display:flex; align-items:center; justify-content:center; flex-shrink:0;',
+                    'display:inline-block; vertical-align:top; line-height:26px; text-align:center;'),
+                    '<div class="step"><div class="step-num">',
+                    '<div class="step"><div class="step-num" style="display:inline-block;vertical-align:top;">')
+                WHERE name IN ('לקוח לא הוסיף מוצרים - אפס מוצרים', 'הפעלה_אפס_מוצרים')
+                  AND body LIKE '%display:flex%'
+            """)
+        )
         # Reset automation flags for ilan316@gmail.com (testing)
         await conn.execute(
             __import__("sqlalchemy").text("""
