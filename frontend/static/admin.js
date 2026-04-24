@@ -981,6 +981,9 @@ async function loadSendLogs() {
         ${l.failed_count > 0 ? `<span style="font-size:0.78rem;color:var(--error);margin-right:6px;">❌ ${l.failed_count}</span>` : ""}
       </td>
       <td style="text-align:center;font-weight:600;">${l.clicks > 0 ? `🖱 ${l.clicks}` : "—"}</td>
+      <td style="text-align:center;" onclick="event.stopPropagation()">
+        <button onclick="deleteSendLog(${l.id})" style="background:none;border:none;cursor:pointer;color:var(--error);font-size:1rem;padding:2px 6px;" title="מחק">🗑</button>
+      </td>
     </tr>
     <tr id="send-log-detail-${l.id}" style="display:none;">
       <td colspan="6" style="padding:0;background:var(--bg);">
@@ -988,6 +991,15 @@ async function loadSendLogs() {
       </td>
     </tr>`;
   }).join("");
+}
+
+async function deleteSendLog(logId) {
+  if (!confirm("למחוק רשומה זו?")) return;
+  const res = await apiFetch(`/admin/email-send-logs/${logId}`, { method: "DELETE" });
+  if (res && res.ok) {
+    document.getElementById(`send-log-detail-${logId}`)?.remove();
+    document.querySelector(`tr[onclick*="toggleSendLogDetail(${logId},"]`)?.remove();
+  }
 }
 
 async function toggleSendLogDetail(logId, templateId, sentAt, clickedRow) {

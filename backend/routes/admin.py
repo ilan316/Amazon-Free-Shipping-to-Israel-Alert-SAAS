@@ -1106,6 +1106,18 @@ async def list_send_logs(
     ]
 
 
+@router.delete("/email-send-logs/{log_id}")
+async def delete_send_log(
+    log_id: int,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    await db.execute(delete(EmailSendRecipient).where(EmailSendRecipient.send_log_id == log_id))
+    await db.execute(delete(EmailSendLog).where(EmailSendLog.id == log_id))
+    await db.commit()
+    return {"deleted": log_id}
+
+
 @router.get("/email-send-logs/{log_id}/recipients")
 async def get_send_log_recipients(
     log_id: int,
