@@ -329,7 +329,17 @@
 
         <!-- Outbox: send history -->
         <div style="margin-top:28px;">
-          <h2 style="font-size:1.05rem;margin-bottom:12px;">📬 מיילים שנשלחו</h2>
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+            <h2 style="font-size:1.05rem;margin:0;">📬 מיילים שנשלחו</h2>
+            <select id="send-log-days" onchange="loadSendLogs()" style="padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;font-family:inherit;">
+              <option value="7">7 ימים אחרונים</option>
+              <option value="14">14 ימים</option>
+              <option value="30" selected>30 ימים</option>
+              <option value="60">60 ימים</option>
+              <option value="90">90 ימים</option>
+              <option value="365">שנה</option>
+            </select>
+          </div>
           <div style="overflow-x:auto;">
             <table class="admin-table">
               <thead>
@@ -505,7 +515,7 @@
   </div>
 
   <script src="/static/app.js?v=10"></script>
-  <script src="/static/admin.js?v=25"></script>
+  <script src="/static/admin.js?v=26"></script>
   <script>
     requireAuth();
     loadAdminData();

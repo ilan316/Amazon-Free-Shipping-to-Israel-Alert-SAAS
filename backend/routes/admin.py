@@ -1066,12 +1066,16 @@ async def get_send_progress(
 async def list_send_logs(
     admin: Annotated[User, Depends(get_current_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    days: int = 30,
 ):
+    from datetime import datetime, timedelta, timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     rows = (await db.execute(
         select(
             EmailSendLog,
             func.count(func.distinct(EmailClick.user_id)).label("clicks"),
         )
+        .where(EmailSendLog.sent_at >= cutoff)
         .outerjoin(EmailClick, (EmailClick.user_id.in_(
                                    select(EmailSendRecipient.user_id)
                                    .where(EmailSendRecipient.send_log_id == EmailSendLog.id,
@@ -1080,7 +1084,7 @@ async def list_send_logs(
                                (EmailClick.clicked_at >= EmailSendLog.sent_at))
         .group_by(EmailSendLog.id)
         .order_by(EmailSendLog.sent_at.desc())
-        .limit(200)
+        .limit(500)
     )).all()
     return [
         {
