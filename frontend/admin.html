@@ -127,6 +127,7 @@
       <button class="admin-tab" onclick="switchTab('products', this)">📦 מוצרים</button>
       <button class="admin-tab" onclick="switchTab('notifications', this)">📋 לוג התראות</button>
       <button class="admin-tab" onclick="switchTab('templates', this)">📧 תבניות מייל</button>
+      <button class="admin-tab" onclick="switchTab('testing', this)">🧪 בדיקות מייל</button>
       <button class="admin-tab" onclick="switchTab('account', this)">⚙️ הגדרות חשבון</button>
     </div>
 
@@ -153,9 +154,6 @@
       <!-- Action buttons -->
       <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
         <button class="btn-run-check" id="run-check-btn" onclick="triggerCheck()">▶ הרץ בדיקה עכשיו</button>
-        <button class="btn-run-check" id="run-summary-btn" onclick="triggerSummary()" style="background:var(--surface); border:1px solid var(--border); color:var(--text);">📧 שלח סיכום עכשיו</button>
-        <button class="btn-run-check" id="run-test-click-btn" onclick="sendTestClickEmail()" style="background:var(--surface); border:1px solid var(--border); color:var(--text);">🧪 שלח מייל בדיקת לחיצה</button>
-        <button class="btn-run-check" id="run-automation-btn" onclick="triggerAutomation()" style="background:var(--surface); border:1px solid var(--border); color:var(--text);">⚡ הרץ אוטומציה עכשיו</button>
         <button class="btn-run-check" id="btn-pause-checks" onclick="toggleChecks()">טוען...</button>
         <span id="pause-checks-msg" style="font-size:0.85rem;"></span>
         <span id="check-msg"></span>
@@ -439,6 +437,29 @@
       </div>
     </div>
 
+    <!-- Tab: Email Testing -->
+    <div class="tab-panel" id="tab-testing">
+      <div class="section">
+        <div class="section-header"><h2>🧪 בדיקות מייל</h2></div>
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:20px;">כפתורים אלו לצורך בדיקה בלבד — לא משפיעים על משתמשים אחרים.</p>
+        <div style="display:flex; flex-direction:column; gap:16px; max-width:420px;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <button class="btn-run-check" id="run-summary-btn" onclick="triggerSummary()" style="background:var(--surface); border:1px solid var(--border); color:var(--text); white-space:nowrap;">📧 שלח סיכום יומי לעצמי</button>
+            <span style="font-size:0.82rem; color:var(--text-muted);">שולח סיכום עם המוצרים שלך (לבדיקת עיצוב)</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <button class="btn-run-check" id="run-test-click-btn" onclick="sendTestClickEmail()" style="background:var(--surface); border:1px solid var(--border); color:var(--text); white-space:nowrap;">🧪 שלח מייל בדיקת לחיצה</button>
+            <span style="font-size:0.82rem; color:var(--text-muted);">שולח מייל עם קישור מעקב לבדיקת click tracking</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <button class="btn-run-check" id="run-automation-btn" onclick="triggerAutomation()" style="background:var(--surface); border:1px solid var(--border); color:var(--text); white-space:nowrap;">⚡ הרץ אוטומציה עכשיו</button>
+            <span style="font-size:0.82rem; color:var(--text-muted);">מריץ מיילי הפעלה/תזכורת/הרחבה לפי כללי הזמנים</span>
+          </div>
+        </div>
+        <div id="test-msg" style="margin-top:16px; font-size:0.9rem; min-height:20px;"></div>
+      </div>
+    </div>
+
     <!-- Tab: Account Settings -->
     <div class="tab-panel" id="tab-account">
       <div class="profile-grid">
@@ -484,7 +505,7 @@
   </div>
 
   <script src="/static/app.js?v=10"></script>
-  <script src="/static/admin.js?v=24"></script>
+  <script src="/static/admin.js?v=25"></script>
   <script>
     requireAuth();
     loadAdminData();

@@ -675,10 +675,10 @@ async function triggerCheck() {
 
 async function triggerSummary() {
   const btn = document.getElementById("run-summary-btn");
-  const msg = document.getElementById("check-msg");
+  const msg = document.getElementById("test-msg");
   btn.disabled = true; btn.textContent = "שולח...";
   const res = await apiFetch("/admin/trigger-summary", { method: "POST" });
-  btn.disabled = false; btn.textContent = "📧 שלח סיכום עכשיו";
+  btn.disabled = false; btn.textContent = "📧 שלח סיכום יומי לעצמי";
   if (res) {
     const data = await res.json().catch(() => ({}));
     msg.textContent = data.message || (res.ok ? "✅ נשלח!" : "❌ שגיאה");
@@ -688,7 +688,7 @@ async function triggerSummary() {
 
 async function triggerAutomation() {
   const btn = document.getElementById("run-automation-btn");
-  const msg = document.getElementById("check-msg");
+  const msg = document.getElementById("test-msg");
   btn.disabled = true; btn.textContent = "מריץ...";
   const res = await apiFetch("/admin/trigger-automation", { method: "POST" });
   btn.disabled = false; btn.textContent = "⚡ הרץ אוטומציה עכשיו";
@@ -707,7 +707,7 @@ async function deleteClick(id) {
 
 async function sendTestClickEmail() {
   const btn = document.getElementById("run-test-click-btn");
-  const msg = document.getElementById("check-msg");
+  const msg = document.getElementById("test-msg");
   btn.disabled = true; btn.textContent = "שולח...";
   const res = await apiFetch("/admin/send-test-click-email", { method: "POST" });
   btn.disabled = false; btn.textContent = "🧪 שלח מייל בדיקת לחיצה";
