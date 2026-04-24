@@ -271,10 +271,11 @@ async def _run_automation_flow(
 
     sent = failed = 0
     for u in users:
-        ok = await _send_via_resend(
+        ok = _send_via_resend(
             u.notify_email,
             _auto_substitute(tpl.subject, u),
             _auto_substitute(tpl.body, u),
+            "",
         )
         db.add(EmailSendRecipient(send_log_id=log.id, user_id=u.id, email=u.notify_email, success=ok))
         if ok:
