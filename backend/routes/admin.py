@@ -306,7 +306,7 @@ async def trigger_summary(
     admin: Annotated[User, Depends(get_current_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Send daily summary only to the calling admin (for testing). Uses all tracked products regardless of status."""
+    """Send daily summary only to the calling admin (for testing). Uses all tracked products, or a dummy if none."""
     from backend.models import Product, UserProduct
     from backend.notifier import send_daily_summary
 
@@ -316,8 +316,17 @@ async def trigger_summary(
         .where(UserProduct.user_id == admin.id, UserProduct.is_paused == False)
     )
     products = products_result.all()
+
     if not products:
-        return {"message": "אין מוצרים במעקב בחשבון שלך"}
+        # Create a dummy product for visual testing
+        dummy = Product()
+        dummy.asin = "B0TEST12345"
+        dummy.name = "מוצר לדוגמא — Apple AirPods Pro (2nd Gen)"
+        dummy.url = "https://www.amazon.com/dp/B0CHWRXH8B"
+        dummy.last_status = "free"
+        dummy.raw_text = "FREE Shipping to Israel"
+        products = [(dummy, None)]
+
     send_daily_summary(admin, products)
     return {"message": f"✅ סיכום נשלח אליך ({len(products)} מוצרים)"}
 
