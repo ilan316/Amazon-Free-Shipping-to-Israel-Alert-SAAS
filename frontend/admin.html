@@ -155,6 +155,7 @@
         <button class="btn-run-check" id="run-check-btn" onclick="triggerCheck()">▶ הרץ בדיקה עכשיו</button>
         <button class="btn-run-check" id="run-summary-btn" onclick="triggerSummary()" style="background:var(--surface); border:1px solid var(--border); color:var(--text);">📧 שלח סיכום עכשיו</button>
         <button class="btn-run-check" id="run-test-click-btn" onclick="sendTestClickEmail()" style="background:var(--surface); border:1px solid var(--border); color:var(--text);">🧪 שלח מייל בדיקת לחיצה</button>
+        <button class="btn-run-check" id="run-automation-btn" onclick="triggerAutomation()" style="background:var(--surface); border:1px solid var(--border); color:var(--text);">⚡ הרץ אוטומציה עכשיו</button>
         <button class="btn-run-check" id="btn-pause-checks" onclick="toggleChecks()">טוען...</button>
         <span id="pause-checks-msg" style="font-size:0.85rem;"></span>
         <span id="check-msg"></span>
@@ -483,7 +484,7 @@
   </div>
 
   <script src="/static/app.js?v=10"></script>
-  <script src="/static/admin.js?v=22"></script>
+  <script src="/static/admin.js?v=23"></script>
   <script>
     requireAuth();
     loadAdminData();

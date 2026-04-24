@@ -685,6 +685,18 @@ async function triggerSummary() {
   }
 }
 
+async function triggerAutomation() {
+  const btn = document.getElementById("run-automation-btn");
+  const msg = document.getElementById("check-msg");
+  btn.disabled = true; btn.textContent = "מריץ...";
+  const res = await apiFetch("/admin/trigger-automation", { method: "POST" });
+  btn.disabled = false; btn.textContent = "⚡ הרץ אוטומציה עכשיו";
+  if (res && res.ok) {
+    msg.textContent = "✅ אוטומציה הופעלה!";
+    setTimeout(() => { msg.textContent = ""; }, 4000);
+  }
+}
+
 async function deleteClick(id) {
   const res = await apiFetch(`/admin/clicks/${id}`, { method: "DELETE" });
   if (res && res.ok) {

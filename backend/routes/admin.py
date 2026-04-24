@@ -346,6 +346,18 @@ async def set_check_time(
     return {"time": time_str, "message": f"בדיקה יומית עודכנה ל-{time_str}"}
 
 
+@router.post("/trigger-automation")
+async def trigger_automation(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Trigger automation emails immediately (for testing)."""
+    from backend.scheduler import run_automation_emails
+    import asyncio
+    asyncio.create_task(run_automation_emails())
+    return {"message": "Automation emails triggered"}
+
+
 @router.post("/trigger-check")
 async def trigger_check(
     admin: Annotated[User, Depends(get_current_admin)],
