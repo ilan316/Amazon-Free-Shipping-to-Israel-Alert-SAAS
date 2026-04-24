@@ -676,9 +676,11 @@ async function triggerCheck() {
 async function triggerSummary() {
   const btn = document.getElementById("run-summary-btn");
   const msg = document.getElementById("test-msg");
+  const to = document.getElementById("test-target-email")?.value.trim();
   btn.disabled = true; btn.textContent = "שולח...";
-  const res = await apiFetch("/admin/trigger-summary", { method: "POST" });
-  btn.disabled = false; btn.textContent = "📧 שלח סיכום יומי לעצמי";
+  const url = to ? `/admin/trigger-summary?to=${encodeURIComponent(to)}` : "/admin/trigger-summary";
+  const res = await apiFetch(url, { method: "POST" });
+  btn.disabled = false; btn.textContent = "📧 שלח סיכום יומי";
   if (res) {
     const data = await res.json().catch(() => ({}));
     msg.textContent = data.message || (res.ok ? "✅ נשלח!" : "❌ שגיאה");
@@ -708,8 +710,10 @@ async function deleteClick(id) {
 async function sendTestClickEmail() {
   const btn = document.getElementById("run-test-click-btn");
   const msg = document.getElementById("test-msg");
+  const to = document.getElementById("test-target-email")?.value.trim();
   btn.disabled = true; btn.textContent = "שולח...";
-  const res = await apiFetch("/admin/send-test-click-email", { method: "POST" });
+  const url = to ? `/admin/send-test-click-email?to=${encodeURIComponent(to)}` : "/admin/send-test-click-email";
+  const res = await apiFetch(url, { method: "POST" });
   btn.disabled = false; btn.textContent = "🧪 שלח מייל בדיקת לחיצה";
   if (res && res.ok) {
     const data = await res.json().catch(() => ({}));

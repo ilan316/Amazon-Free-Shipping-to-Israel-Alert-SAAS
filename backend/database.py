@@ -156,16 +156,6 @@ async def create_tables():
                   AND body LIKE '%display:flex%'
             """)
         )
-        # Reset automation flags for ilan316@gmail.com (testing)
-        await conn.execute(
-            __import__("sqlalchemy").text("""
-                UPDATE users
-                SET automation_activation_sent_at = NULL,
-                    automation_reminder_sent_at = NULL,
-                    automation_expansion_sent_at = NULL
-                WHERE LOWER(email) IN ('ilan316@gmail.com', 'ilan316ebay@gmail.com')
-            """)
-        )
 
 
 def _apply_rtl_to_html(body: str) -> str:

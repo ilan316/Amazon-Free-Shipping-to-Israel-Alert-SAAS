@@ -451,11 +451,16 @@
     <div class="tab-panel" id="tab-testing">
       <div class="section">
         <div class="section-header"><h2>🧪 בדיקות מייל</h2></div>
-        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:20px;">כפתורים אלו לצורך בדיקה בלבד — לא משפיעים על משתמשים אחרים.</p>
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:16px;">כפתורים אלו לצורך בדיקה בלבד — לא משפיעים על משתמשים אחרים.</p>
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:20px; max-width:420px;">
+          <label style="font-size:0.85rem; font-weight:600; white-space:nowrap;">📨 שלח אל:</label>
+          <input type="email" id="test-target-email" dir="ltr" placeholder="השאר ריק לשלוח לעצמי"
+            style="flex:1; padding:7px 12px; border:1px solid var(--border); border-radius:8px; font-size:0.88rem; background:var(--bg); color:var(--text); font-family:inherit;">
+        </div>
         <div style="display:flex; flex-direction:column; gap:16px; max-width:420px;">
           <div style="display:flex; align-items:center; gap:12px;">
-            <button class="btn-run-check" id="run-summary-btn" onclick="triggerSummary()" style="background:var(--surface); border:1px solid var(--border); color:var(--text); white-space:nowrap;">📧 שלח סיכום יומי לעצמי</button>
-            <span style="font-size:0.82rem; color:var(--text-muted);">שולח סיכום עם המוצרים שלך (לבדיקת עיצוב)</span>
+            <button class="btn-run-check" id="run-summary-btn" onclick="triggerSummary()" style="background:var(--surface); border:1px solid var(--border); color:var(--text); white-space:nowrap;">📧 שלח סיכום יומי</button>
+            <span style="font-size:0.82rem; color:var(--text-muted);">שולח סיכום עם מוצרי המשתמש (לבדיקת עיצוב)</span>
           </div>
           <div style="display:flex; align-items:center; gap:12px;">
             <button class="btn-run-check" id="run-test-click-btn" onclick="sendTestClickEmail()" style="background:var(--surface); border:1px solid var(--border); color:var(--text); white-space:nowrap;">🧪 שלח מייל בדיקת לחיצה</button>
@@ -515,7 +520,7 @@
   </div>
 
   <script src="/static/app.js?v=10"></script>
-  <script src="/static/admin.js?v=29"></script>
+  <script src="/static/admin.js?v=30"></script>
   <script>
     requireAuth();
     loadAdminData();

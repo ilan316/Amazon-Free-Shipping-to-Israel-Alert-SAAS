@@ -310,20 +310,28 @@ async def set_inactivity_days(
 async def trigger_summary(
     admin: Annotated[User, Depends(get_current_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    to: str | None = None,
 ):
-    """Send daily summary only to the calling admin (for testing). Uses all tracked products, or a dummy if none."""
+    """Send daily summary to a specific email (or admin if none). Uses all tracked products, or a dummy if none."""
     from backend.models import Product, UserProduct
     from backend.notifier import send_daily_summary
+
+    target = admin
+    if to:
+        found = (await db.execute(select(User).where(User.email == to))).scalar_one_or_none()
+        if not found:
+            found = (await db.execute(select(User).where(User.notify_email == to))).scalar_one_or_none()
+        if found:
+            target = found
 
     products_result = await db.execute(
         select(Product, UserProduct.custom_name)
         .join(UserProduct, Product.id == UserProduct.product_id)
-        .where(UserProduct.user_id == admin.id, UserProduct.is_paused == False)
+        .where(UserProduct.user_id == target.id, UserProduct.is_paused == False)
     )
     products = products_result.all()
 
     if not products:
-        # Create a dummy product for visual testing
         dummy = Product()
         dummy.asin = "B0TEST12345"
         dummy.name = "מוצר לדוגמא — Apple AirPods Pro (2nd Gen)"
@@ -332,8 +340,10 @@ async def trigger_summary(
         dummy.raw_text = "FREE Shipping to Israel"
         products = [(dummy, None)]
 
-    send_daily_summary(admin, products)
-    return {"message": f"✅ סיכום נשלח אליך ({len(products)} מוצרים)"}
+    dest = to or target.notify_email
+    target.notify_email = dest
+    send_daily_summary(target, products)
+    return {"message": f"✅ סיכום נשלח ל-{dest} ({len(products)} מוצרים)"}
 
 
 @router.get("/get-check-time")
@@ -817,6 +827,7 @@ async def delete_click(
 @router.post("/send-test-click-email")
 async def send_test_click_email(
     admin: Annotated[User, Depends(get_current_admin)],
+    to: str | None = None,
 ):
     import os
     from urllib.parse import urlencode
@@ -840,8 +851,9 @@ async def send_test_click_email(
       <p style="margin-top:16px;font-size:12px;color:#999;">ASIN: {test_asin} · user_id: {admin.id}</p>
     </div>"""
 
-    ok = _send_via_resend(admin.notify_email, "🧪 בדיקת Click Tracking — amzfreeil", html, f"לחץ כאן: {tracking}")
-    return {"sent": ok, "to": admin.notify_email, "tracking_url": tracking}
+    dest = to or admin.notify_email
+    ok = _send_via_resend(dest, "🧪 בדיקת Click Tracking — amzfreeil", html, f"לחץ כאן: {tracking}")
+    return {"sent": ok, "to": dest, "tracking_url": tracking}
 
 
 # ── Email Templates ───────────────────────────────────────────────────────────
