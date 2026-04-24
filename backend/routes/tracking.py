@@ -80,8 +80,9 @@ async def track_email_open(
         if uid and tid:
             ua = request.headers.get("User-Agent", "")
             if _is_bot(ua):
-                logger.debug(f"email-open ignored (bot UA): uid={uid} tid={tid} ua={ua[:80]}")
+                logger.info(f"email-open BLOCKED (bot UA): uid={uid} tid={tid} ua={ua[:120]}")
             else:
+                logger.info(f"email-open ALLOWED: uid={uid} tid={tid} ua={ua[:120]}")
                 ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
                 if ip:
                     ip = ip.split(",")[0].strip()[:64]
