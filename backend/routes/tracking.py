@@ -16,13 +16,16 @@ router = APIRouter(tags=["tracking"])
 
 # Known email security scanner / bot UA fragments — all lowercase
 _BOT_UA_FRAGMENTS = (
-    "bot", "crawl", "spider", "scan", "preview", "proxy",
-    "microsoft", "outlook", "office", "feedfetch", "imageproxy",
+    "bot", "crawl", "spider", "scan",
+    "microsoft", "outlook", "office", "feedfetch",
     "barracuda", "proofpoint", "mimecast", "symantec",
     "trendmicro", "ironport", "postini", "cisco",
-    "googleimageproxy", "googlebot", "bingpreview",
+    "googlebot", "bingpreview",
     "safebrowsing", "phishtank", "urlscan",
 )
+# NOTE: googleimageproxy / ggpht.com are intentionally NOT blocked —
+# Gmail fires its image proxy on every real user open (not on arrival),
+# so these hits represent actual opens and should be counted.
 
 
 def _is_bot(ua: str) -> bool:

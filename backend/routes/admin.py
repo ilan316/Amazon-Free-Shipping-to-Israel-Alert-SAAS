@@ -927,7 +927,7 @@ async def _execute_send_job(
     for i, (uid, email, notify_email, pc) in enumerate(user_data):
         recipient = notify_email or email
         subj = tpl_subject.replace("{{email}}", email).replace("{{product_count}}", str(pc))
-        pixel_url = f"{base_url}/track/email-open?uid={uid}&tid={template_id}"
+        pixel_url = f"{base_url}/track/email-open?uid={uid}&tid={template_id}&ts={int(datetime.utcnow().timestamp())}"
         pixel = f'<img src="{pixel_url}" width="1" height="1" style="display:none;" alt="">'
         html_body = (
             tpl_body

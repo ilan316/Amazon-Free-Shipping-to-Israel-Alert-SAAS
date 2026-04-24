@@ -279,7 +279,7 @@ async def _run_automation_flow(
         count = (await db.execute(
             select(func.count(UserProduct.id)).where(UserProduct.user_id == u.id)
         )).scalar() or 0
-        pixel = f'<img src="{base_url}/track/email-open?uid={u.id}&tid={tpl.id}" width="1" height="1" style="display:none;" alt="">'
+        pixel = f'<img src="{base_url}/track/email-open?uid={u.id}&tid={tpl.id}&ts={int(sent_at.timestamp())}" width="1" height="1" style="display:none;" alt="">'
         ok = _send_via_resend(
             u.notify_email,
             _auto_substitute(tpl.subject, u, count),
