@@ -148,7 +148,7 @@ async def create_tables():
                 SET automation_activation_sent_at = NULL,
                     automation_reminder_sent_at = NULL,
                     automation_expansion_sent_at = NULL
-                WHERE LOWER(email) = 'ilan316@gmail.com'
+                WHERE LOWER(email) IN ('ilan316@gmail.com', 'ilan316ebay@gmail.com')
             """)
         )
 
