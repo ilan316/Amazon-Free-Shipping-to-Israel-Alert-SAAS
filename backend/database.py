@@ -156,6 +156,15 @@ async def create_tables():
                   AND body LIKE '%display:flex%'
             """)
         )
+        # Mark test accounts as having received automation emails (one-time, idempotent)
+        await conn.execute(
+            __import__("sqlalchemy").text("""
+                UPDATE users
+                SET automation_activation_sent_at = COALESCE(automation_activation_sent_at, NOW()),
+                    automation_expansion_sent_at   = COALESCE(automation_expansion_sent_at,   NOW())
+                WHERE LOWER(email) IN ('ilan316@gmail.com', 'ilan316ebay@gmail.com')
+            """)
+        )
 
 
 def _apply_rtl_to_html(body: str) -> str:
