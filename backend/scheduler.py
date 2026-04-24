@@ -241,9 +241,13 @@ async def run_inactivity_check():
         logger.info(f"=== Inactivity check: {len(users)} user(s) moved to vacation mode ===")
 
 
-def _auto_substitute(text: str, user: User) -> str:
+def _auto_substitute(text: str, user: User, product_count: int = 0) -> str:
     from backend.notifier import _pause_url
-    return text.replace("{{email}}", user.notify_email).replace("{{pause_url}}", _pause_url(user.id))
+    return (text
+        .replace("{{email}}", user.notify_email)
+        .replace("{{pause_url}}", _pause_url(user.id))
+        .replace("{{product_count}}", str(product_count))
+    )
 
 
 async def _run_automation_flow(
@@ -271,10 +275,13 @@ async def _run_automation_flow(
 
     sent = failed = 0
     for u in users:
+        count = (await db.execute(
+            select(func.count(UserProduct.id)).where(UserProduct.user_id == u.id)
+        )).scalar() or 0
         ok = _send_via_resend(
             u.notify_email,
-            _auto_substitute(tpl.subject, u),
-            _auto_substitute(tpl.body, u),
+            _auto_substitute(tpl.subject, u, count),
+            _auto_substitute(tpl.body, u, count),
             "",
         )
         db.add(EmailSendRecipient(send_log_id=log.id, user_id=u.id, email=u.notify_email, success=ok))
