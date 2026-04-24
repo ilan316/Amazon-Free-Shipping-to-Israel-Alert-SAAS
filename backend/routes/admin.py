@@ -122,6 +122,11 @@ async def delete_user(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    # Explicitly delete related records to avoid FK issues on older DB schemas
+    await db.execute(delete(UserProduct).where(UserProduct.user_id == user_id))
+    await db.execute(delete(NotificationLog).where(NotificationLog.user_id == user_id))
+    await db.execute(delete(EmailClick).where(EmailClick.user_id == user_id))
+    await db.execute(delete(EmailOpen).where(EmailOpen.user_id == user_id))
     await db.execute(delete(User).where(User.id == user_id))
     await db.commit()
     return {"deleted": user_id}
