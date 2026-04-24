@@ -242,7 +242,7 @@ async def run_inactivity_check():
 
 
 def _auto_substitute(text: str, user: User) -> str:
-    from backend.routes.admin import _pause_url
+    from backend.notifier import _pause_url
     return text.replace("{{email}}", user.notify_email).replace("{{pause_url}}", _pause_url(user.id))
 
 
