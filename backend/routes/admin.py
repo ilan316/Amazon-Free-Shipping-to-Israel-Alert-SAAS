@@ -75,6 +75,9 @@ async def list_users(
             "product_count": product_count_map.get(u.id, 0),
             "max_products": u.max_products,
             "vacation_mode": u.vacation_mode,
+            "notify_email_bounced": u.notify_email_bounced,
+            "notify_email_bounce_type": u.notify_email_bounce_type,
+            "notify_email_bounced_at": u.notify_email_bounced_at.isoformat() if u.notify_email_bounced_at else None,
         }
         for u in users
     ]
@@ -389,6 +392,22 @@ async def trigger_automation(
     import asyncio
     asyncio.create_task(run_automation_emails())
     return {"message": "Automation emails triggered"}
+
+
+@router.post("/users/{user_id}/clear-bounce")
+async def clear_user_bounce(
+    user_id: int,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.notify_email_bounced = False
+    user.notify_email_bounced_at = None
+    user.notify_email_bounce_type = None
+    await db.commit()
+    return {"message": f"Bounce cleared for user {user_id}"}
 
 
 @router.post("/users/{user_id}/reset-automation")

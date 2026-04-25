@@ -440,11 +440,13 @@ async function loadUsers() {
       </td>
       <td class="ltr">${u.created_at ? new Date(u.created_at).toLocaleDateString("he-IL") : "—"}</td>
       <td>
-        ${!u.is_active
-          ? '<span class="tag-inactive">מושהה</span>'
-          : u.vacation_mode
-            ? '<span style="color:var(--warning,#f59e0b);font-weight:600;">🏖 חופשה</span>'
-            : '<span style="color:var(--success);font-weight:600;">פעיל</span>'}
+        ${u.notify_email_bounced
+          ? `<span style="background:#fce8e8;color:var(--error);padding:2px 7px;border-radius:12px;font-size:0.72rem;font-weight:700;" title="${u.notify_email_bounce_type === 'complaint' ? 'ספאם complaint' : 'Bounce'} · ${u.notify_email_bounced_at ? new Date(u.notify_email_bounced_at).toLocaleDateString('he-IL') : ''}">⛔ ${u.notify_email_bounce_type === 'complaint' ? 'ספאם' : 'Bounce'}</span>`
+          : !u.is_active
+            ? '<span class="tag-inactive">מושהה</span>'
+            : u.vacation_mode
+              ? '<span style="color:var(--warning,#f59e0b);font-weight:600;">🏖 חופשה</span>'
+              : '<span style="color:var(--success);font-weight:600;">פעיל</span>'}
       </td>
       <td>
         <div class="action-btns">
@@ -455,6 +457,7 @@ async function loadUsers() {
           <button class="btn-sm" onclick="toggleAdmin(${u.id})">
             ${u.is_admin ? 'הסר מנהל' : 'הפוך למנהל'}
           </button>
+          ${u.notify_email_bounced ? `<button class="btn-sm" onclick="clearBounce(${u.id})" style="color:var(--success);border-color:var(--success);">נקה Bounce</button>` : ''}
           <button class="btn-sm danger" onclick="deleteUser(${u.id})">מחק</button>
         </div>
       </td>
@@ -601,6 +604,12 @@ async function toggleActive(userId) {
 async function toggleAdmin(userId) {
   await apiFetch(`/admin/users/${userId}/toggle-admin`, { method: "PATCH" });
   await loadUsers(); await loadStats();
+}
+
+async function clearBounce(userId) {
+  const res = await apiFetch(`/admin/users/${userId}/clear-bounce`, { method: "POST" });
+  if (res && res.ok) { showToast("Bounce נוקה — המשתמש יקבל מיילים שוב", "success"); await loadUsers(); }
+  else showToast("שגיאה בניקוי bounce", "error");
 }
 
 async function deleteUser(userId) {

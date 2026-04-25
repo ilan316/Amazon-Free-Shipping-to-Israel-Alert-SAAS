@@ -288,6 +288,9 @@ def send_admin_error_report(admin_email: str, failed_items: list) -> bool:
 # ── Single product alert ──────────────────────────────────────────────────────
 
 def send_user_alert(user, product, result) -> bool:
+    if getattr(user, "notify_email_bounced", False):
+        logger.info(f"Skipping alert for user {user.id} — email bounced/complained")
+        return False
     lang = getattr(user, "language", "he") or "he"
     recipient = user.notify_email
     affiliate_tag = os.environ.get("AMAZON_AFFILIATE_TAG", "").strip()
