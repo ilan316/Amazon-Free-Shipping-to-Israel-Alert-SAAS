@@ -449,17 +449,23 @@ async function toggleUserProducts(userId, email) {
   expandRow.dataset.loaded = '1';
 
   const u = _allUsers.find(x => x.id === userId);
-  const lastLogin = u?.last_login_at ? new Date(u.last_login_at).toLocaleDateString('he-IL') : '—';
+  const lastLogin = u?.last_login_at ? new Date(u.last_login_at).toLocaleString('he-IL', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
   const lastAdded = u?.last_product_added_at ? new Date(u.last_product_added_at).toLocaleDateString('he-IL') : '—';
 
+  const metaBar = `
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px;font-size:0.82rem;">
+      <span>🔑 <strong>כניסה אחרונה:</strong> <span dir="ltr">${lastLogin}</span></span>
+      <span>📦 <strong>מוצר אחרון נוסף:</strong> <span dir="ltr">${lastAdded}</span></span>
+    </div>`;
+
   if (!products.length) {
-    cell.innerHTML = `<div style="font-size:0.82rem;color:var(--text-muted);">📦 אין מוצרים · כניסה אחרונה: ${lastLogin}</div>`;
+    cell.innerHTML = metaBar + `<div style="font-size:0.82rem;color:var(--text-muted);">אין מוצרים עדיין</div>`;
     return;
   }
 
-  cell.innerHTML = `
+  cell.innerHTML = metaBar + `
     <div style="font-size:0.82rem;font-weight:600;color:var(--text-muted);margin-bottom:8px;">
-      📦 מוצרים של <span dir="ltr">${email}</span> (${products.length})
+      📦 מוצרים (${products.length})
     </div>
     <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:0.82rem;min-width:420px;">
@@ -523,8 +529,6 @@ async function loadUsers() {
           style="margin-right:4px;padding:2px 6px;font-size:0.72rem;">✏️</button>
       </td>
       <td class="ltr">${fmtDate(u.created_at)}</td>
-      <td class="ltr" style="white-space:nowrap;color:${u.last_login_at ? 'var(--text)' : 'var(--text-muted)'};">${fmtDate(u.last_login_at)}</td>
-      <td class="ltr" style="white-space:nowrap;color:${u.last_product_added_at ? 'var(--text)' : 'var(--text-muted)'};">${fmtDate(u.last_product_added_at)}</td>
       <td>
         ${u.notify_email_bounced
           ? `<span style="background:#fce8e8;color:var(--error);padding:2px 7px;border-radius:12px;font-size:0.72rem;font-weight:700;" title="${u.notify_email_bounce_type === 'complaint' ? 'ספאם complaint' : 'Bounce'} · ${u.notify_email_bounced_at ? new Date(u.notify_email_bounced_at).toLocaleDateString('he-IL') : ''}">⛔ ${u.notify_email_bounce_type === 'complaint' ? 'ספאם' : 'Bounce'}</span>`
@@ -546,7 +550,7 @@ async function loadUsers() {
       </td>
     </tr>
     <tr id="user-expand-${u.id}" style="display:none;">
-      <td colspan="10" style="background:var(--surface);padding:12px 20px;border-bottom:2px solid var(--border);"></td>
+      <td colspan="8" style="background:var(--surface);padding:12px 20px;border-bottom:2px solid var(--border);"></td>
     </tr>`;
   }).join("");
   updateUsersSummary(users);
