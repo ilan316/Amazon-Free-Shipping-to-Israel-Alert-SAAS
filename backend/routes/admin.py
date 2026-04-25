@@ -53,7 +53,7 @@ async def list_users(
     admin: Annotated[User, Depends(get_current_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    result = await db.execute(select(User).where(User.is_verified == True).order_by(User.created_at.desc()))
+    result = await db.execute(select(User).where(User.is_verified == True, User.is_admin == False).order_by(User.created_at.desc()))
     users = result.scalars().all()
 
     # Batch-fetch product counts (one query instead of N)

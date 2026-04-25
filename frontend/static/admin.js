@@ -434,9 +434,7 @@ async function loadUsers() {
     return `
     <tr id="user-row-${u.id}">
       <td>${u.id}</td>
-      <td class="ltr truncate">${u.email}
-        ${u.is_admin ? ' <span class="tag-admin">מנהל</span>' : ''}
-      </td>
+      <td class="ltr truncate">${u.email}</td>
       <td class="ltr truncate">${u.notify_email}</td>
       <td style="text-align:center;">${u.product_count}</td>
       <td style="text-align:center;">
@@ -459,9 +457,6 @@ async function loadUsers() {
           <button class="btn-sm ${u.is_active ? 'active-toggle' : 'inactive-toggle'}"
             onclick="toggleActive(${u.id})">
             ${u.is_active ? 'השהה' : 'הפעל'}
-          </button>
-          <button class="btn-sm" onclick="toggleAdmin(${u.id})">
-            ${u.is_admin ? 'הסר מנהל' : 'הפוך למנהל'}
           </button>
           ${u.notify_email_bounced ? `<button class="btn-sm" onclick="clearBounce(${u.id})" style="color:var(--success);border-color:var(--success);">נקה Bounce</button>` : ''}
           <button class="btn-sm danger" onclick="deleteUser(${u.id})">מחק</button>
