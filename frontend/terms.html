@@ -34,7 +34,7 @@
           </picture>
           <span>Amazon Israel Free Ship Alert</span>
         </div>
-        <nav class="index-nav">
+        <nav class="index-nav" id="index-nav">
           <a href="https://amzfreeil.com#features">יכולות</a>
           <a href="https://amzfreeil.com#how">איך זה עובד</a>
           <a href="https://amzfreeil.com/guide.html">מדריכים</a>
@@ -47,6 +47,13 @@
           <a class="index-btn index-btn-primary" href="https://amzfreeil.com">🌐 אתר ראשי</a>
           <a class="index-btn index-btn-outline" href="https://amzfreeil.com#download">🪟 גרסת Windows</a>
         </div>
+        <button class="hamburger" id="hamburger-btn" aria-label="פתח תפריט" aria-expanded="false" aria-controls="index-nav">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect y="4" width="22" height="2" rx="1" fill="currentColor"/>
+            <rect y="10" width="22" height="2" rx="1" fill="currentColor"/>
+            <rect y="16" width="22" height="2" rx="1" fill="currentColor"/>
+          </svg>
+        </button>
       </header>
     </div>
   </div>
@@ -98,15 +105,17 @@
         </picture>
         <span>Amazon Israel Free Ship Alert</span>
       </div>
-      <div class="index-footer-links">
-        <a href="https://amzfreeil.com/privacy.html">מדיניות פרטיות</a>
-        <a href="https://amzfreeil.com/terms.html">תנאי שימוש</a>
-        <a href="https://amzfreeil.com/about.html">אודות</a>
-        <a href="https://amzfreeil.com#disclosure">גילוי נאות</a>
-      </div>
-      <div class="index-footer-social">
-        <a href="https://www.facebook.com/profile.php?id=61588452429138" target="_blank" rel="noopener noreferrer">Facebook</a>
-        <a href="https://www.instagram.com/amzfreeil/" target="_blank" rel="noopener noreferrer">Instagram</a>
+      <div class="index-footer-links-wrap">
+        <div class="index-footer-links">
+          <a href="https://amzfreeil.com/privacy.html">מדיניות פרטיות</a>
+          <a href="https://amzfreeil.com/terms.html">תנאי שימוש</a>
+          <a href="https://amzfreeil.com/about.html">אודות</a>
+          <a href="https://amzfreeil.com#disclosure">גילוי נאות</a>
+        </div>
+        <div class="index-footer-social">
+          <a href="https://www.facebook.com/profile.php?id=61588452429138" target="_blank" rel="noopener noreferrer">Facebook</a>
+          <a href="https://www.instagram.com/amzfreeil/" target="_blank" rel="noopener noreferrer">Instagram</a>
+        </div>
       </div>
     </div>
     <p class="index-footer-copy">© 2026 Amazon Israel Free Ship Alert · אין לאתר זה כל זיקה, שותפות או שיוך ל-Amazon Inc</p>
@@ -117,6 +126,20 @@
       const t = document.getElementById('index-topbar');
       if (t) t.classList.toggle('scrolled', window.scrollY > 20);
     });
+    const _hBtn = document.getElementById('hamburger-btn');
+    const _hNav = document.getElementById('index-nav');
+    if (_hBtn && _hNav) {
+      _hBtn.addEventListener('click', () => {
+        const open = _hNav.classList.toggle('open');
+        _hBtn.setAttribute('aria-expanded', String(open));
+      });
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('#fixed-header')) {
+          _hNav.classList.remove('open');
+          _hBtn.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
   </script>
 
 </body>
