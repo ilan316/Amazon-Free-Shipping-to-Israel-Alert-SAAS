@@ -25,6 +25,15 @@
     .tip-box { background: rgba(255,153,0,0.08); border: 1.5px solid rgba(255,153,0,0.3); border-radius: 10px; padding: 14px 18px; margin: 20px 0; }
     .tip-box p { font-size: 0.9rem; color: var(--text); margin: 0; }
     .tip-box strong { color: #ff6a00; }
+    .step-screenshot {
+      display: block;
+      margin-top: 14px;
+      max-width: 100%;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    .step-screenshot.narrow { max-width: 300px; }
   </style>
 </head>
 <body>
@@ -74,6 +83,7 @@
       <div class="step-body">
         <h3>הירשם לשירות</h3>
         <p>היכנס ל-<a href="https://app.amzfreeil.com">app.amzfreeil.com</a>, מלא כתובת מייל וסיסמה, והגדר את המייל שאליו תרצה לקבל התראות (יכול להיות אותו מייל). לחץ על "הרשמה" ואמת את כתובת המייל דרך הקישור שנשלח אליך.</p>
+        <img src="/static/guide/step1-register.png" alt="טופס הרשמה" class="step-screenshot narrow" loading="lazy">
       </div>
     </div>
 
@@ -90,6 +100,7 @@
       <div class="step-body">
         <h3>הוסף את המוצר לדשבורד</h3>
         <p>בלוח הבקרה (<a href="https://app.amzfreeil.com/dashboard">dashboard</a>), הדבק את קישור המוצר בשדה "הוסף מוצר" ולחץ על הכפתור. המוצר יתווסף לרשימת המעקב שלך תוך שניות.</p>
+        <img src="/static/guide/step3-dashboard.png" alt="לוח הבקרה — הוספת מוצר" class="step-screenshot" loading="lazy">
       </div>
     </div>
 
@@ -98,6 +109,7 @@
       <div class="step-body">
         <h3>המתן להתראה</h3>
         <p>השירות בודק את כל המוצרים שלך אוטומטית פעם ביום. ברגע שמזוהה משלוח חינם לישראל עבור מוצר כלשהו — תקבל מייל עם קישור ישיר לרכישה.</p>
+        <img src="/static/guide/step4-products.png" alt="רשימת מוצרים עם סטטוס משלוח" class="step-screenshot" loading="lazy">
       </div>
     </div>
 
@@ -106,6 +118,7 @@
       <div class="step-body">
         <h3>רכוש לפני שזה נגמר</h3>
         <p>הצעות משלוח חינם לישראל יכולות להיעלם תוך שעות. לחץ על הקישור במייל ההתראה והזמן את המוצר בהקדם כדי לנצל את ההטבה.</p>
+        <img src="/static/guide/step5-email.png" alt="מייל התראה — משלוח חינם לישראל" class="step-screenshot narrow" loading="lazy">
       </div>
     </div>
 
