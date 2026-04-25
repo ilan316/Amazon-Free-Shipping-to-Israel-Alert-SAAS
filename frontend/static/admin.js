@@ -873,6 +873,7 @@ function toggleSingleUser() {
   const v = document.getElementById("tpl-audience").value;
   document.getElementById("tpl-single-user-id").style.display = v === "single" ? "" : "none";
   document.getElementById("tpl-custom-emails-wrap").style.display = v === "custom" ? "" : "none";
+  document.getElementById("tpl-self-email-wrap").style.display = v === "self" ? "" : "none";
 }
 
 function _parseCustomEmails() {
@@ -914,9 +915,10 @@ async function sendTemplate() {
   btn.disabled = true; btn.textContent = "מתחיל...";
   msgEl.textContent = "";
 
+  const to_email = audience === "self" ? (document.getElementById("tpl-self-email")?.value.trim() || null) : null;
   const res = await apiFetch(`/admin/email-templates/${id}/send`, {
     method: "POST",
-    body: JSON.stringify({ audience, user_id, products_min, products_max, custom_emails }),
+    body: JSON.stringify({ audience, user_id, products_min, products_max, custom_emails, to_email }),
   });
 
   if (!res || !res.ok) {

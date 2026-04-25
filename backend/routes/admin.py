@@ -888,6 +888,7 @@ class EmailTemplateSendBody(BaseModel):
     products_min: int | None = None  # include users with >= this many products
     products_max: int | None = None  # include users with <= this many products
     custom_emails: list[str] | None = None  # for audience="custom"
+    to_email: str | None = None  # override recipient for audience="self"
 
 
 @router.get("/email-templates")
@@ -1075,6 +1076,8 @@ async def send_email_template(
 
     # Extract plain data before session closes
     user_data = [(r[0].id, r[0].email, r[0].notify_email or r[0].email, r[1]) for r in rows]
+    if body.audience == "self" and body.to_email:
+        user_data = [(uid, email, body.to_email, pc) for uid, email, _, pc in user_data]
 
     job_id = str(uuid.uuid4())
     _send_jobs[job_id] = {

@@ -485,6 +485,11 @@
               <input type="number" id="tpl-single-user-id" placeholder="User ID" min="1"
                 style="display:none;width:110px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.88rem;background:var(--bg);color:var(--text);">
             </div>
+            <div id="tpl-self-email-wrap" style="display:none;align-items:center;gap:8px;margin-top:8px;">
+              <label for="tpl-self-email" style="font-size:0.82rem;font-weight:600;color:var(--text-muted);white-space:nowrap;">שלח אל:</label>
+              <input type="email" id="tpl-self-email" placeholder="השאר ריק לשלוח לעצמי" dir="ltr"
+                style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.88rem;background:var(--bg);color:var(--text);">
+            </div>
             <div id="tpl-custom-emails-wrap" style="display:none;margin-top:10px;">
               <label style="font-size:0.82rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:5px;">רשימת מיילים (שורה אחת לכל מייל, או מופרד בפסיקים):</label>
               <textarea id="tpl-custom-emails" rows="5" dir="ltr"
@@ -602,7 +607,7 @@
   </div>
 
   <script src="/static/app.js?v=10"></script>
-  <script src="/static/admin.js?v=34"></script>
+  <script src="/static/admin.js?v=35"></script>
   <script>
     requireAuth();
     loadAdminData();
