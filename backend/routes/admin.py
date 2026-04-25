@@ -63,6 +63,13 @@ async def list_users(
     )
     product_count_map = {row.user_id: row.cnt for row in count_rows}
 
+    # Batch-fetch last product added date per user
+    last_added_rows = await db.execute(
+        select(UserProduct.user_id, func.max(UserProduct.added_at).label("last_added"))
+        .group_by(UserProduct.user_id)
+    )
+    last_added_map = {row.user_id: row.last_added for row in last_added_rows}
+
     return [
         {
             "id": u.id,
@@ -78,8 +85,37 @@ async def list_users(
             "notify_email_bounced": u.notify_email_bounced,
             "notify_email_bounce_type": u.notify_email_bounce_type,
             "notify_email_bounced_at": u.notify_email_bounced_at.isoformat() if u.notify_email_bounced_at else None,
+            "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
+            "last_product_added_at": last_added_map[u.id].isoformat() if last_added_map.get(u.id) else None,
         }
         for u in users
+    ]
+
+
+@router.get("/users/{user_id}/products")
+async def get_user_products(
+    user_id: int,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    result = await db.execute(
+        select(Product, UserProduct.custom_name, UserProduct.is_paused, UserProduct.added_at)
+        .join(UserProduct, Product.id == UserProduct.product_id)
+        .where(UserProduct.user_id == user_id)
+        .order_by(UserProduct.added_at.desc())
+    )
+    return [
+        {
+            "asin": p.asin,
+            "name": p.name or "",
+            "url": p.url,
+            "last_status": p.last_status,
+            "last_checked": p.last_checked.isoformat() if p.last_checked else None,
+            "custom_name": custom_name,
+            "is_paused": is_paused,
+            "added_at": added_at.isoformat() if added_at else None,
+        }
+        for p, custom_name, is_paused, added_at in result.all()
     ]
 
 

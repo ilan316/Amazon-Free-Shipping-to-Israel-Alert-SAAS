@@ -397,6 +397,7 @@ function filterUsers() {
   const q = (document.getElementById('users-search')?.value || '').trim().toLowerCase();
   _allUsers.forEach(u => {
     const row = document.getElementById(`user-row-${u.id}`);
+    const expandRow = document.getElementById(`user-expand-${u.id}`);
     if (!row) return;
     const matchText = !q || u.email.toLowerCase().includes(q) || (u.notify_email || '').toLowerCase().includes(q);
     const matchFilter =
@@ -404,8 +405,85 @@ function filterUsers() {
       (_userFilter === 'ACTIVE'   &&  u.is_active && !u.vacation_mode) ||
       (_userFilter === 'VACATION' &&  u.is_active &&  u.vacation_mode) ||
       (_userFilter === 'INACTIVE' && !u.is_active);
-    row.style.display = (matchText && matchFilter) ? '' : 'none';
+    const show = matchText && matchFilter;
+    row.style.display = show ? '' : 'none';
+    if (expandRow && !show) expandRow.style.display = 'none';
   });
+}
+
+function updateUsersSummary(users) {
+  let active = 0, vacation = 0, inactive = 0;
+  users.forEach(u => {
+    if (!u.is_active) inactive++;
+    else if (u.vacation_mode) vacation++;
+    else active++;
+  });
+  const elA = document.getElementById('summary-active');
+  const elV = document.getElementById('summary-vacation');
+  const elI = document.getElementById('summary-inactive');
+  if (elA) elA.textContent = `✅ פעיל: ${active}`;
+  if (elV) elV.textContent = `🏖 חופשה: ${vacation}`;
+  if (elI) elI.textContent = `⏸ מושהה: ${inactive}`;
+}
+
+async function toggleUserProducts(userId, email) {
+  const expandRow = document.getElementById(`user-expand-${userId}`);
+  if (!expandRow) return;
+
+  // If already loaded, just toggle
+  if (expandRow.dataset.loaded === '1') {
+    expandRow.style.display = expandRow.style.display === 'none' ? '' : 'none';
+    return;
+  }
+
+  expandRow.style.display = '';
+  const cell = expandRow.querySelector('td');
+  cell.innerHTML = '<span style="color:var(--text-muted);font-size:0.85rem;">טוען מוצרים...</span>';
+
+  const res = await apiFetch(`/admin/users/${userId}/products`);
+  if (!res || !res.ok) {
+    cell.innerHTML = '<span style="color:var(--error);font-size:0.85rem;">שגיאה בטעינת מוצרים</span>';
+    return;
+  }
+  const products = await res.json();
+  expandRow.dataset.loaded = '1';
+
+  const u = _allUsers.find(x => x.id === userId);
+  const lastLogin = u?.last_login_at ? new Date(u.last_login_at).toLocaleDateString('he-IL') : '—';
+  const lastAdded = u?.last_product_added_at ? new Date(u.last_product_added_at).toLocaleDateString('he-IL') : '—';
+
+  if (!products.length) {
+    cell.innerHTML = `<div style="font-size:0.82rem;color:var(--text-muted);">📦 אין מוצרים · כניסה אחרונה: ${lastLogin}</div>`;
+    return;
+  }
+
+  cell.innerHTML = `
+    <div style="font-size:0.82rem;font-weight:600;color:var(--text-muted);margin-bottom:8px;">
+      📦 מוצרים של <span dir="ltr">${email}</span> (${products.length})
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.82rem;min-width:420px;">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border);color:var(--text-muted);">
+            <th style="text-align:right;padding:5px 8px;">ASIN</th>
+            <th style="text-align:right;padding:5px 8px;">שם</th>
+            <th style="text-align:center;padding:5px 8px;">סטטוס</th>
+            <th style="text-align:center;padding:5px 8px;">הושהה</th>
+            <th style="text-align:right;padding:5px 8px;">נוסף</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${products.map(p => `
+            <tr style="border-bottom:1px solid var(--border);">
+              <td dir="ltr" style="padding:5px 8px;"><a href="${p.url}" target="_blank" style="color:var(--brand-dark);font-family:monospace;">${p.asin}</a></td>
+              <td class="truncate" style="padding:5px 8px;max-width:220px;">${p.custom_name || p.name || '—'}</td>
+              <td style="text-align:center;padding:5px 8px;"><span class="status-badge badge-${p.last_status}">${statusLabel(p.last_status)}</span></td>
+              <td style="text-align:center;padding:5px 8px;">${p.is_paused ? '⏸' : ''}</td>
+              <td dir="ltr" style="padding:5px 8px;white-space:nowrap;">${p.added_at ? new Date(p.added_at).toLocaleDateString('he-IL') : '—'}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
 }
 
 async function loadUsers() {
@@ -431,18 +509,22 @@ async function loadUsers() {
     const limitDisplay = isCustom
       ? `<span style="font-weight:600;color:var(--brand-dark);">${u.max_products}</span>`
       : `<span style="color:var(--text-muted);">${globalLimit}</span>`;
+    const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('he-IL') : '—';
+    const emailEsc = u.email.replace(/'/g, "\\'");
     return `
-    <tr id="user-row-${u.id}">
+    <tr id="user-row-${u.id}" style="cursor:pointer;" onclick="toggleUserProducts(${u.id}, '${emailEsc}')">
       <td>${u.id}</td>
       <td class="ltr truncate">${u.email}</td>
       <td class="ltr truncate">${u.notify_email}</td>
       <td style="text-align:center;">${u.product_count}</td>
-      <td style="text-align:center;">
+      <td style="text-align:center;" onclick="event.stopPropagation()">
         ${limitDisplay}
         <button class="btn-sm" onclick="setUserProductLimit(${u.id}, ${isCustom ? u.max_products : 'null'}, ${globalLimit})"
           style="margin-right:4px;padding:2px 6px;font-size:0.72rem;">✏️</button>
       </td>
-      <td class="ltr">${u.created_at ? new Date(u.created_at).toLocaleDateString("he-IL") : "—"}</td>
+      <td class="ltr">${fmtDate(u.created_at)}</td>
+      <td class="ltr" style="white-space:nowrap;color:${u.last_login_at ? 'var(--text)' : 'var(--text-muted)'};">${fmtDate(u.last_login_at)}</td>
+      <td class="ltr" style="white-space:nowrap;color:${u.last_product_added_at ? 'var(--text)' : 'var(--text-muted)'};">${fmtDate(u.last_product_added_at)}</td>
       <td>
         ${u.notify_email_bounced
           ? `<span style="background:#fce8e8;color:var(--error);padding:2px 7px;border-radius:12px;font-size:0.72rem;font-weight:700;" title="${u.notify_email_bounce_type === 'complaint' ? 'ספאם complaint' : 'Bounce'} · ${u.notify_email_bounced_at ? new Date(u.notify_email_bounced_at).toLocaleDateString('he-IL') : ''}">⛔ ${u.notify_email_bounce_type === 'complaint' ? 'ספאם' : 'Bounce'}</span>`
@@ -452,7 +534,7 @@ async function loadUsers() {
               ? '<span style="color:var(--warning,#f59e0b);font-weight:600;">🏖 חופשה</span>'
               : '<span style="color:var(--success);font-weight:600;">פעיל</span>'}
       </td>
-      <td>
+      <td onclick="event.stopPropagation()">
         <div class="action-btns">
           <button class="btn-sm ${u.is_active ? 'active-toggle' : 'inactive-toggle'}"
             onclick="toggleActive(${u.id})">
@@ -462,8 +544,12 @@ async function loadUsers() {
           <button class="btn-sm danger" onclick="deleteUser(${u.id})">מחק</button>
         </div>
       </td>
+    </tr>
+    <tr id="user-expand-${u.id}" style="display:none;">
+      <td colspan="10" style="background:var(--surface);padding:12px 20px;border-bottom:2px solid var(--border);"></td>
     </tr>`;
   }).join("");
+  updateUsersSummary(users);
   filterUsers();
 }
 
