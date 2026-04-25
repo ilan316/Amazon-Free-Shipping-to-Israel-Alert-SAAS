@@ -392,8 +392,17 @@ a:hover{text-decoration:underline}
       });
     }
 
-    // Redirect to dashboard if already logged in
-    if (getToken()) window.location = "/dashboard";
+    // Redirect to dashboard (or admin) if already logged in
+    if (getToken()) {
+      apiFetch("/me").then(async res => {
+        if (res && res.ok) {
+          const me = await res.json();
+          window.location = me.is_admin ? "/admin" : "/dashboard";
+        } else {
+          window.location = "/dashboard";
+        }
+      });
+    }
 
     // Google Sign-In
     async function handleGoogleCredential(response) {
@@ -407,12 +416,14 @@ a:hover{text-decoration:underline}
         if (res.ok) {
           const data = await res.json();
           setToken(data.access_token);
+          const meRes = await apiFetch("/me");
+          const dest = (meRes && meRes.ok && (await meRes.json()).is_admin) ? "/admin" : "/dashboard";
           if (typeof fbq === 'function') {
             const eventId = 'reg_google_' + Date.now();
             fbq('track', 'Lead', {}, { eventID: eventId });
-            setTimeout(() => { window.location = "/dashboard"; }, 300);
+            setTimeout(() => { window.location = dest; }, 300);
           } else {
-            window.location = "/dashboard";
+            window.location = dest;
           }
         } else {
           const err = await res.json();
@@ -479,7 +490,13 @@ a:hover{text-decoration:underline}
         if (res.ok) {
           const data = await res.json();
           setToken(data.access_token);
-          window.location = "/dashboard";
+          const meRes = await apiFetch("/me");
+          if (meRes && meRes.ok) {
+            const me = await meRes.json();
+            window.location = me.is_admin ? "/admin" : "/dashboard";
+          } else {
+            window.location = "/dashboard";
+          }
         } else {
           showAlert(alertEl, "אימייל או סיסמה שגויים");
           document.getElementById("resend-verify-link").style.display = "block";

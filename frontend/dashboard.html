@@ -151,6 +151,7 @@
     apiFetch("/me").then(async res => {
       if (res && res.ok) {
         const user = await res.json();
+        if (user.is_admin) window.location = "/admin";
       }
     });
 
