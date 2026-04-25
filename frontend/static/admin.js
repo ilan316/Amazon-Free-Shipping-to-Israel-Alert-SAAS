@@ -621,16 +621,42 @@ function renderAdminProducts() {
   `).join("");
 }
 
-function exportUsersCSV() {
+async function exportUsersCSV() {
   if (!_allUsers.length) return;
-  const headers = ['#', 'אימייל', 'אימייל התראה', 'מוצרים', 'סטטוס', 'נרשם'];
+
+  const btn = document.querySelector('[onclick="exportUsersCSV()"]');
+  const origText = btn ? btn.textContent : '';
+  if (btn) { btn.textContent = '⏳ טוען...'; btn.disabled = true; }
+
+  // Fetch products for all users in parallel
+  const productResults = await Promise.all(
+    _allUsers.map(u =>
+      apiFetch(`/admin/users/${u.id}/products`)
+        .then(r => r && r.ok ? r.json() : [])
+        .catch(() => [])
+    )
+  );
+  const asinMap = {};
+  _allUsers.forEach((u, i) => {
+    asinMap[u.id] = productResults[i].map(p => p.asin).join(', ');
+  });
+
+  if (btn) { btn.textContent = origText; btn.disabled = false; }
+
+  const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('he-IL') : '';
+  const headers = ['#', 'אימייל', 'אימייל התראה', 'מוצרים', 'ASINs', 'סטטוס', 'נרשם', 'כניסה אחרונה', 'מוצר אחרון נוסף', 'מגבלת מוצרים', 'Bounce'];
   const rows = _allUsers.map(u => [
     u.id,
     u.email,
     u.notify_email || '',
     u.product_count,
+    asinMap[u.id] || '',
     !u.is_active ? 'מושהה' : u.vacation_mode ? 'חופשה' : 'פעיל',
-    u.created_at ? new Date(u.created_at).toLocaleDateString('he-IL') : '',
+    fmtDate(u.created_at),
+    fmtDate(u.last_login_at),
+    fmtDate(u.last_product_added_at),
+    u.max_products !== null && u.max_products !== undefined ? u.max_products : 'גלובלית',
+    u.notify_email_bounced ? (u.notify_email_bounce_type === 'complaint' ? 'ספאם' : 'Bounce') : '',
   ]);
   _downloadCSV('users.csv', headers, rows);
 }
