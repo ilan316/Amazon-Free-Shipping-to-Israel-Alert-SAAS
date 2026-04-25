@@ -29,7 +29,57 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800&family=Rubik:wght@500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=11">
+  <style>
+/* Critical CSS — above the fold */
+:root{--brand:#FF9900;--brand-dark:#ff6a00;--bg:#fffaf1;--surface:#fff;--border:#e8e2d8;--text:#172033;--text-muted:#4d5a70;--success:#167d46;--warning:#b45309;--error:#c62828;--radius:10px;--shadow:0 2px 12px rgba(0,0,0,.08)}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px}
+body{font-family:'Heebo',Arial,sans-serif;background:var(--bg);color:var(--text);direction:rtl;min-height:100vh}
+a{color:var(--brand-dark);text-decoration:none}
+a:hover{text-decoration:underline}
+.bg-glow{position:fixed;z-index:-1;width:440px;height:440px;border-radius:50%;filter:blur(60px);opacity:.35;pointer-events:none}
+.bg-glow-a{background:#ffc36a;top:-120px;right:-120px}
+.bg-glow-b{background:#ff9e80;bottom:-160px;left:-120px}
+#fixed-header{position:fixed;top:0;left:0;right:0;z-index:9999}
+.index-urgency-bar{background:linear-gradient(90deg,#ff6a00,#ff9900);color:#fff;text-align:center;padding:10px 20px;font-size:.88rem;font-weight:500;line-height:1.5;display:flex;align-items:center;justify-content:center;gap:8px}
+.index-urgency-bar strong{font-weight:800}
+.index-urgency-dot{display:inline-block;width:8px;height:8px;background:#fff;border-radius:50%;flex-shrink:0;animation:index-blink 1.8s ease-in-out infinite}
+@keyframes index-blink{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.3)}}
+.index-topbar-outer{display:flex;justify-content:center;padding:10px 4vw}
+.index-topbar{width:min(1140px,100%);padding:10px 16px;border:1px solid rgba(23,32,51,.12);border-radius:14px;display:flex;justify-content:space-between;align-items:center;backdrop-filter:blur(12px);background:rgba(255,255,255,.92);box-shadow:0 2px 16px rgba(23,32,51,.07);transition:box-shadow 200ms ease;position:relative}
+.index-topbar.scrolled{box-shadow:0 8px 32px rgba(23,32,51,.1)}
+.index-brand{display:inline-flex;align-items:center;gap:10px;font-family:"Rubik",sans-serif;font-weight:700;color:#172033;text-decoration:none}
+.index-brand-logo{width:28px;height:28px;border-radius:8px;object-fit:cover}
+.index-nav{display:inline-flex;gap:18px;position:absolute;left:50%;transform:translateX(-50%)}
+.index-nav a,.index-topbar a{color:#172033;text-decoration:none;font-weight:500}
+.index-nav a:hover{color:#ff9900;text-decoration:none}
+.index-nav-cta{display:flex;gap:8px;align-items:center}
+.index-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;font-size:.88rem;font-weight:700;font-family:"Heebo",sans-serif;text-decoration:none;cursor:pointer;border:1px solid rgba(23,32,51,.12);transition:transform 160ms ease,box-shadow 160ms ease}
+.index-btn:hover{transform:translateY(-2px);text-decoration:none}
+.index-btn-primary{background:linear-gradient(135deg,#ff9900,#ff6a00);color:#172033;border:none;box-shadow:0 6px 18px rgba(255,153,0,.33)}
+.index-btn-primary:hover{box-shadow:0 10px 24px rgba(255,153,0,.45);color:#172033}
+.index-btn-outline{background:#fff;color:#172033}
+.index-btn-outline:hover{border-color:#ff9900;color:#ff6a00}
+.index-trust-bar{display:flex;align-items:stretch;background:#172033;border-radius:14px;overflow:hidden;max-width:860px;margin:115px auto 24px}
+.index-trust-item{display:flex;align-items:center;justify-content:center;gap:8px;color:#f0f4ff;padding:14px 20px;font-size:.88rem;font-weight:500;flex:1;border-right:1px solid rgba(255,255,255,.1)}
+.index-trust-item:first-child{border-right:none}
+.auth-hero{text-align:center;padding:0 16px 32px}
+.auth-hero h1{font-size:2rem;color:var(--brand-dark);margin-bottom:10px}
+.auth-hero h1 span{color:#ff6a00}
+.auth-hero p{color:var(--text-muted);font-size:1rem}
+.features{display:flex;gap:14px;max-width:860px;margin:32px auto 0;padding:0 16px;flex-wrap:wrap;justify-content:center}
+.feature-card{flex:0 1 calc(50% - 8px);min-width:200px;background:rgba(255,255,255,.78);border:1px solid rgba(23,32,51,.12);border-radius:16px;padding:20px 18px;text-align:center;backdrop-filter:blur(12px);transition:transform 200ms ease,box-shadow 200ms ease}
+.feature-card:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(23,32,51,.1)}
+.feature-card .icon{font-size:2rem;margin-bottom:10px}
+.feature-card h3{font-size:.95rem;margin-bottom:6px;font-family:"Rubik",sans-serif;font-weight:700}
+.feature-card p{font-size:.84rem;color:var(--text-muted);line-height:1.5}
+.feature-card--featured{border-color:rgba(255,153,0,.5);box-shadow:0 0 0 2px rgba(255,153,0,.18)}
+.feature-card--featured h3{color:#ff6a00}
+@media(max-width:680px){#fixed-header{position:static}.index-nav{display:none}.index-nav-cta{display:none}.index-trust-bar{display:none}.auth-hero{padding-top:0;margin-top:0}.auth-hero h1{font-size:1.35rem}.auth-hero p{font-size:.88rem}.index-urgency-bar{font-size:.8rem;padding:8px 14px}}
+@media(max-width:600px){.feature-card{flex:0 1 100%}}
+  </style>
+  <link rel="preload" href="/static/styles.css?v=12" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="/static/styles.css?v=12"></noscript>
   <!-- Meta Pixel Code -->
   <script>
     !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window, document,'script','https://connect.facebook.net/en_US/fbevents.js');
@@ -40,18 +90,6 @@
   <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=1981109749468001&ev=PageView&noscript=1" /></noscript>
   <!-- End Meta Pixel Code -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <style>
-    /* index-only overrides */
-    .features { display: flex; gap: 14px; max-width: 860px; margin: 32px auto 0; padding: 0 16px; flex-wrap: wrap; justify-content: center; }
-    .feature-card { flex: 0 1 calc(50% - 8px); min-width: 200px; background: rgba(255,255,255,0.78); border: 1px solid rgba(23,32,51,0.12); border-radius: 16px; padding: 20px 18px; text-align: center; backdrop-filter: blur(12px); transition: transform 200ms ease, box-shadow 200ms ease; }
-    .feature-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(23,32,51,0.1); }
-    .feature-card .icon { font-size: 2rem; margin-bottom: 10px; }
-    .feature-card h3 { font-size: 0.95rem; margin-bottom: 6px; font-family: "Rubik", sans-serif; font-weight: 700; }
-    .feature-card p { font-size: 0.84rem; color: var(--text-muted); line-height: 1.5; }
-    .feature-card--featured { border-color: rgba(255,153,0,0.5); box-shadow: 0 0 0 2px rgba(255,153,0,0.18); }
-    .feature-card--featured h3 { color: #ff6a00; }
-    @media (max-width: 600px) { .feature-card { flex: 0 1 100%; } }
-  </style>
 </head>
 <body>
 
@@ -67,7 +105,10 @@
     <div class="index-topbar-outer">
       <header class="index-topbar" id="index-topbar">
         <div class="index-brand">
-          <img src="/static/logo-new.png" alt="logo" class="index-brand-logo" />
+          <picture>
+            <source srcset="/static/logo-new.webp" type="image/webp">
+            <img src="/static/logo-new.png" alt="logo" class="index-brand-logo" />
+          </picture>
           <span>Amazon Israel Free Ship Alert</span>
         </div>
         <nav class="index-nav">
@@ -269,13 +310,17 @@
   <footer class="index-footer">
     <div class="index-footer-topbar">
       <div class="index-brand">
-        <img src="/static/logo-new.png" alt="logo" class="index-brand-logo" />
+        <picture>
+          <source srcset="/static/logo-new.webp" type="image/webp">
+          <img src="/static/logo-new.png" alt="logo" class="index-brand-logo" />
+        </picture>
         <span>Amazon Israel Free Ship Alert</span>
       </div>
       <div class="index-footer-links">
+        <a href="mailto:alerts@amzfreeil.com">צרו קשר</a>
         <a href="https://amzfreeil.com/privacy.html">מדיניות פרטיות</a>
         <a href="https://amzfreeil.com/terms.html">תנאי שימוש</a>
-        <a href="https://amzfreeil.com/about.html">אודות</a>
+        <a href="https://amzfreeil.com/guide.html">מדריך</a>
         <a href="https://amzfreeil.com#disclosure">גילוי נאות</a>
       </div>
       <div class="index-footer-social">
