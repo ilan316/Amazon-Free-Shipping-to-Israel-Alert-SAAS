@@ -131,21 +131,30 @@ def _pause_url(user_id: int) -> str:
 
 # ── Resend sender ─────────────────────────────────────────────────────────────
 
-def _send_via_resend(to: str, subject: str, html: str, text: str) -> bool:
+def _send_via_resend(
+    to: str,
+    subject: str,
+    html: str,
+    text: str,
+    extra_headers: dict | None = None,
+) -> bool:
     api_key = os.environ.get("RESEND_API_KEY", "")
     if not api_key:
         logger.error("RESEND_API_KEY not set")
         return False
     resend_client.api_key = api_key
     from_addr = os.environ.get("FROM_EMAIL", "alerts@amzfreeil.com")
+    payload: dict = {
+        "from": from_addr,
+        "to": [to],
+        "subject": subject,
+        "html": html,
+        "text": text,
+    }
+    if extra_headers:
+        payload["headers"] = extra_headers
     try:
-        resend_client.Emails.send({
-            "from": from_addr,
-            "to": [to],
-            "subject": subject,
-            "html": html,
-            "text": text,
-        })
+        resend_client.Emails.send(payload)
         logger.info(f"Email sent via Resend → {to}: {subject}")
         return True
     except Exception as e:
@@ -398,7 +407,13 @@ def send_user_alert(user, product, result) -> bool:
 </body>
 </html>"""
 
-    return _send_via_resend(recipient, subject, html_body, text_body)
+    unsubscribe_url = _pause_url(user.id)
+    headers = {
+        "List-Unsubscribe": f"<{unsubscribe_url}>",
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        "List-Id": "Amazon Israel Alert <alerts.amzfreeil.com>",
+    }
+    return _send_via_resend(recipient, subject, html_body, text_body, extra_headers=headers)
 
 
 # ── Daily summary ─────────────────────────────────────────────────────────────
@@ -521,4 +536,10 @@ def send_daily_summary(user, free_products: list) -> bool:
 </body>
 </html>"""
 
-    return _send_via_resend(recipient, subject, html_body, text_body)
+    unsubscribe_url = _pause_url(user.id)
+    headers = {
+        "List-Unsubscribe": f"<{unsubscribe_url}>",
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        "List-Id": "Amazon Israel Alert <alerts.amzfreeil.com>",
+    }
+    return _send_via_resend(recipient, subject, html_body, text_body, extra_headers=headers)

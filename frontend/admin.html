@@ -6,7 +6,7 @@
   <title>פאנל מנהל · Amazon Israel Alert</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=10">
+  <link rel="stylesheet" href="/static/styles.css?v=11">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     .admin-page { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
@@ -103,6 +103,67 @@
     .profile-msg { font-size: 0.85rem; margin-top: 10px; min-height: 20px; }
     .profile-msg.ok { color: var(--success); }
     .profile-msg.err { color: var(--error); }
+
+    /* ── Mobile admin ──────────────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .admin-page { padding: 12px 8px; }
+
+      /* Tabs: scrollable row */
+      .admin-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        flex-wrap: nowrap;
+        scrollbar-width: none;
+        gap: 0;
+        padding-bottom: 0;
+      }
+      .admin-tabs::-webkit-scrollbar { display: none; }
+      .admin-tab {
+        white-space: nowrap;
+        flex-shrink: 0;
+        padding: 9px 11px;
+        font-size: 0.78rem;
+      }
+
+      /* Stat cards: 2-per-row */
+      .stat-card { min-width: calc(50% - 8px); }
+      .stat-value { font-size: 1.7rem; }
+
+      /* Tables: shrink truncate */
+      .truncate { max-width: 130px; }
+      .admin-table { font-size: 0.8rem; }
+      .admin-table th, .admin-table td { padding: 8px 8px; }
+
+      /* Settings inline rows: stack */
+      .settings-inline-row {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 8px !important;
+      }
+      .settings-inline-row input[type="number"],
+      .settings-inline-row input[type="time"] { width: 100% !important; box-sizing: border-box; }
+      .settings-inline-row button { width: 100%; }
+
+      /* Action buttons: stack */
+      .admin-action-row {
+        flex-direction: column !important;
+        align-items: stretch !important;
+      }
+      .admin-action-row button { width: 100%; }
+
+      /* Click analytics table scrollable */
+      #clicks-by-asin { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      #clicks-by-asin table { min-width: 480px; }
+
+      /* Template editor: single column */
+      .tpl-editor-grid { grid-template-columns: 1fr !important; }
+
+      /* Send panel filters: wrap */
+      .send-row { flex-wrap: wrap; }
+
+      /* Progress bar labels */
+      #tpl-send-progress > div:last-child { flex-direction: column; gap: 8px; }
+    }
   </style>
 </head>
 <body>
@@ -152,7 +213,7 @@
       </div>
 
       <!-- Action buttons -->
-      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+      <div class="admin-action-row" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
         <button class="btn-run-check" id="run-check-btn" onclick="triggerCheck()">▶ הרץ בדיקה עכשיו</button>
         <button class="btn-run-check" id="btn-pause-checks" onclick="toggleChecks()">טוען...</button>
         <span id="pause-checks-msg" style="font-size:0.85rem;"></span>
@@ -174,7 +235,7 @@
       </div>
 
       <!-- Product limit -->
-      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);">
+      <div class="settings-inline-row" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);">
         <span style="font-weight:600; font-size:0.9rem;">📦 מגבלת מוצרים למשתמש:</span>
         <input type="number" id="product-limit-input" min="1" max="10000" value="10"
           style="width:80px; padding:6px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:0.9rem;">
@@ -183,7 +244,7 @@
       </div>
 
       <!-- Inactivity vacation mode -->
-      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);">
+      <div class="settings-inline-row" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);">
         <span style="font-weight:600; font-size:0.9rem;">🏖 מצב חופשה אחרי חוסר פעילות:</span>
         <input type="number" id="inactivity-days-input" min="0" max="3650" value="90"
           style="width:80px; padding:6px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:0.9rem;">
@@ -193,7 +254,7 @@
       </div>
 
       <!-- Daily check time selector -->
-      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:28px; padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);">
+      <div class="settings-inline-row" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:28px; padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);">
         <span style="font-weight:600; font-size:0.9rem;">⏰ שעת בדיקה יומית:</span>
         <input type="time" id="check-time-input" value="06:00" style="padding:6px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:0.9rem;">
         <button class="btn-sm" onclick="setCheckTime()" style="background:var(--brand);color:#111;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;">שמור</button>
