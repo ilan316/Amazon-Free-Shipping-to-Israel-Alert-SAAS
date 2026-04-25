@@ -236,6 +236,7 @@ async def google_login(request: Request, background_tasks: BackgroundTasks, db: 
             language="he",
             is_verified=True,
             google_id=google_id,
+            last_login_at=datetime.now(timezone.utc),
         )
         db.add(user)
         await db.commit()
