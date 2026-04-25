@@ -243,7 +243,8 @@ if os.path.isdir(frontend_dir):
 
     @app.get("/guide", include_in_schema=False)
     async def serve_guide():
-        return FileResponse(os.path.join(frontend_dir, "guide.html"))
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="https://www.amzfreeil.com/web-guide.html", status_code=301)
 
     @app.get("/about", include_in_schema=False)
     async def serve_about():
