@@ -151,19 +151,11 @@
       }
       .admin-action-row button { width: 100%; }
 
-      /* Click analytics table: fixed layout, hide IP, truncate email */
-      #clicks-by-asin { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; }
-      #clicks-by-asin table { min-width: unset; width: 100%; table-layout: fixed; font-size: 0.78rem; }
-      #clicks-by-asin table th:nth-child(1),
-      #clicks-by-asin table td:nth-child(1) { width: 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      #clicks-by-asin table th:nth-child(2),
-      #clicks-by-asin table td:nth-child(2) { width: 32%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      #clicks-by-asin table th:nth-child(3),
-      #clicks-by-asin table td:nth-child(3) { width: 22%; white-space: nowrap; font-size: 0.75rem; }
+      /* Click analytics: scroll horizontally, hide IP column */
+      #clicks-by-asin { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      #clicks-by-asin table { min-width: 360px; font-size: 0.8rem; }
       #clicks-by-asin table th:nth-child(4),
-      #clicks-by-asin table td:nth-child(4) { display: none; } /* hide IP on mobile */
-      #clicks-by-asin table th:nth-child(5),
-      #clicks-by-asin table td:nth-child(5) { width: 8%; text-align: center; padding: 4px 2px !important; }
+      #clicks-by-asin table td:nth-child(4) { display: none; }
 
       /* Users/Products/Notifications tables: enforce horizontal scroll */
       #tab-users .admin-table,

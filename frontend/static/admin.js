@@ -57,7 +57,7 @@ async function loadClickStats() {
       };
       const asinLabels = {"automation_activation":"הפעלה 📨","automation_reminder":"תזכורת 🔔","automation_expansion":"הרחבה 📦","cta":"📧 CTA"};
       byAsin.innerHTML = `
-        <table style="width:100%;border-collapse:collapse;font-size:0.82rem;margin-top:8px;">
+        <table style="width:100%;min-width:360px;border-collapse:collapse;font-size:0.82rem;margin-top:8px;">
           <thead>
             <tr style="border-bottom:2px solid var(--border);color:var(--text-muted);">
               <th style="text-align:right;padding:6px 8px;">משתמש</th>
