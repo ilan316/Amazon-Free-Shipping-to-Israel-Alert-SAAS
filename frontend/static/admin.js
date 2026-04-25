@@ -449,7 +449,7 @@ async function toggleUserProducts(userId, email) {
   expandRow.dataset.loaded = '1';
 
   const u = _allUsers.find(x => x.id === userId);
-  const lastLogin = u?.last_login_at ? new Date(u.last_login_at).toLocaleString('he-IL', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+  const lastLogin = u?.last_login_at ? new Date(u.last_login_at).toLocaleString('he-IL', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '<span style="color:var(--text-muted);font-size:0.78rem;">לא נרשם (לפני המעקב)</span>';
   const lastAdded = u?.last_product_added_at ? new Date(u.last_product_added_at).toLocaleDateString('he-IL') : '—';
 
   const metaBar = `
