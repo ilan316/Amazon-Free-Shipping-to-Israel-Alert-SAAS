@@ -80,7 +80,7 @@ async def run_global_check_cycle():
                 Product.id.in_(
                     select(UserProduct.product_id)
                     .join(User, UserProduct.user_id == User.id)
-                    .where(User.is_active == True, User.vacation_mode == False)
+                    .where(User.is_active == True, User.vacation_mode == False, User.is_admin == False)
                     .distinct()
                 )
             )
@@ -162,6 +162,7 @@ async def run_daily_summary():
                 User.is_active == True,
                 User.vacation_mode == False,
                 User.notify_email_bounced == False,
+                User.is_admin == False,
             )
         )
         users = users_result.scalars().all()
@@ -338,6 +339,7 @@ async def run_automation_emails():
                     User.created_at <= now - timedelta(hours=24),
                     User.automation_activation_sent_at == None,
                     product_count == 0,
+                    User.is_admin == False,
                 )
             )).scalars().all()
 
@@ -358,6 +360,7 @@ async def run_automation_emails():
                     User.automation_activation_sent_at <= now - timedelta(days=3),
                     User.automation_reminder_sent_at == None,
                     product_count == 0,
+                    User.is_admin == False,
                 )
             )).scalars().all()
 
@@ -380,6 +383,7 @@ async def run_automation_emails():
                         User.automation_expansion_sent_at == None,
                         User.automation_expansion_sent_at <= now - timedelta(days=30),
                     ),
+                    User.is_admin == False,
                 )
             )).scalars().all()
 
