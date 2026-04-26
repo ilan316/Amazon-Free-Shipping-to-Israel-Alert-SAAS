@@ -352,13 +352,19 @@ def send_user_alert(user, product, result) -> bool:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>@media only screen and (max-width:600px){{.email-container{{width:100% !important;}}}}</style>
+  <style>
+    @media only screen and (max-width:600px){{
+      .email-container{{width:100% !important;}}
+      .email-container img{{max-width:100% !important;height:auto !important;}}
+      .product-name{{font-size:14px !important;}}
+    }}
+  </style>
 </head>
 <body{body_dir} style="margin:0;padding:0;background:#f3f3f3;font-family:Arial,'Segoe UI',sans-serif;">
   <div style="display:none;max-height:0;overflow:hidden;">{_t(lang, "preheader")}</div>
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f3f3;padding:24px 0;">
     <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" class="email-container" style="max-width:600px;width:100%;">
+      <table width="100%" cellpadding="0" cellspacing="0" class="email-container" style="max-width:600px;width:100%;">
         <tr>
           <td style="background:#ffffff;border-radius:10px 10px 0 0;border-bottom:2px solid #FF9900;padding:24px 24px 18px;text-align:center;">
             {header_brand}
@@ -372,7 +378,7 @@ def send_user_alert(user, product, result) -> bool:
                    style="background:#ffffff;border:1px solid #e8e8e8;border-radius:10px;margin-bottom:14px;">
               <tr>
                 <td valign="top" style="padding:16px;">
-                  <p style="margin:0 0 4px;font-size:16px;font-weight:bold;line-height:1.4;text-align:{txt_align};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" {txt_dir}>
+                  <p class="product-name" style="margin:0 0 4px;font-size:16px;font-weight:bold;line-height:1.4;text-align:{txt_align};word-wrap:break-word;overflow-wrap:break-word;" {txt_dir}>
                     <a href="{url}" style="color:#111111;text-decoration:none;">{name}</a>
                   </p>
                   <p style="margin:0 0 10px;font-size:13px;color:#666;text-align:{txt_align};">ASIN: {asin}</p>
@@ -473,7 +479,7 @@ def send_daily_summary(user, free_products: list) -> bool:
                style="background:#ffffff;border:1px solid #e8e8e8;border-radius:10px;margin-bottom:12px;">
           <tr>
             <td valign="top" style="padding:14px 16px;">
-              <p style="margin:0 0 4px;font-size:15px;font-weight:bold;line-height:1.4;text-align:{txt_align};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" {txt_dir}>
+              <p class="product-name" style="margin:0 0 4px;font-size:15px;font-weight:bold;line-height:1.4;text-align:{txt_align};word-wrap:break-word;overflow-wrap:break-word;" {txt_dir}>
                 <a href="{url}" style="color:#111111;text-decoration:none;">{name}</a>
               </p>
               <p style="margin:0 0 8px;font-size:12px;color:#666;text-align:{txt_align};">ASIN: {p.asin}</p>
@@ -495,13 +501,19 @@ def send_daily_summary(user, free_products: list) -> bool:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>@media only screen and (max-width:600px){{.email-container{{width:100% !important;}}}}</style>
+  <style>
+    @media only screen and (max-width:600px){{
+      .email-container{{width:100% !important;}}
+      .email-container img{{max-width:100% !important;height:auto !important;}}
+      .product-name{{font-size:14px !important;}}
+    }}
+  </style>
 </head>
 <body{body_dir} style="margin:0;padding:0;background:#f3f3f3;font-family:Arial,'Segoe UI',sans-serif;">
   <div style="display:none;max-height:0;overflow:hidden;">{_t(lang, "preheader")}</div>
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f3f3;padding:24px 0;">
     <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" class="email-container" style="max-width:600px;width:100%;">
+      <table width="100%" cellpadding="0" cellspacing="0" class="email-container" style="max-width:600px;width:100%;">
         <tr>
           <td style="background:#ffffff;border-radius:10px 10px 0 0;border-bottom:2px solid #FF9900;padding:24px 24px 18px;text-align:center;">
             {header_brand}
