@@ -3,6 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends, HTTPException, Request
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
@@ -191,6 +192,33 @@ async def public_system_message():
     async with AsyncSessionLocal() as db:
         row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "system_message"))).scalar_one_or_none()
         return {"message": row.value if row else ""}
+
+
+class ContactRequest(BaseModel):
+    name: str
+    email: str
+    message: str
+
+
+@app.post("/api/contact")
+@limiter.limit("5/hour")
+async def contact_form(request: Request, body: ContactRequest):
+    from backend.database import AsyncSessionLocal
+    from backend.models import User
+    from backend.notifier import send_simple_email
+    from sqlalchemy import select
+    html = (
+        f"<p><strong>שם:</strong> {body.name}</p>"
+        f"<p><strong>אימייל:</strong> {body.email}</p>"
+        f"<p><strong>הודעה:</strong><br>{body.message.replace(chr(10), '<br>')}</p>"
+    )
+    async with AsyncSessionLocal() as db:
+        admins = (await db.execute(
+            select(User).where(User.is_admin == True, User.is_active == True)
+        )).scalars().all()
+    for admin in admins:
+        send_simple_email(admin.email, f"[צרו קשר] {body.name}", html)
+    return {"ok": True}
 
 
 @app.get("/health")
