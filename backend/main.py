@@ -160,7 +160,7 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SecurityHeadersMiddleware)
 
-_raw_origins = os.environ.get("ALLOWED_ORIGINS", "https://app.amzfreeil.com,https://amzfreeil.com")
+_raw_origins = os.environ.get("ALLOWED_ORIGINS", "https://app.amzfreeil.com,https://amzfreeil.com,https://www.amzfreeil.com")
 allowed_origins = [o.strip() for o in _raw_origins.split(",")]
 app.add_middleware(
     CORSMiddleware,
