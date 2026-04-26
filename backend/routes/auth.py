@@ -177,6 +177,84 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
     return TokenResponse(access_token=create_access_token(user.id))
 
 
+@router.get("/google-config", include_in_schema=False)
+async def google_config():
+    client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+    if not client_id:
+        raise HTTPException(status_code=503, detail="Google login not configured")
+    return {"client_id": client_id}
+
+
+@router.post("/google-extension", response_model=TokenResponse)
+@limiter.limit("10/minute")
+async def google_login_extension(request: Request, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
+    """Chrome extension Google login — accepts an OAuth2 access token."""
+    body = await request.json()
+    access_token = body.get("access_token", "").strip()
+    if not access_token:
+        raise HTTPException(status_code=400, detail="Missing access_token")
+
+    import httpx
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+    if resp.status_code != 200:
+        raise HTTPException(status_code=401, detail="Invalid Google token")
+
+    info = resp.json()
+    google_id = info.get("sub")
+    email = info.get("email", "").lower().strip()
+    if not google_id or not email:
+        raise HTTPException(status_code=400, detail="Missing profile info from Google")
+
+    result = await db.execute(select(User).where(User.google_id == google_id))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        result = await db.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
+
+    if user:
+        if not user.is_active:
+            raise HTTPException(status_code=403, detail="Account disabled")
+        if not user.google_id:
+            user.google_id = google_id
+        if not user.is_verified:
+            user.is_verified = True
+        user.last_login_at = datetime.now(timezone.utc)
+        await db.commit()
+    else:
+        user = User(
+            email=email,
+            password_hash="",
+            notify_email=email,
+            language="he",
+            is_verified=True,
+            google_id=google_id,
+            last_login_at=datetime.now(timezone.utc),
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+        background_tasks.add_task(
+            _send_meta_capi_lead,
+            email,
+            request.client.host,
+            request.headers.get("user-agent", ""),
+        )
+
+        admins_result = await db.execute(select(User).where(User.is_admin == True, User.is_active == True))
+        admins = admins_result.scalars().all()
+        from backend.notifier import send_admin_new_user_notification
+        for admin in admins:
+            send_admin_new_user_notification(admin.email, email)
+
+    return TokenResponse(access_token=create_access_token(user.id))
+
+
 @router.post("/google", response_model=TokenResponse)
 @limiter.limit("10/minute")
 async def google_login(request: Request, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):

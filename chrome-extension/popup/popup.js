@@ -13,13 +13,12 @@ function showScreen(name) {
 
 // ── Startup ──────────────────────────────────────────────────────────────────
 
-chrome.storage.local.get('token', async ({ token }) => {
-  if (!token) {
+chrome.runtime.sendMessage({ action: 'checkActivity' }, (res) => {
+  if (chrome.runtime.lastError || !res || !res.valid) {
     showScreen('login');
     return;
   }
-  // מחובר — בדוק אם בדף מוצר
-  loadProductScreen(token);
+  loadProductScreen(res.token);
 });
 
 // ── Load product screen ───────────────────────────────────────────────────────
@@ -62,12 +61,21 @@ function addProduct(url, token, btn) {
 
   const resultEl = document.getElementById('add-result');
   resultEl.className = 'result hidden';
+  resultEl.textContent = '';
 
   chrome.runtime.sendMessage(
     { action: 'addProduct', url_or_asin: url, token },
     (res) => {
       btn.disabled = false;
       btn.textContent = '+ הוסף למעקב';
+
+      if (chrome.runtime.lastError || !res) {
+        resultEl.textContent = 'שגיאת חיבור — נסה שנית';
+        resultEl.className = 'result error';
+        resultEl.classList.remove('hidden');
+        return;
+      }
+
       resultEl.classList.remove('hidden');
 
       if (res.ok) {
@@ -75,6 +83,18 @@ function addProduct(url, token, btn) {
         resultEl.className = 'result success';
         btn.disabled = true;
         btn.textContent = '✅ במעקב';
+      } else if (res.alreadyExists) {
+        resultEl.textContent = '✅ המוצר כבר קיים ברשימה שלך';
+        resultEl.className = 'result success';
+        btn.disabled = true;
+        btn.textContent = '✅ במעקב';
+      } else if (res.unauthorized) {
+        resultEl.textContent = 'פג תוקף החיבור — התחבר מחדש';
+        resultEl.className = 'result error';
+        setTimeout(() => {
+          showScreen('login');
+          document.getElementById('login-form').reset();
+        }, 1500);
       } else {
         resultEl.textContent = res.error || 'שגיאה בהוספת מוצר';
         resultEl.className = 'result error';
@@ -100,10 +120,43 @@ document.getElementById('login-form').addEventListener('submit', (e) => {
     btn.disabled = false;
     btn.textContent = 'התחבר';
 
+    if (chrome.runtime.lastError || !res) {
+      errorEl.textContent = 'שגיאת חיבור — נסה שנית';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
     if (res.ok) {
       loadProductScreen(res.token);
     } else {
       errorEl.textContent = res.error;
+      errorEl.classList.remove('hidden');
+    }
+  });
+});
+
+// ── Google Login ──────────────────────────────────────────────────────────
+
+document.getElementById('google-btn').addEventListener('click', () => {
+  const btn = document.getElementById('google-btn');
+  const errorEl = document.getElementById('login-error');
+
+  btn.disabled = true;
+  errorEl.classList.add('hidden');
+
+  chrome.runtime.sendMessage({ action: 'googleLogin' }, (res) => {
+    btn.disabled = false;
+
+    if (chrome.runtime.lastError || !res) {
+      errorEl.textContent = 'שגיאת חיבור — נסה שנית';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    if (res.ok) {
+      loadProductScreen(res.token);
+    } else {
+      errorEl.textContent = res.error || 'שגיאה בהתחברות עם Google';
       errorEl.classList.remove('hidden');
     }
   });
@@ -118,6 +171,7 @@ function logout() {
     document.getElementById('login-error').classList.add('hidden');
   });
 }
+
 
 document.getElementById('logout-btn').addEventListener('click', logout);
 document.getElementById('logout-btn-2').addEventListener('click', logout);
