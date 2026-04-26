@@ -123,6 +123,38 @@ def _tracking_url(user_id: int, asin: str) -> str:
     return f"{base}/track/click?{params}"
 
 
+def _wrap_responsive(html_body: str, is_rtl: bool = True) -> str:
+    body_dir = ' dir="rtl"' if is_rtl else ""
+    return f"""<!DOCTYPE html>
+<html{body_dir}>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    @media only screen and (max-width:600px){{
+      .email-container{{width:100% !important;}}
+      .email-container img{{max-width:100% !important;height:auto !important;}}
+    }}
+  </style>
+</head>
+<body{body_dir} style="margin:0;padding:0;background:#f3f3f3;font-family:Arial,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f3f3;padding:24px 0;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" class="email-container"
+             style="max-width:600px;width:100%;background:#ffffff;border-radius:10px;
+                    overflow:hidden;border:1px solid #e8e8e8;">
+        <tr>
+          <td style="padding:24px;">
+            {html_body}
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
+
 def _pause_url(user_id: int) -> str:
     base = os.environ.get("APP_BASE_URL", "https://app.amzfreeil.com").rstrip("/")
     token = create_pause_token(user_id)

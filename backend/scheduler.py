@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database import AsyncSessionLocal
 from backend.models import Product, User, UserProduct, NotificationLog, EmailTemplate, EmailSendLog, EmailSendRecipient
 from backend.checker import browser_manager, ShippingStatus, CheckResult
-from backend.notifier import send_daily_summary, _send_via_resend
+from backend.notifier import send_daily_summary, _send_via_resend, _wrap_responsive
 
 logger = logging.getLogger(__name__)
 
@@ -287,10 +287,12 @@ async def _run_automation_flow(
         count = (await db.execute(
             select(func.count(UserProduct.id)).where(UserProduct.user_id == u.id)
         )).scalar() or 0
+        raw_body = _auto_substitute(tpl.body, u, count, label=audience)
+        wrapped = _wrap_responsive(raw_body, is_rtl=True)
         ok = _send_via_resend(
             u.notify_email,
             _auto_substitute(tpl.subject, u, count, label=audience),
-            _auto_substitute(tpl.body, u, count, label=audience),
+            wrapped,
             "",
         )
         db.add(EmailSendRecipient(send_log_id=log.id, user_id=u.id, email=u.notify_email, success=ok))
