@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Amazon Israel Free Ship Alert",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Track Amazon products and get alerts when free shipping to Israel is available. Add products directly from any Amazon product page.",
   "permissions": [
     "storage",
