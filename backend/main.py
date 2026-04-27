@@ -37,7 +37,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         )
         return response
 
-from backend.database import create_tables, fix_gmail_template
+from backend.database import create_tables, fix_gmail_template, seed_default_templates
 from backend.routes import auth, products, settings, admin as admin_routes, tracking, pause as pause_route, webhooks as webhooks_route
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -99,6 +99,7 @@ async def lifespan(app: FastAPI):
     # ── Startup ──────────────────────────────────────────────────────────────
     await create_tables()
     await fix_gmail_template()
+    await seed_default_templates()
 
     # Import here to avoid circular imports at module level
     from backend.checker import browser_manager
