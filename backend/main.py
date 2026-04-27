@@ -98,8 +98,8 @@ def _upsert_job(func, job_id: str, kwargs: dict):
 async def lifespan(app: FastAPI):
     # ── Startup ──────────────────────────────────────────────────────────────
     await create_tables()
-    await fix_gmail_template()
     await seed_default_templates()
+    await fix_gmail_template()
 
     # Import here to avoid circular imports at module level
     from backend.checker import browser_manager

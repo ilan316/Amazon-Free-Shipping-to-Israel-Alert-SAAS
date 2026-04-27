@@ -252,6 +252,7 @@ async def fix_gmail_template():
         for tpl_name in [
             "לקוח לא הוסיף מוצרים - אפס מוצרים",
             "לקוח - הוסף עוד מוצרים למעקב",
+            "לקוח לא פעיל - האם אתה עדיין פה?",
         ]:
             tpl = (await session.execute(
                 select(EmailTemplate).where(EmailTemplate.name == tpl_name)
