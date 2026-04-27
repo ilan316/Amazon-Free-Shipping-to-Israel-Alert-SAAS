@@ -33,7 +33,7 @@ _STRINGS = {
         "btn_buy":              "קנה עכשיו — משלוח חינם",
         "urgency":              "⏰ המחיר עשוי להשתנות בכל עת",
         "quick_tip_title":      "💡 טיפ לחיסכון",
-        "quick_tip_body":       "הזמינו בין $49 ל-$130 כדי ליהנות ממשלוח חינם ללא מכס ישראלי.",
+        "quick_tip_body":       "",  # populated dynamically by _daily_tip()
         "disclosure":           "קישור שותף — הקנייה לא עולה לך יותר, אך אנו עשויים לקבל עמלה קטנה.",
         "footer":               "נבדק: {checked_at} · Amazon Free Shipping to Israel Alert",
         "aod_note":             "⚠️ המשלוח החינמי נמצא תחת <strong>\"כל אפשרויות הקנייה\"</strong>.<br>"
@@ -59,7 +59,7 @@ _STRINGS = {
         "btn_buy":              "Buy Now",
         "urgency":              "⏰ Price may change at any time",
         "quick_tip_title":      "💡 Money-Saving Tip",
-        "quick_tip_body":       "Order between $49–$130 to enjoy free shipping without Israeli customs fees.",
+        "quick_tip_body":       "",  # populated dynamically by _daily_tip()
         "disclosure":           "Affiliate link — no extra cost to you, but we may earn a small commission.",
         "footer":               "Checked at: {checked_at} · Amazon Free Shipping to Israel Alert",
         "aod_note":             "⚠️ Free shipping found in <strong>All Buying Options</strong>.<br>"
@@ -75,6 +75,48 @@ _STRINGS = {
         "plain_footer":         "Checked at: {checked_at}",
     },
 }
+
+
+_DAILY_TIPS: dict[str, list[str]] = {
+    "he": [
+        "הזמינו בין $49 ל-$130 כדי ליהנות ממשלוח חינם ללא מכס ישראלי.",
+        "מעל $130? ייתכן מכס של 18% מע\"מ + אגרת שחרור — חשבו פעמיים לפני הקנייה.",
+        "כמה פריטים קטנים? שווה לאחד להזמנה אחת מעל $49 ולחסוך בדמי משלוח.",
+        "פריטים מתחת ל-$49 גובים דמי משלוח — בדקו אם הוספת פריט נוסף חוסכת כסף.",
+        "מחיר נמוך מדי? בדקו שהמוכר הוא <bdi>Amazon</bdi> ולא <bdi>Third-party</bdi> עם מדיניות החזרה שונה.",
+        '<bdi>"Ships from and sold by Amazon.com"</bdi> = המחיר שתראו כאן הוא אמיתי וכולל <bdi>Prime</bdi>.',
+        "כוכבים לא מספיקים — קראו ביקורות 3 כוכבים: הן הכנות ביותר.",
+        'פילטר <bdi>"4 stars and up"</bdi> + <bdi>Sort by "Most Recent"</bdi> = ביקורות אמינות.',
+        "<bdi>Keepa.com</bdi> מציג היסטוריית מחיר חינם — לעולם אל תקנו בלי לבדוק.",
+        "ספרים אנגליים מאמזון — לרוב זולים משמעותית מחנויות בישראל, כולל משלוח.",
+        "תוספי תזונה מ-<bdi>iHerb</bdi> מול <bdi>Amazon</bdi> — השוו מחירים, לעיתים יש הפרש גדול.",
+        "כבלים ואביזרי טכנולוגיה — <bdi>Amazon Basics</bdi> איכות טובה במחיר שליש.",
+        "מוצרי טיפוח ויופי — בדקו תאריך תפוגה בביקורות לפני קנייה.",
+        '<bdi>Size Guide</bdi> של <bdi>Amazon</bdi> לרוב מדויק — השתמשו בו לפני הזמנת ביגוד ונעליים.',
+    ],
+    "en": [
+        "Order between $49–$130 to enjoy free shipping without Israeli customs fees.",
+        "Over $130? Expect 18% VAT + customs clearance fee — think twice before buying.",
+        "Multiple small items? Combine into one order over $49 to save on shipping.",
+        "Items under $49 charge shipping — check if adding another item saves money overall.",
+        "Price too low? Verify the seller is Amazon, not a Third-party with different return policies.",
+        '"Ships from and sold by Amazon.com" = the price you see is real and includes Prime.',
+        "Stars alone aren't enough — read 3-star reviews: they're the most honest.",
+        'Filter "4 stars and up" + Sort by "Most Recent" = more reliable reviews.',
+        "Keepa.com shows free price history — never buy without checking it first.",
+        "English books from Amazon — usually much cheaper than Israeli bookstores, shipping included.",
+        "Supplements on iHerb vs Amazon — compare prices, the difference can be significant.",
+        "Cables and tech accessories — Amazon Basics quality at a third of the price.",
+        "Beauty and personal care — check expiration dates in reviews before buying.",
+        "Jackets and shoes — Amazon's Size Guide is usually accurate, always use it.",
+    ],
+}
+
+
+def _daily_tip(lang: str) -> str:
+    tips = _DAILY_TIPS.get(lang, _DAILY_TIPS["en"])
+    idx = datetime.now().timetuple().tm_yday % len(tips)
+    return tips[idx]
 
 
 def _t(lang: str, key: str, **kw) -> str:
@@ -429,7 +471,7 @@ def send_user_alert(user, product, result) -> bool:
               <tr>
                 <td style="padding:12px 16px;text-align:{txt_align};" {txt_dir}>
                   <p style="margin:0 0 3px;font-size:13px;font-weight:bold;color:#2e7d32;">{_t(lang, "quick_tip_title")}</p>
-                  <p style="margin:0;font-size:12px;color:#388e3c;line-height:1.5;">{_t(lang, "quick_tip_body")}</p>
+                  <p style="margin:0;font-size:12px;color:#388e3c;line-height:1.5;">{_daily_tip(lang)}</p>
                 </td>
               </tr>
             </table>
@@ -564,7 +606,7 @@ def send_daily_summary(user, free_products: list) -> bool:
               <tr>
                 <td style="padding:12px 16px;text-align:{txt_align};" {txt_dir}>
                   <p style="margin:0 0 3px;font-size:13px;font-weight:bold;color:#2e7d32;">{_t(lang, "quick_tip_title")}</p>
-                  <p style="margin:0;font-size:12px;color:#388e3c;line-height:1.5;">{_t(lang, "quick_tip_body")}</p>
+                  <p style="margin:0;font-size:12px;color:#388e3c;line-height:1.5;">{_daily_tip(lang)}</p>
                 </td>
               </tr>
             </table>
