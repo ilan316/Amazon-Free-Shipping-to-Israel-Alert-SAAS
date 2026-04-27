@@ -587,6 +587,8 @@ async def _verify_location(page: Page) -> bool:
 # ── Classification ────────────────────────────────────────────────────────────
 
 def _classify(text: str) -> ShippingStatus:
+    # Normalize non-breaking spaces (\xa0) so ILS\xa059.14 becomes ILS 59.14
+    text = text.replace('\xa0', ' ')
     t = text.lower()
 
     # NO_SHIP must be checked FIRST — "cannot be shipped" always wins over any "free delivery" text
@@ -613,16 +615,17 @@ def _classify(text: str) -> ShippingStatus:
     if "free delivery" in t and any(p in t for p in ("eligible orders", "eligible international", "eligible items")):
         return ShippingStatus.FREE
 
-    # With Israel as active location, Amazon shows "$X.XX delivery [date]" without mentioning Israel
+    # Paid shipping/delivery with explicit Israel mention — handles $ and ILS/₪
+    # e.g. "$19.54 Shipping to Israel" or "ILS 59.14 Shipping to Israel"
     paid_pat_explicit = re.compile(
-        r'\$[\d]+\.[\d]{2}.{0,40}israel|israel.{0,40}\$[\d]+\.[\d]{2}',
+        r'(\$|ILS\s+|₪\s*)[\d,]+\.[\d]{2}.{0,40}israel|israel.{0,40}(\$|ILS\s+|₪\s*)[\d,]+\.[\d]{2}',
         re.IGNORECASE,
     )
     if paid_pat_explicit.search(text) and "israel" in t:
         return ShippingStatus.PAID
 
-    # Generic paid delivery: "$X.XX delivery" or "ILS X.XX delivery" — shown when Israel is active location
-    paid_pat_generic = re.compile(r'(\$|ILS|₪)\s*[\d,]+\.?\d*\s+delivery', re.IGNORECASE)
+    # Generic paid delivery/shipping: "$X.XX delivery", "ILS X.XX delivery", "ILS X.XX shipping"
+    paid_pat_generic = re.compile(r'(\$|ILS\s+|₪\s*)[\d,]+\.?\d*\s+(delivery|shipping)', re.IGNORECASE)
     if paid_pat_generic.search(text) and "free" not in t:
         return ShippingStatus.PAID
 
