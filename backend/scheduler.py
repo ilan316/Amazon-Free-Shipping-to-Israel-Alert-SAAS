@@ -216,8 +216,12 @@ async def _notify_admin_of_errors(failed_items: list):
 
 
 async def run_inactivity_check():
-    """Set vacation_mode=True for users who haven't logged in for X days."""
-    from backend.models import SystemSetting
+    """
+    Two-phase inactivity check based on last email click (fallback: last_login_at).
+    Phase 1 (days-15): send re-engagement warning email.
+    Phase 2 (days):    move to vacation_mode.
+    """
+    from backend.models import SystemSetting, EmailClick
     async with AsyncSessionLocal() as db:
         row = (await db.execute(
             select(SystemSetting).where(SystemSetting.key == "inactivity_days")
@@ -226,24 +230,65 @@ async def run_inactivity_check():
         if days <= 0:
             return  # disabled
 
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-        result = await db.execute(
+        now = datetime.now(timezone.utc)
+        vacation_cutoff = now - timedelta(days=days)
+        warning_cutoff  = now - timedelta(days=days - 15)
+
+        # Last email click per user
+        clicks_result = await db.execute(
+            select(EmailClick.user_id, func.max(EmailClick.clicked_at).label("last_click"))
+            .group_by(EmailClick.user_id)
+        )
+        last_clicks = {r.user_id: r.last_click for r in clicks_result.all()}
+
+        users = (await db.execute(
             select(User).where(
                 User.is_active == True,
                 User.vacation_mode == False,
                 User.is_admin == False,
-                User.last_login_at < cutoff,
-                User.last_login_at.isnot(None),
+                User.notify_email_bounced == False,
             )
-        )
-        users = result.scalars().all()
-        if not users:
-            return
+        )).scalars().all()
+
+        tpl = (await db.execute(
+            select(EmailTemplate).where(EmailTemplate.name == "לקוח לא פעיל - האם אתה עדיין פה?")
+        )).scalar_one_or_none()
+
+        to_vacation, to_warn, to_reset = [], [], []
+
         for user in users:
+            last_click = last_clicks.get(user.id)
+            candidates = [dt for dt in [user.last_login_at, last_click] if dt is not None]
+            if not candidates:
+                continue  # no activity data yet
+            last_activity = max(candidates)
+
+            # If user clicked after the warning was sent → they re-engaged, reset flag
+            if user.automation_reengagement_sent_at and last_click and last_click > user.automation_reengagement_sent_at:
+                to_reset.append(user)
+
+            if last_activity < vacation_cutoff:
+                to_vacation.append(user)
+            elif last_activity < warning_cutoff and user.automation_reengagement_sent_at is None:
+                to_warn.append(user)
+
+        for user in to_reset:
+            user.automation_reengagement_sent_at = None
+
+        for user in to_vacation:
             user.vacation_mode = True
+            user.automation_reengagement_sent_at = None
             logger.info(f"[inactivity] User {user.id} → vacation_mode (inactive {days}+ days)")
+
+        if tpl and to_warn:
+            sent, _ = await _run_automation_flow(
+                db, tpl, "automation_reengagement", to_warn, now,
+                lambda u, ts: setattr(u, "automation_reengagement_sent_at", ts),
+            )
+            logger.info(f"[inactivity] Re-engagement warning sent to {sent} user(s)")
+
         await db.commit()
-        logger.info(f"=== Inactivity check: {len(users)} user(s) moved to vacation mode ===")
+        logger.info(f"=== Inactivity check: {len(to_vacation)} → vacation, {len(to_warn)} warned, {len(to_reset)} reset ===")
 
 
 def _auto_substitute(text: str, user: User, product_count: int = 0, label: str = "cta") -> str:

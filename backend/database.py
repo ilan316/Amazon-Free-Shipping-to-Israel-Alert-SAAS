@@ -99,6 +99,11 @@ async def create_tables():
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_email_bounce_type VARCHAR(20)"
             )
         )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS automation_reengagement_sent_at TIMESTAMP WITH TIME ZONE"
+            )
+        )
         # Mark users who already received the activation template manually so automation skips them
         await conn.execute(
             __import__("sqlalchemy").text("""
@@ -175,8 +180,9 @@ async def create_tables():
         await conn.execute(
             __import__("sqlalchemy").text("""
                 UPDATE users
-                SET automation_activation_sent_at = COALESCE(automation_activation_sent_at, NOW()),
-                    automation_expansion_sent_at   = COALESCE(automation_expansion_sent_at,   NOW())
+                SET automation_activation_sent_at    = COALESCE(automation_activation_sent_at,    NOW()),
+                    automation_expansion_sent_at      = COALESCE(automation_expansion_sent_at,      NOW()),
+                    automation_reengagement_sent_at   = COALESCE(automation_reengagement_sent_at,   NOW())
                 WHERE is_admin = TRUE
             """)
         )
@@ -374,6 +380,19 @@ async def seed_default_templates():
       <a href="{dashboard_url}" class="cta">← הוסף עוד מוצרים</a>
     </div>""")
 
+    template3_body = _wrap(f"""
+    <div class="body">
+      <h2>עדיין מחפש משלוח חינם? 👀</h2>
+      <p>שמנו לב שלא ראינו אותך זמן מה.</p>
+      <p>המוצרים שלך <strong>עדיין במעקב</strong> — אנחנו ממשיכים לבדוק עבורך כל יום.</p>
+      <p style="background:{_BG};border-radius:10px;padding:14px 18px;font-size:14px;border-right:4px solid {_BRAND};">
+        ברגע שמוצר יציע <strong>משלוח חינם לישראל</strong> — תקבל מייל מיידי. אין צורך להיכנס לאתר.
+      </p>
+      <p>אם אתה עדיין מעוניין בשירות — לחץ על הכפתור ואנחנו נמשיך לעדכן אותך.</p>
+      <a href="{dashboard_url}" class="cta">← כן, אני עדיין פה</a>
+      <p style="font-size:13px;color:#888;text-align:center;margin-top:8px;">אם לא תלחץ, נעביר את החשבון שלך למצב חופשה בעוד 15 יום.</p>
+    </div>""")
+
     async with AsyncSessionLocal() as session:
         defaults = [
             EmailTemplate(
@@ -385,6 +404,11 @@ async def seed_default_templates():
                 name="הוסף_עוד_מוצרים",
                 subject="יש לך עוד מקומות פנויים — הגדל את הסיכויים שלך 🛒",
                 body=template2_body,
+            ),
+            EmailTemplate(
+                name="לקוח לא פעיל - האם אתה עדיין פה?",
+                subject="עדיין רוצה לקבל התראות על משלוח חינם? 👀",
+                body=template3_body,
             ),
         ]
         for t in defaults:
