@@ -352,6 +352,14 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
                 raw_text = text
                 break
 
+    # Always also check exports_feature_div — books and some products put
+    # "No Import Charges & $X.XX Shipping to Israel" there, not in the main delivery block.
+    exports_el = soup.find(id="exports_feature_div")
+    if exports_el:
+        exports_text = exports_el.get_text(separator=" ", strip=True)
+        if exports_text and exports_text != raw_text:
+            raw_text = (raw_text + " " + exports_text).strip() if raw_text else exports_text
+
     if not raw_text:
         return CheckResult(asin, ShippingStatus.NO_SHIP, error_message="No delivery block found",
                            product_name=product_name)
@@ -625,16 +633,30 @@ def _classify(text: str) -> ShippingStatus:
 # ── Delivery text reading ─────────────────────────────────────────────────────
 
 async def _read_delivery_text(page: Page) -> str:
+    raw_text = ""
     for sel in DELIVERY_BLOCK_SELECTORS:
         try:
             el = await page.wait_for_selector(sel, timeout=3000, state="attached")
             if el:
                 text = await el.inner_text()
                 if text.strip():
-                    return text.strip()
+                    raw_text = text.strip()
+                    break
         except (PWTimeout, Exception):
             continue
-    return ""
+
+    # Always also check exports_feature_div — books and some products put
+    # "No Import Charges & $X.XX Shipping to Israel" there, not in the main delivery block.
+    try:
+        exports_el = await page.query_selector("#exports_feature_div")
+        if exports_el:
+            exports_text = (await exports_el.inner_text()).strip()
+            if exports_text and exports_text != raw_text:
+                raw_text = (raw_text + " " + exports_text).strip() if raw_text else exports_text
+    except Exception:
+        pass
+
+    return raw_text
 
 
 async def _check_all_buying_options(page: Page, asin: str) -> str:
