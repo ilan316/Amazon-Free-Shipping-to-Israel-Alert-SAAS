@@ -743,11 +743,14 @@ async function deleteUser(userId) {
 async function cleanOrphans() {
   if (!confirm("למחוק את כל המוצרים ללא עוקבים?")) return;
   const res = await apiFetch("/admin/products-orphans", { method: "DELETE" });
-  if (res && res.ok) {
-    const data = await res.json();
-    alert(`נמחקו ${data.count} מוצרים`);
-    await loadProducts(); await loadStats();
+  if (!res || !res.ok) {
+    const err = res ? await res.text() : "שגיאת רשת";
+    alert(`שגיאה בניקוי מוצרים: ${err}`);
+    return;
   }
+  const data = await res.json();
+  alert(`נמחקו ${data.count} מוצרים`);
+  await loadProducts(); await loadStats();
 }
 
 async function clearCookies() {

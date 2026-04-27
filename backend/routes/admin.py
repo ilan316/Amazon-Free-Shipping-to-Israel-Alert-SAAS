@@ -594,18 +594,18 @@ async def delete_orphan_products(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Delete all products with 0 watchers."""
-    result = await db.execute(select(Product))
-    products = result.scalars().all()
-    deleted = []
-    for p in products:
-        count = (await db.execute(
-            select(func.count()).select_from(UserProduct).where(UserProduct.product_id == p.id)
-        )).scalar()
-        if count == 0:
-            await db.execute(delete(Product).where(Product.id == p.id))
-            deleted.append(p.asin)
+    watched_ids = select(UserProduct.product_id).distinct()
+    orphans_result = await db.execute(
+        select(Product.id, Product.asin).where(Product.id.not_in(watched_ids))
+    )
+    orphans = orphans_result.all()
+    if not orphans:
+        return {"deleted": [], "count": 0}
+    orphan_ids = [row.id for row in orphans]
+    await db.execute(delete(NotificationLog).where(NotificationLog.product_id.in_(orphan_ids)))
+    await db.execute(delete(Product).where(Product.id.in_(orphan_ids)))
     await db.commit()
-    return {"deleted": deleted, "count": len(deleted)}
+    return {"deleted": [row.asin for row in orphans], "count": len(orphans)}
 
 
 # ── Admin profile management ──────────────────────────────────────────────────
