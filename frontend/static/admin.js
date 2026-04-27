@@ -759,16 +759,34 @@ async function cleanOrphans() {
 async function checkSingleProduct(productId) {
   const btn = document.getElementById(`chk-${productId}`);
   if (btn) { btn.textContent = "⏳"; btn.disabled = true; }
+
+  // Record current last_checked before triggering
+  const currentProduct = (_allAdminProducts || []).find(p => p.id === productId);
+  const prevChecked = currentProduct?.last_checked || null;
+
   const res = await apiFetch(`/admin/products/${productId}/check`, { method: "POST" });
   if (!res || !res.ok) {
     if (btn) { btn.textContent = "▶"; btn.disabled = false; }
     alert("שגיאה בהרצת הבדיקה");
     return;
   }
-  if (btn) { btn.textContent = "✓"; }
-  setTimeout(async () => {
+
+  // Poll until last_checked changes (max 90s)
+  const deadline = Date.now() + 90000;
+  const poll = async () => {
     await loadProducts();
-  }, 3000);
+    const updated = (_allAdminProducts || []).find(p => p.id === productId);
+    if (updated && updated.last_checked !== prevChecked) {
+      if (btn) { btn.textContent = "▶"; btn.disabled = false; }
+      return;
+    }
+    if (Date.now() < deadline) {
+      setTimeout(poll, 3000);
+    } else {
+      if (btn) { btn.textContent = "▶"; btn.disabled = false; }
+    }
+  };
+  setTimeout(poll, 4000);
 }
 
 async function clearCookies() {
