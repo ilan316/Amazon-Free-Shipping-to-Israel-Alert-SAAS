@@ -474,6 +474,22 @@ async def trigger_check(
     return {"message": "Check cycle triggered"}
 
 
+@router.post("/products/{product_id}/check")
+async def trigger_single_product_check(
+    product_id: int,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    import asyncio
+    result = await db.execute(select(Product).where(Product.id == product_id))
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    from backend.scheduler import check_single_product
+    asyncio.create_task(check_single_product(product.asin, product.url))
+    return {"message": f"Check triggered for {product.asin}"}
+
+
 @router.post("/clear-cookies")
 async def clear_cookies(
     admin: Annotated[User, Depends(get_current_admin)],

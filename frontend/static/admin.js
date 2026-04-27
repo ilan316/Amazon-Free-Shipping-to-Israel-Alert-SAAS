@@ -599,7 +599,7 @@ function renderAdminProducts() {
     : _allAdminProducts.filter(p => p.last_status === _adminFilter);
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">אין מוצרים</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:24px;">אין מוצרים</td></tr>';
     return;
   }
   tbody.innerHTML = filtered.map(p => `
@@ -616,6 +616,9 @@ function renderAdminProducts() {
       <td class="truncate ltr" style="max-width:200px;font-size:0.78rem;color:var(--text-muted);"
           title="${p.raw_text ? p.raw_text.replace(/"/g,'&quot;') : ''}">
         ${p.raw_text ? p.raw_text.substring(0, 60) + (p.raw_text.length > 60 ? '…' : '') : '—'}
+      </td>
+      <td style="text-align:center;">
+        <button id="chk-${p.id}" class="btn-outline" style="padding:3px 8px;font-size:0.78rem;" title="הרץ בדיקה" onclick="checkSingleProduct(${p.id})">▶</button>
       </td>
     </tr>
   `).join("");
@@ -751,6 +754,21 @@ async function cleanOrphans() {
   const data = await res.json();
   alert(`נמחקו ${data.count} מוצרים`);
   await loadProducts(); await loadStats();
+}
+
+async function checkSingleProduct(productId) {
+  const btn = document.getElementById(`chk-${productId}`);
+  if (btn) { btn.textContent = "⏳"; btn.disabled = true; }
+  const res = await apiFetch(`/admin/products/${productId}/check`, { method: "POST" });
+  if (!res || !res.ok) {
+    if (btn) { btn.textContent = "▶"; btn.disabled = false; }
+    alert("שגיאה בהרצת הבדיקה");
+    return;
+  }
+  if (btn) { btn.textContent = "✓"; }
+  setTimeout(async () => {
+    await loadProducts();
+  }, 3000);
 }
 
 async function clearCookies() {
