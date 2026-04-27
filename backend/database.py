@@ -358,28 +358,6 @@ async def seed_default_templates():
 </body>
 </html>"""
 
-    template1_body = _wrap(f"""
-    <div class="body">
-      <h2>היי, עדיין לא הוספת מוצר 👋</h2>
-      <p>נרשמת ל-<strong>AMZFREEIL</strong> — השירות שמתריע כשמוצרי אמזון מציעים <strong>משלוח חינם לישראל</strong>.</p>
-      <p style="margin-bottom:6px;"><strong>איך זה עובד בשלושה שלבים:</strong></p>
-      <div class="step"><div class="step-num">1</div><div>היכנס לאמזון, מצא מוצר שמעניין אותך</div></div>
-      <div class="step"><div class="step-num">2</div><div>העתק את הקישור ● הדבק בדשבורד שלך<br><span style="font-size:13px;color:#888;">💡 מהיר יותר? <a href="https://chromewebstore.google.com/detail/amazon-israel-free-ship-a/mbickhgdhofaefhibfbgpacejhbelddn" style="color:{_BRAND};font-weight:600;">התקן את תוסף הכרום</a> — מוסיף מוצרים בלחיצה אחת ישירות מאמזון</span></div></div>
-      <div class="step"><div class="step-num">3</div><div>ברגע שהמשלוח הופך לחינם — נשלח לך מייל 🎉</div></div>
-      <a href="{dashboard_url}" class="cta">← הוסף את המוצר הראשון שלך<br><span style="font-size:13px;font-weight:400;opacity:0.8;">לוקח פחות מ-30 שניות</span></a>
-    </div>""")
-
-    template2_body = _wrap(f"""
-    <div class="body">
-      <h2>יש לך עוד מקומות פנויים 🛒</h2>
-      <p>עקבת אחרי {{{{product_count}}}} מוצרים — אבל יש לך מקום ליותר.</p>
-      <p>כל מוצר נוסף שתוסיף = עוד הזדמנות לקבל <strong>משלוח חינם לישראל</strong>.</p>
-      <p style="background:{_BG};border-radius:10px;padding:14px 18px;font-size:14px;border-right:4px solid {_BRAND};">
-        💡 <strong>טיפ:</strong> מוצרים שעוקבים אחריהם הרבה אנשים — בדרך כלל מקבלים הנחות ומשלוחים חינם יותר בתדירות גבוהה.
-      </p>
-      <a href="{dashboard_url}" class="cta">← הוסף עוד מוצרים</a>
-    </div>""")
-
     template3_body = _wrap(f"""
     <div class="body">
       <h2>עדיין מחפש משלוח חינם? 👀</h2>
@@ -395,16 +373,6 @@ async def seed_default_templates():
 
     async with AsyncSessionLocal() as session:
         defaults = [
-            EmailTemplate(
-                name="הפעלה_אפס_מוצרים",
-                subject="הוספת מוצר ראשון ב-30 שניות ✨",
-                body=template1_body,
-            ),
-            EmailTemplate(
-                name="הוסף_עוד_מוצרים",
-                subject="יש לך עוד מקומות פנויים — הגדל את הסיכויים שלך 🛒",
-                body=template2_body,
-            ),
             EmailTemplate(
                 name="לקוח לא פעיל - האם אתה עדיין פה?",
                 subject="עדיין רוצה לקבל התראות על משלוח חינם? 👀",
