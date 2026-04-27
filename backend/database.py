@@ -361,13 +361,12 @@ async def seed_default_templates():
     template3_body = _wrap(f"""
     <div class="body">
       <h2>עדיין מחפש משלוח חינם? 👀</h2>
-      <p>שמנו לב שלא ראינו אותך זמן מה.</p>
-      <p>המוצרים שלך <strong>עדיין במעקב</strong> — אנחנו ממשיכים לבדוק עבורך כל יום.</p>
+      <p>שמנו לב שלא ביקרת אצלנו זמן מה.</p>
+      <p>אנחנו כאן בשבילך — בדיקות יומיות, התראה מיידית ברגע שמוצר מציע <strong>משלוח חינם לישראל</strong>.</p>
       <p style="background:{_BG};border-radius:10px;padding:14px 18px;font-size:14px;border-right:4px solid {_BRAND};">
-        ברגע שמוצר יציע <strong>משלוח חינם לישראל</strong> — תקבל מייל מיידי. אין צורך להיכנס לאתר.
+        רוצה להתחיל לעקוב אחרי מוצרים? זה לוקח פחות מ-30 שניות.
       </p>
-      <p>אם אתה עדיין מעוניין בשירות — לחץ על הכפתור ואנחנו נמשיך לעדכן אותך.</p>
-      <a href="{dashboard_url}" class="cta">← כן, אני עדיין פה</a>
+      <a href="{dashboard_url}" class="cta">← בוא נתחיל</a>
       <p style="font-size:13px;color:#888;text-align:center;margin-top:8px;">אם לא תלחץ, נעביר את החשבון שלך למצב חופשה בעוד 15 יום.</p>
     </div>""")
 
