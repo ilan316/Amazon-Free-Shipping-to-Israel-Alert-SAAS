@@ -28,7 +28,6 @@ async function loadAdminData() {
   await Promise.all([
     loadStats(),
     loadSchedulerStatus(),
-    loadRegistrationsChart(),
     loadUsers(),
     loadProducts(),
     loadNotificationsLog(),
