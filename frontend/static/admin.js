@@ -1324,6 +1324,47 @@ async function requestEmailChange() {
   }
 }
 
+// ─── Export ───────────────────────────────────────────────────────────────────
+
+async function exportExcel() {
+  const token = getToken();
+  if (!token) return;
+  const btn = document.getElementById("btn-export-excel");
+  const msg = document.getElementById("export-msg");
+  btn.disabled = true;
+  btn.textContent = "מכין דוח...";
+  msg.textContent = "";
+  try {
+    const res = await apiFetch(`/admin/export/excel?token=${encodeURIComponent(token)}`);
+    if (!res || !res.ok) {
+      msg.textContent = "שגיאה בייצוא הדוח";
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const today = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `amzfree-report-${today}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+    msg.textContent = "✅ הדוח הורד בהצלחה";
+    setTimeout(() => { msg.textContent = ""; }, 4000);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "⬇ ייצא Excel";
+  }
+}
+
+function triggerPrint() {
+  if (!_analyticsLoaded) {
+    const msg = document.getElementById("export-msg");
+    if (msg) { msg.textContent = "⚠ יש לטעון את הלשונית לפני ייצוא PDF"; }
+    return;
+  }
+  window.print();
+}
+
 // ─── Analytics Tab ────────────────────────────────────────────────────────────
 
 function _statCard(value, label, color) {

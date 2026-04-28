@@ -20,6 +20,25 @@
     }
     .admin-tab:hover { color: var(--text); }
     .admin-tab.active { color: var(--brand-dark); border-bottom-color: var(--brand); }
+    /* Export buttons */
+    .btn-export {
+      padding: 9px 20px; font-size: 0.9rem; font-weight: 700; cursor: pointer;
+      border-radius: 8px; border: none; font-family: inherit; transition: opacity 0.15s;
+    }
+    .btn-export:hover { opacity: 0.85; }
+    .btn-export-excel { background: #1D6F42; color: #fff; }
+    .btn-export-pdf   { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    /* Print */
+    @media print {
+      .admin-tabs, header, nav, .admin-page > *:not(#tab-analytics) { display: none !important; }
+      #tab-analytics { display: block !important; }
+      .btn-export-row { display: none !important; }
+      body { background: #fff; }
+      .stat-card { border: 1px solid #ccc !important; box-shadow: none !important; break-inside: avoid; }
+      .section { break-inside: avoid; page-break-inside: avoid; }
+      canvas { max-width: 500px !important; }
+      .admin-table { font-size: 0.75rem; }
+    }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
     /* Stats */
@@ -558,6 +577,13 @@
     <!-- Tab: Analytics -->
     <div class="tab-panel" id="tab-analytics">
 
+      <!-- Export buttons -->
+      <div class="btn-export-row" style="display:flex; gap:10px; margin-bottom:24px; flex-wrap:wrap; align-items:center;">
+        <button class="btn-export btn-export-excel" onclick="exportExcel()" id="btn-export-excel">⬇ ייצא Excel</button>
+        <button class="btn-export btn-export-pdf" onclick="triggerPrint()">🖨 ייצא PDF</button>
+        <span id="export-msg" style="font-size:0.85rem; color:var(--text-muted);"></span>
+      </div>
+
       <!-- רישומים לאורך זמן -->
       <div class="section">
         <h2 style="font-size:1.05rem; margin-bottom:12px;">רישומים לאורך זמן</h2>
@@ -658,7 +684,7 @@
   </div>
 
   <script src="/static/app.js?v=10"></script>
-  <script src="/static/admin.js?v=41"></script>
+  <script src="/static/admin.js?v=42"></script>
   <script>
     requireAuth();
     loadAdminData();

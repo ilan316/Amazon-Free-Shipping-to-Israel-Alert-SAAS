@@ -1,7 +1,12 @@
+import io
 from datetime import datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from jose import JWTError, jwt
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill, Font, Alignment
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete
@@ -1440,3 +1445,244 @@ async def get_template_opens(
             for r in rows
         ]
     }
+
+
+# ─── Excel Export ─────────────────────────────────────────────────────────────
+
+def _xl_header_style():
+    fill = PatternFill(fill_type="solid", fgColor="E47911")
+    font = Font(color="FFFFFF", bold=True)
+    return fill, font
+
+def _xl_title_style():
+    return Font(bold=True, size=13)
+
+def _xl_write_headers(ws, headers):
+    fill, font = _xl_header_style()
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=ws.max_row, column=col, value=h)
+        cell.fill = fill
+        cell.font = font
+        cell.alignment = Alignment(horizontal="center")
+
+def _xl_autofit(ws):
+    for col in ws.columns:
+        max_len = max((len(str(c.value or "")) for c in col), default=8)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 50)
+
+
+@router.get("/export/excel")
+async def export_excel(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    token: str = Query(...),
+):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    result = await db.execute(
+        select(User).where(User.id == int(user_id), User.is_active == True, User.is_admin == True)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    now = datetime.utcnow()
+    report_date = now.strftime("%d/%m/%Y %H:%M")
+    file_date = now.strftime("%Y-%m-%d")
+
+    wb = Workbook()
+
+    # ── Sheet 1: סיכום ──────────────────────────────────────────────────────
+    ws = wb.active
+    ws.title = "סיכום"
+    ws.sheet_view.rightToLeft = True
+
+    ws.append(["דוח מנהל — AmzFree Israel"])
+    ws["A1"].font = _xl_title_style()
+    ws.append([f"תאריך הפקה: {report_date}"])
+    ws.append([])
+
+    # Engagement data
+    base_u = lambda *extra: select(func.count()).select_from(User).where(
+        User.is_admin == False, User.is_verified == True, *extra
+    )
+    total_verified = (await db.execute(base_u())).scalar()
+    active_7d  = (await db.execute(base_u(User.last_login_at >= now - timedelta(days=7)))).scalar()
+    active_30d = (await db.execute(base_u(User.last_login_at >= now - timedelta(days=30)))).scalar()
+    vacation   = (await db.execute(base_u(User.vacation_mode == True))).scalar()
+    churn_14   = (await db.execute(base_u((User.last_login_at <= now - timedelta(days=14)) | (User.last_login_at == None)))).scalar()
+    churn_30   = (await db.execute(base_u((User.last_login_at <= now - timedelta(days=30)) | (User.last_login_at == None)))).scalar()
+    bounce_count = (await db.execute(base_u(User.notify_email_bounced == True))).scalar()
+    google_users = (await db.execute(base_u(User.google_id != None))).scalar()
+    total_reg  = (await db.execute(select(func.count()).select_from(User).where(User.is_admin == False))).scalar()
+    unverified = total_reg - total_verified
+
+    send_rows = (await db.execute(select(func.sum(EmailSendLog.sent_count)))).scalar() or 0
+    total_opens_count = (await db.execute(select(func.count()).select_from(EmailOpen))).scalar()
+    total_clicks_count = (await db.execute(select(func.count()).select_from(EmailClick))).scalar()
+    open_rate = round(total_opens_count / send_rows * 100, 1) if send_rows else 0
+    ctr       = round(total_clicks_count / total_opens_count * 100, 1) if total_opens_count else 0
+    bounce_rate = round(bounce_count / total_verified * 100, 1) if total_verified else 0
+    verify_rate = round(total_verified / total_reg * 100, 1) if total_reg else 0
+
+    sections = [
+        ("📊 מעורבות משתמשים", [
+            ("סה\"כ משתמשים מאומתים", total_verified),
+            ("פעילים — 7 ימים אחרונים", active_7d),
+            ("פעילים — 30 ימים אחרונים", active_30d),
+            ("מצב חופשה", vacation),
+            ("בסכנת נטישה (14 יום)", churn_14),
+            ("בסכנת נטישה (30 יום)", churn_30),
+        ]),
+        ("📧 ביצועי מיילים", [
+            ("סה\"כ מיילים שנשלחו", send_rows),
+            ("סה\"כ פתיחות", total_opens_count),
+            ("Open Rate %", f"{open_rate}%"),
+            ("סה\"כ לחיצות", total_clicks_count),
+            ("CTR %", f"{ctr}%"),
+            ("Bounces", bounce_count),
+            ("Bounce Rate %", f"{bounce_rate}%"),
+        ]),
+        ("🔍 Funnel גיוס", [
+            ("סה\"כ נרשמו", total_reg),
+            ("אימתו אימייל", total_verified),
+            ("לא אימתו", unverified),
+            ("אחוז אימות", f"{verify_rate}%"),
+            ("הרשמה דרך Google", google_users),
+            ("הרשמה דרך אימייל+סיסמה", total_verified - google_users),
+        ]),
+    ]
+
+    for section_title, rows_data in sections:
+        ws.append([section_title])
+        ws.cell(row=ws.max_row, column=1).font = Font(bold=True, size=11)
+        ws.append(["מדד", "ערך"])
+        _xl_write_headers(ws, ["מדד", "ערך"])
+        # remove duplicate header row written by append
+        ws.delete_rows(ws.max_row - 1)
+        for label, val in rows_data:
+            ws.append([label, val])
+        ws.append([])
+
+    _xl_autofit(ws)
+
+    # ── Sheet 2: משתמשים ────────────────────────────────────────────────────
+    ws2 = wb.create_sheet("משתמשים")
+    ws2.sheet_view.rightToLeft = True
+
+    user_rows = (await db.execute(
+        select(User).where(User.is_admin == False).order_by(User.created_at.desc())
+    )).scalars().all()
+
+    prod_count_rows = (await db.execute(
+        select(UserProduct.user_id, func.count().label("cnt")).group_by(UserProduct.user_id)
+    )).all()
+    prod_count_map = {r.user_id: r.cnt for r in prod_count_rows}
+
+    ws2.append(["מ\"ס", "אימייל", "אימייל התראות", "מאומת", "פעיל", "חופשה", "Bounce",
+                "סוג Bounce", "מוצרים", "מקס׳ מוצרים", "שיטת הרשמה",
+                "תאריך הרשמה", "כניסה אחרונה"])
+    _xl_write_headers(ws2, ["מ\"ס", "אימייל", "אימייל התראות", "מאומת", "פעיל", "חופשה", "Bounce",
+                             "סוג Bounce", "מוצרים", "מקס׳ מוצרים", "שיטת הרשמה",
+                             "תאריך הרשמה", "כניסה אחרונה"])
+    ws2.delete_rows(ws2.max_row - 1)
+
+    fmt = lambda dt: dt.strftime("%d/%m/%Y %H:%M") if dt else "—"
+    for i, u in enumerate(user_rows, 1):
+        ws2.append([
+            i,
+            u.email,
+            u.notify_email or "—",
+            "כן" if u.is_verified else "לא",
+            "כן" if u.is_active else "לא",
+            "כן" if u.vacation_mode else "לא",
+            "כן" if u.notify_email_bounced else "לא",
+            u.notify_email_bounce_type or "—",
+            prod_count_map.get(u.id, 0),
+            u.max_products or "—",
+            "Google" if u.google_id else "אימייל",
+            fmt(u.created_at),
+            fmt(u.last_login_at),
+        ])
+    _xl_autofit(ws2)
+
+    # ── Sheet 3: מוצרים ─────────────────────────────────────────────────────
+    ws3 = wb.create_sheet("מוצרים")
+    ws3.sheet_view.rightToLeft = True
+
+    product_rows = (await db.execute(
+        select(Product, func.count(UserProduct.user_id).label("watchers"))
+        .outerjoin(UserProduct, UserProduct.product_id == Product.id)
+        .group_by(Product.id)
+        .order_by(func.count(UserProduct.user_id).desc())
+    )).all()
+
+    ws3.append(["מ\"ס", "ASIN", "שם מוצר", "סטטוס", "עוקבים", "שגיאות ברצף", "בדיקה אחרונה", "URL"])
+    _xl_write_headers(ws3, ["מ\"ס", "ASIN", "שם מוצר", "סטטוס", "עוקבים", "שגיאות ברצף", "בדיקה אחרונה", "URL"])
+    ws3.delete_rows(ws3.max_row - 1)
+
+    for i, (p, watchers) in enumerate(product_rows, 1):
+        ws3.append([i, p.asin, p.name or "—", p.last_status or "—", watchers,
+                    p.consecutive_errors, fmt(p.last_checked), p.url or "—"])
+    _xl_autofit(ws3)
+
+    # ── Sheet 4: ביצועי מיילים ──────────────────────────────────────────────
+    ws4 = wb.create_sheet("ביצועי מיילים")
+    ws4.sheet_view.rightToLeft = True
+
+    tpl_send_rows = (await db.execute(
+        select(EmailSendLog.template_id, EmailSendLog.template_name,
+               func.sum(EmailSendLog.sent_count).label("sent"),
+               func.sum(EmailSendLog.failed_count).label("failed"))
+        .group_by(EmailSendLog.template_id, EmailSendLog.template_name)
+        .order_by(func.sum(EmailSendLog.sent_count).desc())
+    )).all()
+
+    open_by_tid = {r.template_id: r.opens for r in (await db.execute(
+        select(EmailOpen.template_id, func.count().label("opens")).group_by(EmailOpen.template_id)
+    )).all()}
+
+    ws4.append(["תבנית", "נשלח", "נכשל", "נפתח", "Open Rate %"])
+    _xl_write_headers(ws4, ["תבנית", "נשלח", "נכשל", "נפתח", "Open Rate %"])
+    ws4.delete_rows(ws4.max_row - 1)
+
+    for r in tpl_send_rows:
+        sent = r.sent or 0
+        opens = open_by_tid.get(r.template_id, 0)
+        rate = f"{round(opens / sent * 100, 1)}%" if sent else "—"
+        ws4.append([r.template_name, sent, r.failed or 0, opens, rate])
+    _xl_autofit(ws4)
+
+    # ── Sheet 5: רישומים ────────────────────────────────────────────────────
+    ws5 = wb.create_sheet("רישומים לאורך זמן")
+    ws5.sheet_view.rightToLeft = True
+
+    reg_rows = (await db.execute(
+        select(cast(User.created_at, Date).label("date"), func.count().label("count"))
+        .where(User.is_admin == False)
+        .group_by(cast(User.created_at, Date))
+        .order_by(cast(User.created_at, Date).asc())
+    )).all()
+
+    ws5.append(["תאריך", "הרשמות"])
+    _xl_write_headers(ws5, ["תאריך", "הרשמות"])
+    ws5.delete_rows(ws5.max_row - 1)
+
+    for r in reg_rows:
+        ws5.append([str(r.date), r.count])
+    _xl_autofit(ws5)
+
+    # ── Return file ──────────────────────────────────────────────────────────
+    stream = io.BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+
+    return StreamingResponse(
+        stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="amzfree-report-{file_date}.xlsx"'},
+    )
