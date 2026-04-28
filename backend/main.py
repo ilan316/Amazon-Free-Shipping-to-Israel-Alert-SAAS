@@ -115,7 +115,7 @@ async def lifespan(app: FastAPI):
     daily_hour = int(os.environ.get("DAILY_SUMMARY_HOUR", "8"))
     scheduler.start()
 
-    from backend.scheduler import run_inactivity_check, run_automation_emails
+    from backend.scheduler import run_inactivity_check, run_automation_emails, check_decodo_quota
 
     _upsert_job(run_daily_summary, "daily_summary", dict(
         trigger="cron", hour=daily_hour, minute=0, timezone="Asia/Jerusalem", misfire_grace_time=600
@@ -126,11 +126,14 @@ async def lifespan(app: FastAPI):
     _upsert_job(run_automation_emails, "automation_emails", dict(
         trigger="cron", hour=9, minute=0, timezone="Asia/Jerusalem", misfire_grace_time=600
     ))
+    _upsert_job(check_decodo_quota, "decodo_quota_check", dict(
+        trigger="cron", hour=7, minute=30, timezone="Asia/Jerusalem", misfire_grace_time=600
+    ))
 
     # Read daily check time from DB (cron trigger — no timer reset on deploy)
     check_hour, check_minute = await _get_check_time()
     reschedule_check_job(check_hour, check_minute)
-    logger.info(f"Scheduler started — daily check at {check_hour:02d}:{check_minute:02d} Israel time, summary at {daily_hour:02d}:00")
+    logger.info(f"Scheduler started — daily check at {check_hour:02d}:{check_minute:02d} Israel time, summary at {daily_hour:02d}:00, Decodo quota check at 07:30")
 
     # Re-apply pause state from DB (survives deployments)
     try:

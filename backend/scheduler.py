@@ -14,6 +14,7 @@ Daily summary logic:
 """
 
 import asyncio
+import httpx
 import logging
 import os
 from datetime import datetime, timedelta, timezone
@@ -472,3 +473,41 @@ async def check_single_product(asin: str, url: str):
             product.last_status = ShippingStatus.ERROR.value
             product.consecutive_errors += 1
             await db.commit()
+
+
+async def check_decodo_quota():
+    """Check Decodo residential proxy bandwidth — logs WARNING if < 200 MB remaining."""
+    logger.info("=== Decodo quota check started ===")
+    api_key = os.environ.get("DECODO_API_KEY", "")
+    if not api_key:
+        logger.info("DECODO_API_KEY not set — skipping quota check.")
+        return
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(
+                "https://api.decodo.com/v2/sub-users?service_type=residential_proxies",
+                headers={"Authorization": api_key},
+            )
+        if resp.status_code != 200:
+            logger.warning(f"Decodo quota API returned {resp.status_code}: {resp.text[:200]}")
+            return
+        data = resp.json()
+        items = data if isinstance(data, list) else data.get("data", [data])
+        total_limit = sum(i.get("traffic_limit_bytes", 0) or 0 for i in items)
+        total_used  = sum(i.get("traffic_used_bytes",  0) or 0 for i in items)
+        remaining_mb = (total_limit - total_used) / (1024 * 1024)
+        used_mb      = total_used / (1024 * 1024)
+        limit_mb     = total_limit / (1024 * 1024)
+        if remaining_mb < 200:
+            logger.warning(
+                f"🚨 DECODO QUOTA LOW: {remaining_mb:.1f} MB remaining "
+                f"({used_mb:.1f} / {limit_mb:.1f} MB used). Add funds to wallet!"
+            )
+        else:
+            logger.info(
+                f"✅ Decodo quota: {remaining_mb:.1f} MB remaining "
+                f"({used_mb:.1f} / {limit_mb:.1f} MB used)"
+            )
+    except Exception as e:
+        logger.warning(f"Decodo quota check error: {e}")
+    logger.info("=== Decodo quota check complete ===")
