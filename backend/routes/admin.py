@@ -48,6 +48,114 @@ async def get_stats(
     }
 
 
+@router.get("/analytics")
+async def get_analytics(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    now = datetime.utcnow()
+    base_users = lambda *extra: select(func.count()).select_from(User).where(
+        User.is_admin == False, User.is_verified == True, *extra
+    )
+
+    total_verified = (await db.execute(base_users())).scalar()
+
+    active_7d = (await db.execute(base_users(
+        User.last_login_at >= now - timedelta(days=7)
+    ))).scalar()
+
+    active_30d = (await db.execute(base_users(
+        User.last_login_at >= now - timedelta(days=30)
+    ))).scalar()
+
+    vacation_count = (await db.execute(base_users(User.vacation_mode == True))).scalar()
+
+    churn_risk_14d = (await db.execute(base_users(
+        (User.last_login_at <= now - timedelta(days=14)) | (User.last_login_at == None)
+    ))).scalar()
+
+    churn_risk_30d = (await db.execute(base_users(
+        (User.last_login_at <= now - timedelta(days=30)) | (User.last_login_at == None)
+    ))).scalar()
+
+    prod_dist_rows = (await db.execute(
+        select(UserProduct.user_id, func.count().label("cnt")).group_by(UserProduct.user_id)
+    )).all()
+    dist_one = sum(1 for r in prod_dist_rows if r.cnt == 1)
+    dist_two_five = sum(1 for r in prod_dist_rows if 2 <= r.cnt <= 5)
+    dist_six_plus = sum(1 for r in prod_dist_rows if r.cnt >= 6)
+
+    # Email stats
+    send_log_rows = (await db.execute(
+        select(EmailSendLog.template_id, EmailSendLog.template_name,
+               func.sum(EmailSendLog.sent_count).label("sent"))
+        .group_by(EmailSendLog.template_id, EmailSendLog.template_name)
+        .order_by(func.sum(EmailSendLog.sent_count).desc())
+    )).all()
+    total_sent = sum((r.sent or 0) for r in send_log_rows)
+
+    open_rows = (await db.execute(
+        select(EmailOpen.template_id, func.count().label("opens"))
+        .group_by(EmailOpen.template_id)
+    )).all()
+    total_opens = sum(r.opens for r in open_rows)
+    open_by_tid = {r.template_id: r.opens for r in open_rows}
+
+    total_clicks = (await db.execute(select(func.count()).select_from(EmailClick))).scalar()
+
+    bounce_count = (await db.execute(base_users(User.notify_email_bounced == True))).scalar()
+
+    by_template = []
+    for r in send_log_rows:
+        sent = r.sent or 0
+        opens = open_by_tid.get(r.template_id, 0)
+        open_rate = round(opens / sent * 100, 1) if sent else 0
+        by_template.append({
+            "name": r.template_name,
+            "sent": sent,
+            "opens": opens,
+            "open_rate": open_rate,
+        })
+
+    # Funnel
+    total_registered = (await db.execute(
+        select(func.count()).select_from(User).where(User.is_admin == False)
+    )).scalar()
+
+    google_users = (await db.execute(base_users(User.google_id != None))).scalar()
+
+    return {
+        "engagement": {
+            "active_7d": active_7d,
+            "active_30d": active_30d,
+            "total_verified": total_verified,
+            "vacation_count": vacation_count,
+            "vacation_pct": round(vacation_count / total_verified * 100, 1) if total_verified else 0,
+            "churn_risk_14d": churn_risk_14d,
+            "churn_risk_30d": churn_risk_30d,
+            "product_dist": {"one": dist_one, "two_to_five": dist_two_five, "six_plus": dist_six_plus},
+        },
+        "email": {
+            "total_sent": total_sent,
+            "total_opens": total_opens,
+            "total_clicks": total_clicks,
+            "open_rate": round(total_opens / total_sent * 100, 1) if total_sent else 0,
+            "ctr": round(total_clicks / total_opens * 100, 1) if total_opens else 0,
+            "bounce_count": bounce_count,
+            "bounce_rate": round(bounce_count / total_verified * 100, 1) if total_verified else 0,
+            "by_template": by_template,
+        },
+        "funnel": {
+            "total_registered": total_registered,
+            "verified": total_verified,
+            "unverified": total_registered - total_verified,
+            "verify_rate": round(total_verified / total_registered * 100, 1) if total_registered else 0,
+            "google_users": google_users,
+            "email_users": total_verified - google_users,
+        },
+    }
+
+
 @router.get("/users")
 async def list_users(
     admin: Annotated[User, Depends(get_current_admin)],

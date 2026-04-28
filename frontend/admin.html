@@ -202,6 +202,7 @@
       <button class="admin-tab" onclick="switchTab('notifications', this)">📋 לוג התראות</button>
       <button class="admin-tab" onclick="switchTab('templates', this)">📧 תבניות מייל</button>
       <button class="admin-tab" onclick="switchTab('testing', this)">🧪 בדיקות מייל</button>
+      <button class="admin-tab" onclick="switchTab('analytics', this)">📈 אנליטיקס</button>
       <button class="admin-tab" onclick="switchTab('account', this)">⚙️ הגדרות חשבון</button>
     </div>
 
@@ -561,6 +562,64 @@
       </div>
     </div>
 
+    <!-- Tab: Analytics -->
+    <div class="tab-panel" id="tab-analytics">
+
+      <!-- רישומים לאורך זמן -->
+      <div class="section">
+        <h2 style="font-size:1.05rem; margin-bottom:12px;">רישומים לאורך זמן</h2>
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow);">
+          <canvas id="registrations-chart-analytics" height="80"></canvas>
+        </div>
+      </div>
+
+      <!-- מעורבות משתמשים -->
+      <div class="section">
+        <h2 style="font-size:1.05rem; margin-bottom:12px;">מעורבות משתמשים</h2>
+        <div class="stats-row" id="analytics-engagement-cards" style="margin-bottom:20px;"></div>
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); max-width:400px;">
+          <div style="font-size:0.88rem; font-weight:600; color:var(--text-muted); margin-bottom:14px; text-align:center;">התפלגות מוצרים למשתמש</div>
+          <canvas id="analytics-product-dist-chart" height="200"></canvas>
+        </div>
+      </div>
+
+      <!-- ביצועי מיילים -->
+      <div class="section">
+        <h2 style="font-size:1.05rem; margin-bottom:12px;">ביצועי מיילים</h2>
+        <div class="stats-row" id="analytics-email-cards" style="margin-bottom:20px;"></div>
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow);">
+          <table class="admin-table" id="analytics-email-table">
+            <thead>
+              <tr>
+                <th>תבנית</th>
+                <th>נשלח</th>
+                <th>נפתח</th>
+                <th>Open Rate</th>
+              </tr>
+            </thead>
+            <tbody id="analytics-email-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Funnel גיוס משתמשים -->
+      <div class="section">
+        <h2 style="font-size:1.05rem; margin-bottom:12px;">Funnel גיוס משתמשים</h2>
+        <div class="stats-row" id="analytics-funnel-cards" style="margin-bottom:20px;"></div>
+        <div style="display:flex; gap:20px; flex-wrap:wrap;">
+          <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); flex:1; min-width:260px;">
+            <div style="font-size:0.88rem; font-weight:600; color:var(--text-muted); margin-bottom:14px; text-align:center;">אימות אימייל</div>
+            <canvas id="analytics-funnel-verify-chart" height="160"></canvas>
+          </div>
+          <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); flex:1; min-width:260px;">
+            <div style="font-size:0.88rem; font-weight:600; color:var(--text-muted); margin-bottom:14px; text-align:center;">שיטת הרשמה</div>
+            <canvas id="analytics-funnel-method-chart" height="160"></canvas>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
     <!-- Tab: Account Settings -->
     <div class="tab-panel" id="tab-account">
       <div class="profile-grid">
@@ -606,7 +665,7 @@
   </div>
 
   <script src="/static/app.js?v=10"></script>
-  <script src="/static/admin.js?v=39"></script>
+  <script src="/static/admin.js?v=40"></script>
   <script>
     requireAuth();
     loadAdminData();

@@ -1,8 +1,14 @@
+let _analyticsLoaded = false;
+
 function switchTab(name, btn) {
   document.querySelectorAll(".admin-tab").forEach(t => t.classList.remove("active"));
   document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
   document.getElementById("tab-" + name).classList.add("active");
   btn.classList.add("active");
+  if (name === "analytics" && !_analyticsLoaded) {
+    _analyticsLoaded = true;
+    loadAnalyticsTab();
+  }
 }
 
 let _allUsers = [];
@@ -1316,5 +1322,181 @@ async function requestEmailChange() {
   } else {
     msgEl.textContent = "❌ " + (data.detail || "שגיאה");
     msgEl.className = "profile-msg err";
+  }
+}
+
+// ─── Analytics Tab ────────────────────────────────────────────────────────────
+
+function _statCard(value, label, color) {
+  return `<div class="stat-card"><div class="stat-value" style="color:${color || "var(--brand-dark)"};">${value}</div><div class="stat-label">${label}</div></div>`;
+}
+
+async function loadAnalyticsTab() {
+  const [analyticsRes, regRes] = await Promise.all([
+    apiFetch("/admin/analytics"),
+    apiFetch("/admin/registrations-chart"),
+  ]);
+
+  if (analyticsRes && analyticsRes.ok) {
+    const d = await analyticsRes.json();
+    _renderEngagement(d.engagement);
+    _renderEmailStats(d.email);
+    _renderFunnel(d.funnel);
+  }
+
+  if (regRes && regRes.ok) {
+    const regData = await regRes.json();
+    _renderRegistrationsChartAnalytics(regData);
+  }
+}
+
+function _renderRegistrationsChartAnalytics(data) {
+  const canvas = document.getElementById("registrations-chart-analytics");
+  if (!canvas) return;
+  Chart.getChart(canvas)?.destroy();
+  if (!data.length) {
+    canvas.style.display = "none";
+    const msg = document.createElement("p");
+    msg.textContent = "אין נתונים עדיין";
+    msg.style.cssText = "text-align:center;color:var(--text-muted);padding:24px 0;margin:0;";
+    canvas.parentNode.appendChild(msg);
+    return;
+  }
+  new Chart(canvas, {
+    type: "line",
+    data: {
+      labels: data.map(d => d.date),
+      datasets: [{
+        label: "משתמשים חדשים",
+        data: data.map(d => d.count),
+        borderColor: "#e47911",
+        backgroundColor: "rgba(228,121,17,0.1)",
+        tension: 0.3, fill: true, pointRadius: 4, pointBackgroundColor: "#e47911",
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } }, x: { ticks: { maxTicksLimit: 10 } } }
+    }
+  });
+}
+
+function _renderEngagement(e) {
+  const container = document.getElementById("analytics-engagement-cards");
+  if (!container) return;
+  const activeColor = e.active_7d > 0 ? "var(--success, #27ae60)" : "var(--text-muted)";
+  const churnColor = e.churn_risk_14d > 0 ? "var(--error, #e74c3c)" : "var(--text-muted)";
+  const vacColor = e.vacation_count > 0 ? "#f39c12" : "var(--text-muted)";
+  container.innerHTML = [
+    _statCard(e.active_7d, "פעילים (7 ימים)", activeColor),
+    _statCard(e.active_30d, "פעילים (30 ימים)", activeColor),
+    _statCard(e.vacation_count + (e.vacation_pct ? ` (${e.vacation_pct}%)` : ""), "מצב חופשה", vacColor),
+    _statCard(e.churn_risk_14d, "בסכנת נטישה (14 יום)", churnColor),
+    _statCard(e.churn_risk_30d, "בסכנת נטישה (30 יום)", churnColor),
+  ].join("");
+
+  const canvas = document.getElementById("analytics-product-dist-chart");
+  if (!canvas) return;
+  Chart.getChart(canvas)?.destroy();
+  const { one, two_to_five, six_plus } = e.product_dist;
+  new Chart(canvas, {
+    type: "doughnut",
+    data: {
+      labels: ["מוצר 1", "2–5 מוצרים", "6+ מוצרים"],
+      datasets: [{
+        data: [one, two_to_five, six_plus],
+        backgroundColor: ["#e47911", "#3498db", "#27ae60"],
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: "bottom", labels: { font: { size: 12 }, padding: 14 } } }
+    }
+  });
+}
+
+function _renderEmailStats(e) {
+  const container = document.getElementById("analytics-email-cards");
+  if (!container) return;
+  const openColor = e.open_rate >= 30 ? "var(--success, #27ae60)" : e.open_rate >= 15 ? "#f39c12" : "var(--error, #e74c3c)";
+  const bounceColor = e.bounce_rate > 2 ? "var(--error, #e74c3c)" : "var(--text-muted)";
+  container.innerHTML = [
+    _statCard(e.open_rate + "%", "Open Rate", openColor),
+    _statCard(e.ctr + "%", "CTR (לחיצה/פתיחה)", "var(--brand-dark)"),
+    _statCard(e.bounce_count + (e.bounce_rate ? ` (${e.bounce_rate}%)` : ""), "Bounces", bounceColor),
+    _statCard(e.total_sent, "סה\"כ נשלח", "var(--text-muted)"),
+  ].join("");
+
+  const tbody = document.getElementById("analytics-email-tbody");
+  if (!tbody) return;
+  if (!e.by_template.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px;">אין נתוני תבניות</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = e.by_template.map(t => {
+    const color = t.open_rate >= 30 ? "#27ae60" : t.open_rate >= 15 ? "#f39c12" : "#e74c3c";
+    const bar = `<div style="background:#eee;border-radius:4px;height:6px;margin-top:4px;"><div style="background:${color};width:${Math.min(t.open_rate,100)}%;height:6px;border-radius:4px;"></div></div>`;
+    return `<tr>
+      <td style="font-weight:600;">${t.name}</td>
+      <td>${t.sent.toLocaleString()}</td>
+      <td>${t.opens.toLocaleString()}</td>
+      <td><span style="color:${color};font-weight:700;">${t.open_rate}%</span>${bar}</td>
+    </tr>`;
+  }).join("");
+}
+
+function _renderFunnel(f) {
+  const container = document.getElementById("analytics-funnel-cards");
+  if (!container) return;
+  const verifyColor = f.verify_rate >= 70 ? "var(--success, #27ae60)" : f.verify_rate >= 40 ? "#f39c12" : "var(--error, #e74c3c)";
+  const googlePct = f.verified > 0 ? Math.round(f.google_users / f.verified * 100) : 0;
+  container.innerHTML = [
+    _statCard(f.total_registered, "סה\"כ נרשמו", "var(--text-muted)"),
+    _statCard(f.verify_rate + "%", "אחוז אימות", verifyColor),
+    _statCard(f.google_users + ` (${googlePct}%)`, "הרשמה דרך Google", "#4285F4"),
+    _statCard(f.email_users, "הרשמה דרך אימייל", "var(--brand-dark)"),
+  ].join("");
+
+  const verifyCanvas = document.getElementById("analytics-funnel-verify-chart");
+  if (verifyCanvas) {
+    Chart.getChart(verifyCanvas)?.destroy();
+    new Chart(verifyCanvas, {
+      type: "bar",
+      data: {
+        labels: ["נרשמו", "אימתו"],
+        datasets: [{
+          data: [f.total_registered, f.verified],
+          backgroundColor: ["#3498db", "#27ae60"],
+          borderRadius: 6, borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+      }
+    });
+  }
+
+  const methodCanvas = document.getElementById("analytics-funnel-method-chart");
+  if (methodCanvas) {
+    Chart.getChart(methodCanvas)?.destroy();
+    new Chart(methodCanvas, {
+      type: "doughnut",
+      data: {
+        labels: ["Google OAuth", "אימייל + סיסמה"],
+        datasets: [{
+          data: [f.google_users, f.email_users],
+          backgroundColor: ["#4285F4", "#e47911"],
+          borderWidth: 0,
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: "bottom", labels: { font: { size: 12 }, padding: 14 } } }
+      }
+    });
   }
 }
