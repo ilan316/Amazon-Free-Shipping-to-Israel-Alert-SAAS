@@ -328,8 +328,7 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
     if title_el:
         product_name = title_el.get_text(strip=True)
     if not product_name:
-        logger.warning(f"[{asin}] httpx: productTitle not found.")
-        return CheckResult(asin, ShippingStatus.ERROR, error_message="productTitle not found.")
+        logger.warning(f"[{asin}] httpx: productTitle not found — continuing without name.")
 
     # Delivery text — same selector priority as Playwright path
     delivery_ids = [
