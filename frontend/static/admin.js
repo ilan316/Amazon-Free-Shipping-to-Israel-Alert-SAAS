@@ -468,7 +468,7 @@ async function toggleUserProducts(userId, email) {
     </div>`;
 
   const emailSection = `
-    <div style="font-size:0.82rem;font-weight:600;color:var(--text-muted);margin:14px 0 8px;">
+    <div style="font-size:0.82rem;font-weight:600;color:var(--text-muted);margin:14px 0 8px;background:var(--bg);padding:6px 10px;border-radius:6px;border-right:3px solid var(--brand);">
       📨 מיילים שנשלחו (${emails.length})
     </div>
     ${emails.length ? `
@@ -500,7 +500,7 @@ async function toggleUserProducts(userId, email) {
   }
 
   cell.innerHTML = metaBar + `
-    <div style="font-size:0.82rem;font-weight:600;color:var(--text-muted);margin-bottom:8px;">
+    <div style="font-size:0.82rem;font-weight:600;color:var(--text-muted);margin-bottom:8px;background:var(--bg);padding:6px 10px;border-radius:6px;border-right:3px solid var(--brand);">
       📦 מוצרים (${products.length})
     </div>
     <div style="overflow-x:auto;">
