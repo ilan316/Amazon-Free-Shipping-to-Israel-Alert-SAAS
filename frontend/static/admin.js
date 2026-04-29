@@ -443,14 +443,18 @@ async function toggleUserProducts(userId, email) {
 
   expandRow.style.display = '';
   const cell = expandRow.querySelector('td');
-  cell.innerHTML = '<span style="color:var(--text-muted);font-size:0.85rem;">טוען מוצרים...</span>';
+  cell.innerHTML = '<span style="color:var(--text-muted);font-size:0.85rem;">טוען...</span>';
 
-  const res = await apiFetch(`/admin/users/${userId}/products`);
+  const [res, mailRes] = await Promise.all([
+    apiFetch(`/admin/users/${userId}/products`),
+    apiFetch(`/admin/users/${userId}/email-history`),
+  ]);
   if (!res || !res.ok) {
     cell.innerHTML = '<span style="color:var(--error);font-size:0.85rem;">שגיאה בטעינת מוצרים</span>';
     return;
   }
   const products = await res.json();
+  const emails = (mailRes && mailRes.ok) ? await mailRes.json() : [];
   expandRow.dataset.loaded = '1';
 
   const u = _allUsers.find(x => x.id === userId);
@@ -463,8 +467,35 @@ async function toggleUserProducts(userId, email) {
       <span>📦 <strong>מוצר אחרון נוסף:</strong> <span dir="ltr">${lastAdded}</span></span>
     </div>`;
 
+  const emailSection = `
+    <div style="font-size:0.82rem;font-weight:600;color:var(--text-muted);margin:14px 0 8px;">
+      📨 מיילים שנשלחו (${emails.length})
+    </div>
+    ${emails.length ? `
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.82rem;min-width:360px;">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border);color:var(--text-muted);">
+            <th style="text-align:right;padding:5px 8px;">תבנית</th>
+            <th style="text-align:right;padding:5px 8px;">תאריך</th>
+            <th style="text-align:center;padding:5px 8px;">נשלח</th>
+            <th style="text-align:center;padding:5px 8px;">הקליק</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${emails.map(m => `
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:5px 8px;">${m.template_name}</td>
+              <td dir="ltr" style="padding:5px 8px;white-space:nowrap;">${m.sent_at}</td>
+              <td style="text-align:center;padding:5px 8px;">${m.success ? '✅' : '❌'}</td>
+              <td style="text-align:center;padding:5px 8px;">${m.clicked ? '🖱️' : '—'}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : `<div style="font-size:0.82rem;color:var(--text-muted);">לא נשלחו מיילי תבנית</div>`}`;
+
   if (!products.length) {
-    cell.innerHTML = metaBar + `<div style="font-size:0.82rem;color:var(--text-muted);">אין מוצרים עדיין</div>`;
+    cell.innerHTML = metaBar + `<div style="font-size:0.82rem;color:var(--text-muted);">אין מוצרים עדיין</div>` + emailSection;
     return;
   }
 
@@ -494,7 +525,7 @@ async function toggleUserProducts(userId, email) {
             </tr>`).join('')}
         </tbody>
       </table>
-    </div>`;
+    </div>` + emailSection;
 }
 
 async function loadUsers() {

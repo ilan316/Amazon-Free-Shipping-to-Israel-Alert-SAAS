@@ -232,6 +232,44 @@ async def get_user_products(
     ]
 
 
+@router.get("/users/{user_id}/email-history")
+async def get_user_email_history(
+    user_id: int,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    rows = (await db.execute(
+        select(EmailSendRecipient, EmailSendLog)
+        .join(EmailSendLog, EmailSendRecipient.send_log_id == EmailSendLog.id)
+        .where(EmailSendRecipient.user_id == user_id)
+        .order_by(EmailSendLog.sent_at.desc())
+        .limit(30)
+    )).all()
+
+    if not rows:
+        return []
+
+    log_ids = [log.id for _, log in rows]
+    clicked_result = await db.execute(
+        select(EmailSendLog.id)
+        .join(EmailSendRecipient, EmailSendRecipient.send_log_id == EmailSendLog.id)
+        .join(EmailClick, (EmailClick.user_id == user_id) & (EmailClick.clicked_at >= EmailSendLog.sent_at))
+        .where(EmailSendLog.id.in_(log_ids), EmailSendRecipient.user_id == user_id)
+        .distinct()
+    )
+    clicked_log_ids = {r for r, in clicked_result.all()}
+
+    return [
+        {
+            "template_name": log.template_name,
+            "sent_at": (log.sent_at + timedelta(hours=3)).strftime("%d/%m/%Y %H:%M") if log.sent_at else "",
+            "success": recipient.success,
+            "clicked": log.id in clicked_log_ids,
+        }
+        for recipient, log in rows
+    ]
+
+
 @router.patch("/users/{user_id}/toggle-active")
 async def toggle_active(
     user_id: int,
