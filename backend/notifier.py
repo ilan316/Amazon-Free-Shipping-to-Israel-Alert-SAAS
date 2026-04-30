@@ -546,10 +546,18 @@ def send_daily_summary(user, free_products: list) -> bool:
     for p, custom_name in free_products:
         name = _short(custom_name or p.name or p.asin, _MAX_NAME_BODY)
         url = _tracking_url(user.id, p.asin)
+        img_url = f"https://images-na.ssl-images-amazon.com/images/P/{p.asin}.01._SL100_.jpg"
         product_rows += f"""
         <table width="100%" cellpadding="0" cellspacing="0"
                style="background:#ffffff;border:1px solid #e8e8e8;border-radius:10px;margin-bottom:12px;">
           <tr>
+            <td valign="middle" style="padding:12px 0 12px 14px;width:100px;">
+              <a href="{url}">
+                <img src="{img_url}" width="100" height="100"
+                     style="display:block;border-radius:6px;border:1px solid #eeeeee;object-fit:contain;"
+                     alt="{name}">
+              </a>
+            </td>
             <td valign="top" style="padding:14px 16px;">
               <p class="product-name" style="margin:0 0 4px;font-size:15px;font-weight:bold;line-height:1.4;text-align:{txt_align};word-wrap:break-word;overflow-wrap:break-word;" {txt_dir}>
                 <a href="{url}" style="color:#111111;text-decoration:none;">{name}</a>
