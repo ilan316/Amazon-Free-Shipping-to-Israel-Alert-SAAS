@@ -41,6 +41,11 @@ async def create_tables():
         )
         await conn.execute(
             __import__("sqlalchemy").text(
+                "ALTER TABLE user_products ADD COLUMN IF NOT EXISTS paused_until TIMESTAMP WITH TIME ZONE"
+            )
+        )
+        await conn.execute(
+            __import__("sqlalchemy").text(
                 "CREATE TABLE IF NOT EXISTS system_settings (key VARCHAR(100) PRIMARY KEY, value TEXT NOT NULL DEFAULT '')"
             )
         )
