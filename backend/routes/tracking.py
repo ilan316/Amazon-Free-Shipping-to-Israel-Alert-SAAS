@@ -1,5 +1,5 @@
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Request, Depends
@@ -26,6 +26,8 @@ _BOT_UA_FRAGMENTS = (
 # NOTE: googleimageproxy / ggpht.com are intentionally NOT blocked —
 # Gmail fires its image proxy on every real user open (not on arrival),
 # so these hits represent actual opens and should be counted.
+
+_CLICK_DEDUP_MINUTES = 5
 
 
 def _is_bot(ua: str) -> bool:
@@ -56,12 +58,29 @@ async def track_click(
 
     # Record the click (best-effort — never block the redirect on DB errors)
     try:
-        ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
-        if ip:
-            ip = ip.split(",")[0].strip()[:64]
-        click = EmailClick(user_id=u, asin=a[:10] if a else "", ip=ip, dest_url=url[:512])
-        db.add(click)
-        await db.commit()
+        ua = request.headers.get("User-Agent", "")
+        if _is_bot(ua):
+            logger.info(f"click BLOCKED (bot UA): u={u} a={a} ua={ua[:120]}")
+        else:
+            ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
+            if ip:
+                ip = ip.split(",")[0].strip()[:64]
+            # Dedup: same user + ASIN within 5 min = scanner duplicate, skip
+            if u and a:
+                cutoff = datetime.now(timezone.utc) - timedelta(minutes=_CLICK_DEDUP_MINUTES)
+                recent = (await db.execute(
+                    select(EmailClick).where(
+                        EmailClick.user_id == u,
+                        EmailClick.asin == a[:10],
+                        EmailClick.clicked_at >= cutoff,
+                    ).limit(1)
+                )).scalar_one_or_none()
+                if recent:
+                    logger.debug(f"click DEDUP (same user+ASIN <{_CLICK_DEDUP_MINUTES}m): u={u} a={a}")
+                    return RedirectResponse(url, status_code=302)
+            click = EmailClick(user_id=u, asin=a[:10] if a else "", ip=ip, dest_url=url[:512])
+            db.add(click)
+            await db.commit()
     except Exception as exc:
         logger.warning(f"Failed to record email click: {exc}")
 
