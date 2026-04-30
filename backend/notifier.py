@@ -611,7 +611,16 @@ def send_daily_summary(user, free_products: list) -> bool:
           </td>
         </tr>
         <tr>
-          <td style="background:#f8f8f8;border-radius:0 0 10px 10px;padding:14px 24px;text-align:center;">
+          <td style="background:#f8f8f8;padding:16px 24px 8px;text-align:center;">
+            <a href="https://app.amzfreeil.com/dashboard"
+               style="display:inline-block;background:#FF9900;color:#111111;font-size:14px;font-weight:bold;
+                      text-decoration:none;padding:11px 32px;border-radius:8px;">
+              {'כניסה לחשבון' if is_rtl else 'Go to My Account'}
+            </a>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f8f8f8;border-radius:0 0 10px 10px;padding:8px 24px 14px;text-align:center;">
             <p style="margin:0 0 6px;color:#888;font-size:12px;" {txt_dir}>{_t(lang, "footer", checked_at=checked_at)}</p>
             <p style="margin:0 0 4px;color:#bbb;font-size:11px;">Amazon Free Shipping to Israel Alert</p>
             <p style="margin:0;font-size:11px;"><a href="{_pause_url(user.id)}" style="color:#aaa;text-decoration:underline;">הפסק לקבל עדכונים</a></p>
