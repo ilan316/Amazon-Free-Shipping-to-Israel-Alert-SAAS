@@ -20,6 +20,10 @@ DEFAULT_MAX_PRODUCTS = 10
 class RenameRequest(BaseModel):
     custom_name: str
 
+
+class PauseRequest(BaseModel):
+    until: str | None = None  # ISO date string "YYYY-MM-DD", None = indefinite
+
 router = APIRouter(prefix="/me/products", tags=["products"])
 
 
@@ -267,6 +271,7 @@ async def toggle_pause(
     asin: str,
     current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),
+    body: PauseRequest | None = None,
 ):
     asin = asin.upper().strip()
     result = await db.execute(
@@ -277,10 +282,33 @@ async def toggle_pause(
     up = result.scalar_one_or_none()
     if not up:
         raise HTTPException(status_code=404, detail="Product not found in your list")
-    up.is_paused = not up.is_paused
+
+    now = datetime.now(timezone.utc)
+    currently_paused = up.is_paused and (up.paused_until is None or up.paused_until > now)
+
+    if currently_paused:
+        up.is_paused = False
+        up.paused_until = None
+        await db.commit()
+        return MessageResponse(message=f"Product {asin} is now פעיל")
+
+    # Pausing — parse optional until date
+    paused_until = None
+    if body and body.until:
+        try:
+            paused_until = datetime.strptime(body.until, "%Y-%m-%d").replace(
+                hour=23, minute=59, second=59, tzinfo=timezone.utc
+            )
+            if paused_until <= now:
+                raise HTTPException(status_code=400, detail="תאריך חזרה חייב להיות בעתיד")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="פורמט תאריך שגוי, נדרש YYYY-MM-DD")
+
+    up.is_paused = True
+    up.paused_until = paused_until
     await db.commit()
-    state = "מושהה" if up.is_paused else "פעיל"
-    return MessageResponse(message=f"Product {asin} is now {state}")
+    suffix = f" עד {body.until}" if paused_until else " ללא הגבלת זמן"
+    return MessageResponse(message=f"Product {asin} is now מושהה{suffix}")
 
 
 @router.patch("/{asin}/name", response_model=MessageResponse)

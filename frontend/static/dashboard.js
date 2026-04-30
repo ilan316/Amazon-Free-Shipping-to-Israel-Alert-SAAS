@@ -174,12 +174,15 @@ function renderProducts() {
     const linkUrl     = p.affiliate_url || p.url;
 
 
+    const pausedUntilStr = p.paused_until
+      ? ` עד ${new Date(p.paused_until).toLocaleDateString('he-IL')}`
+      : '';
     const pauseBtn = `
       <button
         class="btn-pause ${p.is_paused ? 'is-paused' : ''}"
-        onclick="togglePause('${p.asin}', this)"
-        title="${p.is_paused ? 'המשך מעקב' : 'השהה מעקב'}">
-        ${p.is_paused ? '▶ המשך' : '⏸ השהה'}
+        onclick="${p.is_paused ? `togglePause('${p.asin}', this)` : `showPauseDialog('${p.asin}', this)`}"
+        title="${p.is_paused ? `המשך מעקב${pausedUntilStr}` : 'השהה מעקב'}">
+        ${p.is_paused ? `▶ המשך${pausedUntilStr}` : '⏸ השהה'}
       </button>`;
 
     const badgeHtml = p.is_paused
@@ -431,16 +434,62 @@ function _pollForChecked(asins, alertEl) {
   }, 5000);
 }
 
+// ── Pause dialog ──────────────────────────────────────────────────────────────
+
+function showPauseDialog(asin, btn) {
+  // Remove any existing dialog
+  document.getElementById('pause-dialog')?.remove();
+
+  const minDate = new Date();
+  minDate.setDate(minDate.getDate() + 1);
+  const minStr = minDate.toISOString().split('T')[0];
+
+  const dialog = document.createElement('div');
+  dialog.id = 'pause-dialog';
+  dialog.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;
+    display:flex;align-items:center;justify-content:center;`;
+  dialog.innerHTML = `
+    <div style="background:#fff;border-radius:12px;padding:28px 24px;max-width:320px;width:90%;
+                box-shadow:0 8px 32px rgba(0,0,0,0.18);text-align:right;direction:rtl;">
+      <h3 style="margin:0 0 6px;font-size:16px;">⏸ השהה מעקב</h3>
+      <p style="margin:0 0 18px;font-size:13px;color:#555;">בחר תאריך חזרה או השהה ללא הגבלת זמן</p>
+      <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">עד תאריך (אופציונלי)</label>
+      <input type="date" id="pause-until-input" min="${minStr}"
+        style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;
+               font-size:14px;box-sizing:border-box;margin-bottom:18px;">
+      <div style="display:flex;gap:10px;justify-content:flex-start;">
+        <button id="pause-confirm-btn"
+          style="background:#FF9900;color:#111;border:none;border-radius:7px;
+                 padding:9px 20px;font-size:14px;font-weight:bold;cursor:pointer;">
+          השהה
+        </button>
+        <button onclick="document.getElementById('pause-dialog').remove()"
+          style="background:#f0f0f0;color:#333;border:none;border-radius:7px;
+                 padding:9px 16px;font-size:14px;cursor:pointer;">
+          ביטול
+        </button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(dialog);
+  dialog.addEventListener('click', e => { if (e.target === dialog) dialog.remove(); });
+
+  document.getElementById('pause-confirm-btn').addEventListener('click', () => {
+    const until = document.getElementById('pause-until-input').value || null;
+    dialog.remove();
+    togglePause(asin, btn, until);
+  });
+}
+
 // ── Toggle pause ──────────────────────────────────────────────────────────────
 
-async function togglePause(asin, btn) {
+async function togglePause(asin, btn, until = null) {
   const wasPaused = btn.classList.contains("is-paused");
   const card = document.getElementById(`card-${asin}`);
   if (card) {
     card.classList.toggle("card-paused");
     btn.classList.toggle("is-paused");
-    btn.textContent = wasPaused ? '⏸ השהה' : '▶ המשך';
-    btn.title = wasPaused ? 'השהה מעקב' : 'המשך מעקב';
     const badge = card.querySelector(".status-badge");
     if (badge) {
       if (!wasPaused) {
@@ -456,9 +505,18 @@ async function togglePause(asin, btn) {
     }
   }
 
-  const res = await apiFetch(`/me/products/${asin}/toggle-pause`, { method: "PATCH" });
+  const body = wasPaused ? null : (until ? { until } : {});
+  const res = await apiFetch(`/me/products/${asin}/toggle-pause`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: body !== null ? JSON.stringify(body) : undefined,
+  });
   if (res && res.ok) {
-    products = products.map(p => p.asin === asin ? { ...p, is_paused: !wasPaused } : p);
+    const pausedUntil = (!wasPaused && until) ? until + 'T23:59:59Z' : null;
+    products = products.map(p =>
+      p.asin === asin ? { ...p, is_paused: !wasPaused, paused_until: pausedUntil } : p
+    );
+    renderProducts();
   } else {
     await loadProducts(true);
   }

@@ -170,12 +170,17 @@ async def run_daily_summary():
 
         sent = 0
         for user in users:
+            now = datetime.now(timezone.utc)
             free_products_result = await db.execute(
                 select(Product, UserProduct.custom_name)
                 .join(UserProduct, Product.id == UserProduct.product_id)
                 .where(
                     UserProduct.user_id == user.id,
-                    UserProduct.is_paused == False,
+                    # Not paused, OR pause has expired
+                    or_(
+                        UserProduct.is_paused == False,
+                        (UserProduct.paused_until != None) & (UserProduct.paused_until <= now),
+                    ),
                     Product.last_status == ShippingStatus.FREE.value,
                 )
             )

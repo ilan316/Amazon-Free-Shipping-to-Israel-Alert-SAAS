@@ -69,6 +69,7 @@ class ProductResponse(BaseModel):
     last_notified: datetime | None
     added_at: datetime
     is_paused: bool = False
+    paused_until: datetime | None = None
     raw_text: str = ""
     affiliate_url: str = ""
 
