@@ -455,9 +455,9 @@ function showPauseDialog(asin, btn) {
       <h3 style="margin:0 0 6px;font-size:16px;">⏸ השהה מעקב</h3>
       <p style="margin:0 0 18px;font-size:13px;color:#555;">בחר תאריך חזרה או השהה ללא הגבלת זמן</p>
       <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">עד תאריך (אופציונלי)</label>
-      <input type="date" id="pause-until-input" min="${minStr}"
+      <input type="date" id="pause-until-input" min="${minStr}" lang="he-IL"
         style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;
-               font-size:14px;box-sizing:border-box;margin-bottom:18px;">
+               font-size:14px;box-sizing:border-box;margin-bottom:18px;direction:ltr;text-align:right;">
       <div style="display:flex;gap:10px;justify-content:flex-start;">
         <button id="pause-confirm-btn"
           style="background:#FF9900;color:#111;border:none;border-radius:7px;
