@@ -174,15 +174,21 @@ function renderProducts() {
     const linkUrl     = p.affiliate_url || p.url;
 
 
-    const pausedUntilStr = p.paused_until
-      ? ` עד ${new Date(p.paused_until).toLocaleDateString('he-IL')}`
-      : '';
+    const pausedUntilDate = p.paused_until
+      ? new Date(p.paused_until).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' })
+      : null;
+    const pauseBtnLabel = p.is_paused
+      ? (pausedUntilDate ? `▶ מושהה עד ${pausedUntilDate}` : '▶ מושהה ∞')
+      : '⏸ השהה';
+    const pauseBtnTitle = p.is_paused
+      ? (pausedUntilDate ? `לחץ לביטול השהייה (עד ${pausedUntilDate})` : 'השהייה ללא הגבלה — לחץ לביטול')
+      : 'השהה מעקב';
     const pauseBtn = `
       <button
         class="btn-pause ${p.is_paused ? 'is-paused' : ''}"
         onclick="${p.is_paused ? `togglePause('${p.asin}', this)` : `showPauseDialog('${p.asin}', this)`}"
-        title="${p.is_paused ? `המשך מעקב${pausedUntilStr}` : 'השהה מעקב'}">
-        ${p.is_paused ? `▶ המשך${pausedUntilStr}` : '⏸ השהה'}
+        title="${pauseBtnTitle}">
+        ${pauseBtnLabel}
       </button>`;
 
     const badgeHtml = p.is_paused
