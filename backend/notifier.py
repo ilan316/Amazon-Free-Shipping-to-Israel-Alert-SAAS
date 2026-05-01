@@ -551,14 +551,16 @@ def send_daily_summary(user, free_products: list) -> bool:
         <table width="100%" cellpadding="0" cellspacing="0"
                style="background:#ffffff;border:1px solid #e8e8e8;border-radius:10px;margin-bottom:12px;">
           <tr>
-            <td class="prod-img-td" valign="middle" width="100" style="padding:12px 0 12px 14px;width:100px;min-width:100px;">
+            <td class="prod-img-td" style="padding:14px 16px 4px;text-align:{txt_align};">
               <a href="{url}">
                 <img src="{img_url}" width="100" height="100"
-                     style="display:block;border-radius:6px;border:1px solid #eeeeee;"
+                     style="display:inline-block;border-radius:8px;border:1px solid #eeeeee;"
                      alt="{name}">
               </a>
             </td>
-            <td valign="top" style="padding:14px 16px;">
+          </tr>
+          <tr>
+            <td valign="top" style="padding:6px 16px 14px;">
               <p class="product-name" style="margin:0 0 4px;font-size:15px;font-weight:bold;line-height:1.4;text-align:{txt_align};word-wrap:break-word;overflow-wrap:break-word;" {txt_dir}>
                 <a href="{url}" style="color:#111111;text-decoration:none;">{name}</a>
               </p>
@@ -586,8 +588,7 @@ def send_daily_summary(user, free_products: list) -> bool:
       .email-container{{width:100% !important;}}
       .email-container img{{max-width:100% !important;height:auto !important;}}
       .product-name{{font-size:14px !important;}}
-      .prod-img-td{{width:80px !important;min-width:80px !important;}}
-      .prod-img-td img{{width:80px !important;height:80px !important;max-width:80px !important;}}
+      .prod-img-td img{{width:80px !important;height:80px !important;}}
     }}
   </style>
 </head>
