@@ -164,31 +164,31 @@ AOD_OFFER_SELECTORS = [
 
 def _extract_price(soup) -> str:
     """Extract current product price from parsed Amazon HTML.
+    Only looks inside the buybox — avoids picking up prices from recommendations,
+    sponsored sections, or other unrelated parts of the page.
     Returns a normalized string like 'ILS 42.81' or '$29.99', or '' if not found.
     Note: price does NOT include shipping, taxes, or customs fees.
     """
-    selectors = [
+    import re as _re
+    # Ordered from most-specific (buybox) to less-specific — all scoped to buybox area
+    buybox_selectors = [
         "#corePrice_desktop .a-offscreen",
-        ".apex-pricetopay-value .a-offscreen",
+        "#apex_desktop_qualifiedBuyBox .a-price .a-offscreen",
+        "#apex_desktop .priceToPay .a-offscreen",
         ".priceToPay .a-offscreen",
         ".apexPriceToPay .a-offscreen",
-        ".a-price .a-offscreen",
+        "#buybox .a-price .a-offscreen",
+        "#buyBoxInner .a-price .a-offscreen",
+        "#priceblock_ourprice",
+        "#price_inside_buybox",
     ]
-    for sel in selectors:
+    for sel in buybox_selectors:
         el = soup.select_one(sel)
         if el:
             txt = el.get_text().replace("\xa0", " ").strip()
             if txt and any(c.isdigit() for c in txt):
                 # Normalize: ILS42.81 → ILS 42.81 (currency code stuck to digits)
-                import re as _re
-                txt = _re.sub(r"([A-Z]{2,})(\d)", r"\1 \2", txt)
-                return txt
-    for pid in ("priceblock_ourprice", "price_inside_buybox"):
-        el = soup.find(id=pid)
-        if el:
-            txt = el.get_text().replace("\xa0", " ").strip()
-            if txt and any(c.isdigit() for c in txt):
-                return txt
+                return _re.sub(r"([A-Z]{2,})(\d)", r"\1 \2", txt)
     return ""
 
 
