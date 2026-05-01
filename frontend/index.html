@@ -217,13 +217,6 @@ a:hover{text-decoration:underline}
           <label for="reg-notify-email">אימייל לקבלת התראות</label>
           <input type="email" id="reg-notify-email" required placeholder="your@email.com">
         </div>
-        <div class="form-group">
-          <label for="reg-language">שפת התראות</label>
-          <select id="reg-language">
-            <option value="he" selected>עברית</option>
-            <option value="en">English</option>
-          </select>
-        </div>
         <div class="form-group" style="flex-direction:row;align-items:center;gap:8px;">
           <input type="checkbox" id="reg-agree" required style="width:auto;margin:0;">
           <label for="reg-agree" style="font-size:0.85rem;color:var(--text-muted);cursor:pointer;">
@@ -538,7 +531,7 @@ a:hover{text-decoration:underline}
             email: document.getElementById("reg-email").value.trim(),
             password: passVal,
             notify_email: notifyVal,
-            language: document.getElementById("reg-language").value,
+            language: "he",
           }),
         });
         if (!res) return;

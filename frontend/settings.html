@@ -97,13 +97,6 @@
           <label for="notify-email">אימייל לקבלת התראות</label>
           <input type="email" id="notify-email" required placeholder="your@email.com">
         </div>
-        <div class="form-group">
-          <label for="language">שפת התראות</label>
-          <select id="language">
-            <option value="he">עברית</option>
-            <option value="en">English</option>
-          </select>
-        </div>
         <button type="submit" class="btn-primary" id="save-btn" style="width:auto; padding:11px 28px;">
           שמור שינויים
         </button>
@@ -186,7 +179,6 @@
         const user = await res.json();
         document.getElementById("login-email").value = user.email;
         document.getElementById("notify-email").value = user.notify_email;
-        document.getElementById("language").value = user.language;
         originalNotifyEmail = user.notify_email || "";
         applyVacationUI(user.vacation_mode);
       }
@@ -247,7 +239,6 @@
         method: "PATCH",
         body: JSON.stringify({
           notify_email: document.getElementById("notify-email").value,
-          language: document.getElementById("language").value,
         }),
       });
 
