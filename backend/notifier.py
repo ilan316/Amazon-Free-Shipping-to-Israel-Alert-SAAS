@@ -551,10 +551,10 @@ def send_daily_summary(user, free_products: list) -> bool:
         <table width="100%" cellpadding="0" cellspacing="0"
                style="background:#ffffff;border:1px solid #e8e8e8;border-radius:10px;margin-bottom:12px;">
           <tr>
-            <td valign="middle" style="padding:12px 0 12px 14px;width:100px;">
+            <td class="prod-img-td" valign="middle" width="100" style="padding:12px 0 12px 14px;width:100px;min-width:100px;">
               <a href="{url}">
                 <img src="{img_url}" width="100" height="100"
-                     style="display:block;border-radius:6px;border:1px solid #eeeeee;object-fit:contain;"
+                     style="display:block;border-radius:6px;border:1px solid #eeeeee;"
                      alt="{name}">
               </a>
             </td>
@@ -586,6 +586,8 @@ def send_daily_summary(user, free_products: list) -> bool:
       .email-container{{width:100% !important;}}
       .email-container img{{max-width:100% !important;height:auto !important;}}
       .product-name{{font-size:14px !important;}}
+      .prod-img-td{{width:80px !important;min-width:80px !important;}}
+      .prod-img-td img{{width:80px !important;height:80px !important;max-width:80px !important;}}
     }}
   </style>
 </head>
