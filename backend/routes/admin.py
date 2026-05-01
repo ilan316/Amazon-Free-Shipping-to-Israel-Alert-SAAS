@@ -227,6 +227,7 @@ async def get_user_products(
             "custom_name": custom_name,
             "is_paused": is_paused,
             "added_at": added_at.isoformat() if added_at else None,
+            "last_price": p.last_price or "",
         }
         for p, custom_name, is_paused, added_at in result.all()
     ]
@@ -348,6 +349,7 @@ async def list_products(
             "consecutive_errors": p.consecutive_errors,
             "watchers": watcher_map.get(p.id, 0),
             "raw_text": p.raw_text[:200] if p.raw_text else "",
+            "last_price": p.last_price or "",
         }
         for p in products
     ]
