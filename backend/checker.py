@@ -83,6 +83,7 @@ class CheckResult:
     error_message: str = ""
     product_name: str = ""
     found_in_aod: bool = False
+    last_price: str = ""
 
 
 # ── Selectors ─────────────────────────────────────────────────────────────────
@@ -157,6 +158,38 @@ AOD_OFFER_SELECTORS = [
     "#aod-container",
     "#aod-offer",
 ]
+
+
+# ── Price extraction ──────────────────────────────────────────────────────────
+
+def _extract_price(soup) -> str:
+    """Extract current product price from parsed Amazon HTML.
+    Returns a normalized string like 'ILS 42.81' or '$29.99', or '' if not found.
+    Note: price does NOT include shipping, taxes, or customs fees.
+    """
+    selectors = [
+        "#corePrice_desktop .a-offscreen",
+        ".apex-pricetopay-value .a-offscreen",
+        ".priceToPay .a-offscreen",
+        ".apexPriceToPay .a-offscreen",
+        ".a-price .a-offscreen",
+    ]
+    for sel in selectors:
+        el = soup.select_one(sel)
+        if el:
+            txt = el.get_text().replace("\xa0", " ").strip()
+            if txt and any(c.isdigit() for c in txt):
+                # Normalize: ILS42.81 → ILS 42.81 (currency code stuck to digits)
+                import re as _re
+                txt = _re.sub(r"([A-Z]{2,})(\d)", r"\1 \2", txt)
+                return txt
+    for pid in ("priceblock_ourprice", "price_inside_buybox"):
+        el = soup.find(id=pid)
+        if el:
+            txt = el.get_text().replace("\xa0", " ").strip()
+            if txt and any(c.isdigit() for c in txt):
+                return txt
+    return ""
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -364,8 +397,9 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
                            product_name=product_name)
 
     status = _classify(raw_text)
-    logger.info(f"[{asin}] httpx: {status.value} | {raw_text[:120]!r}")
-    return CheckResult(asin, status, raw_text=raw_text, product_name=product_name)
+    price = _extract_price(soup)
+    logger.info(f"[{asin}] httpx: {status.value} | price={price!r} | {raw_text[:120]!r}")
+    return CheckResult(asin, status, raw_text=raw_text, product_name=product_name, last_price=price)
 
 
 async def _check_product_httpx(asin: str, url: str, cookies: list) -> CheckResult:
@@ -738,9 +772,19 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
             return CheckResult(asin, ShippingStatus.NO_SHIP, error_message="No delivery block found",
                                product_name=product_name)
 
-        logger.info(f"[{asin}] {status.value} | {raw_text[:120]!r}")
+        # Extract price from current page HTML
+        pw_price = ""
+        try:
+            from bs4 import BeautifulSoup as _BS
+            pw_html = await page.content()
+            pw_soup = _BS(pw_html, "html.parser")
+            pw_price = _extract_price(pw_soup)
+        except Exception:
+            pass
+
+        logger.info(f"[{asin}] {status.value} | price={pw_price!r} | {raw_text[:120]!r}")
         return CheckResult(asin, status, raw_text=raw_text, product_name=product_name,
-                           found_in_aod=found_in_aod)
+                           found_in_aod=found_in_aod, last_price=pw_price)
 
     except PWTimeout as e:
         return CheckResult(asin, ShippingStatus.ERROR, error_message=f"Timeout: {e}")

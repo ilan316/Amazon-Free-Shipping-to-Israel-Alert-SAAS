@@ -510,6 +510,7 @@ async function toggleUserProducts(userId, email) {
             <th style="text-align:right;padding:5px 8px;">ASIN</th>
             <th style="text-align:right;padding:5px 8px;">שם</th>
             <th style="text-align:center;padding:5px 8px;">סטטוס</th>
+            <th style="text-align:center;padding:5px 8px;">מחיר</th>
             <th style="text-align:center;padding:5px 8px;">הושהה</th>
             <th style="text-align:right;padding:5px 8px;">נוסף</th>
           </tr>
@@ -520,6 +521,7 @@ async function toggleUserProducts(userId, email) {
               <td dir="ltr" style="padding:5px 8px;"><a href="${p.url}" target="_blank" style="color:var(--brand-dark);font-family:monospace;">${p.asin}</a></td>
               <td class="truncate" style="padding:5px 8px;max-width:220px;">${p.custom_name || p.name || '—'}</td>
               <td style="text-align:center;padding:5px 8px;"><span class="status-badge badge-${p.last_status}">${statusLabel(p.last_status)}</span></td>
+              <td dir="ltr" style="text-align:center;padding:5px 8px;font-size:0.82rem;color:#B12704;font-weight:bold;">${p.last_price || '—'}</td>
               <td style="text-align:center;padding:5px 8px;">${p.is_paused ? '⏸' : ''}</td>
               <td dir="ltr" style="padding:5px 8px;white-space:nowrap;">${p.added_at ? new Date(p.added_at).toLocaleDateString('he-IL') : '—'}</td>
             </tr>`).join('')}
@@ -635,7 +637,7 @@ function renderAdminProducts() {
     : _allAdminProducts.filter(p => p.last_status === _adminFilter);
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:24px;">אין מוצרים</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:24px;">אין מוצרים</td></tr>';
     return;
   }
   tbody.innerHTML = filtered.map(p => `
@@ -644,6 +646,7 @@ function renderAdminProducts() {
       <td class="ltr"><a href="${p.url}" target="_blank">${p.asin}</a></td>
       <td class="truncate">${p.name || "—"}</td>
       <td><span class="status-badge badge-${p.last_status}">${statusLabel(p.last_status)}</span></td>
+      <td style="text-align:center;font-size:0.82rem;color:#B12704;font-weight:bold;" dir="ltr">${p.last_price || '—'}</td>
       <td style="text-align:center;">${p.watchers}</td>
       <td class="ltr">${p.last_checked ? formatDate(p.last_checked) : "—"}</td>
       <td style="text-align:center;color:${p.consecutive_errors > 0 ? 'var(--error)' : 'var(--text-muted)'}">

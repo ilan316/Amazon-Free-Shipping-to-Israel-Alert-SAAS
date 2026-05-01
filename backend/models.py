@@ -44,6 +44,7 @@ class Product(Base):
     found_in_aod: Mapped[bool] = mapped_column(Boolean, default=False)
     raw_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
     consecutive_errors: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_price: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
     user_products: Mapped[list["UserProduct"]] = relationship(back_populates="product", cascade="all, delete-orphan")

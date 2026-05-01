@@ -72,6 +72,7 @@ class ProductResponse(BaseModel):
     paused_until: datetime | None = None
     raw_text: str = ""
     affiliate_url: str = ""
+    last_price: str | None = None
 
     model_config = {"from_attributes": True}
 

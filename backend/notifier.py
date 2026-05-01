@@ -454,6 +454,7 @@ def send_user_alert(user, product, result) -> bool:
                     <a href="{url}" style="color:#111111;text-decoration:none;">{name}</a>
                   </p>
                   <p style="margin:0 0 10px;font-size:13px;color:#666;text-align:{txt_align};">ASIN: {asin}</p>
+                  {f'<p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {product.last_price} <span style="font-size:11px;color:#888;font-weight:normal;">({("מחיר באמזון (לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl else "Amazon price (excl. shipping, taxes & fees)")})</span></p>' if getattr(product, "last_price", None) else ""}
                   <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#007600;text-align:{txt_align};" {txt_dir}>{_t(lang, "shipping_badge")}</p>
                   <div style="text-align:{txt_align};">{_cta_btn(url, _t(lang, "btn_buy"), txt_align)}</div>
                   <p style="margin:8px 0 4px;font-size:13px;color:#555;font-style:italic;text-align:{txt_align};" {txt_dir}>{_t(lang, "urgency")}</p>
@@ -547,6 +548,10 @@ def send_daily_summary(user, free_products: list) -> bool:
         name = _short(custom_name or p.name or p.asin, _MAX_NAME_BODY)
         url = _tracking_url(user.id, p.asin)
         img_url = f"https://images-na.ssl-images-amazon.com/images/P/{p.asin}.01._SL100_.jpg"
+        price_html = ""
+        if getattr(p, "last_price", None):
+            price_note = "מחיר באמזון (לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl else "Amazon price (excl. shipping, taxes & fees)"
+            price_html = f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {p.last_price} <span style="font-size:11px;color:#888;font-weight:normal;">({price_note})</span></p>'
         product_rows += f"""
         <table width="100%" cellpadding="0" cellspacing="0"
                style="background:#ffffff;border:1px solid #e8e8e8;border-radius:10px;margin-bottom:12px;">
@@ -565,6 +570,7 @@ def send_daily_summary(user, free_products: list) -> bool:
                 <a href="{url}" style="color:#111111;text-decoration:none;">{name}</a>
               </p>
               <p style="margin:0 0 8px;font-size:12px;color:#666;text-align:{txt_align};">ASIN: {p.asin}</p>
+              {price_html}
               <p style="margin:0 0 10px;font-size:13px;font-weight:bold;color:#007600;text-align:{txt_align};" {txt_dir}>{_t(lang, "shipping_badge")}</p>
               <div style="text-align:{txt_align};">{_cta_btn(url, _t(lang, "btn_buy"), txt_align)}</div>
             </td>

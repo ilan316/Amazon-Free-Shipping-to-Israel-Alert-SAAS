@@ -109,6 +109,11 @@ async def create_tables():
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS automation_reengagement_sent_at TIMESTAMP WITH TIME ZONE"
             )
         )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE products ADD COLUMN IF NOT EXISTS last_price VARCHAR(50)"
+            )
+        )
         # Mark users who already received the activation template manually so automation skips them
         await conn.execute(
             __import__("sqlalchemy").text("""

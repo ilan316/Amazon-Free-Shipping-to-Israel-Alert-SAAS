@@ -121,6 +121,7 @@ async def list_products(
             is_paused=up.is_paused,
             raw_text=p.raw_text or "",
             affiliate_url=_aff_url,
+            last_price=p.last_price or None,
         ))
     return items
 
