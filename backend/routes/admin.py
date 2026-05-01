@@ -501,8 +501,11 @@ async def trigger_summary(
     admin: Annotated[User, Depends(get_current_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
     to: str | None = None,
+    asins: str | None = None,
 ):
-    """Send daily summary to a specific email (or admin if none). Uses all tracked products, or a dummy if none."""
+    """Send daily summary to a specific email (or admin if none).
+    asins: optional comma-separated ASINs to override the product list (e.g. B08NYMBXG8,B07QXV6N1B).
+    """
     from backend.models import Product, UserProduct
     from backend.notifier import send_daily_summary
 
@@ -514,20 +517,37 @@ async def trigger_summary(
         if found:
             target = found
 
-    products_result = await db.execute(
-        select(Product, UserProduct.custom_name)
-        .join(UserProduct, Product.id == UserProduct.product_id)
-        .where(UserProduct.user_id == target.id, UserProduct.is_paused == False)
-    )
-    products = products_result.all()
+    if asins:
+        asin_list = [a.strip().upper() for a in asins.split(",") if a.strip()]
+        products_result = await db.execute(
+            select(Product).where(Product.asin.in_(asin_list))
+        )
+        db_products = {p.asin: p for p in products_result.scalars().all()}
+        products = []
+        for asin in asin_list:
+            if asin in db_products:
+                products.append((db_products[asin], None))
+            else:
+                dummy = Product()
+                dummy.asin = asin
+                dummy.name = f"מוצר לדוגמא — {asin}"
+                dummy.url = f"https://www.amazon.com/dp/{asin}"
+                dummy.last_status = "free"
+                products.append((dummy, None))
+    else:
+        products_result = await db.execute(
+            select(Product, UserProduct.custom_name)
+            .join(UserProduct, Product.id == UserProduct.product_id)
+            .where(UserProduct.user_id == target.id, UserProduct.is_paused == False)
+        )
+        products = products_result.all()
 
     if not products:
         dummy = Product()
-        dummy.asin = "B0TEST12345"
-        dummy.name = "מוצר לדוגמא — Apple AirPods Pro (2nd Gen)"
-        dummy.url = "https://www.amazon.com/dp/B0CHWRXH8B"
+        dummy.asin = "B08NYMBXG8"
+        dummy.name = "מוצר לדוגמא"
+        dummy.url = "https://www.amazon.com/dp/B08NYMBXG8"
         dummy.last_status = "free"
-        dummy.raw_text = "FREE Shipping to Israel"
         products = [(dummy, None)]
 
     dest = to or target.notify_email

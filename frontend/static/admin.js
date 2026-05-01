@@ -878,8 +878,13 @@ async function triggerSummary() {
   const btn = document.getElementById("run-summary-btn");
   const msg = document.getElementById("test-msg");
   const to = document.getElementById("test-target-email")?.value.trim();
+  const asins = document.getElementById("test-summary-asins")?.value.trim();
   btn.disabled = true; btn.textContent = "שולח...";
-  const url = to ? `/admin/trigger-summary?to=${encodeURIComponent(to)}` : "/admin/trigger-summary";
+  const params = new URLSearchParams();
+  if (to) params.set("to", to);
+  if (asins) params.set("asins", asins);
+  const qs = params.toString();
+  const url = `/admin/trigger-summary${qs ? "?" + qs : ""}`;
   const res = await apiFetch(url, { method: "POST" });
   btn.disabled = false; btn.textContent = "📧 שלח סיכום יומי";
   if (res) {
