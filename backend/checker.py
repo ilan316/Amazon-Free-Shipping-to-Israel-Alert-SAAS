@@ -173,14 +173,18 @@ def _extract_price(soup) -> str:
     # Ordered from most-specific (buybox) to less-specific — all scoped to buybox area
     buybox_selectors = [
         "#corePrice_desktop .a-offscreen",
+        "#corePriceDisplay_desktop_feature_div .a-offscreen",
+        "#corePrice_feature_div .a-offscreen",
         "#apex_desktop_qualifiedBuyBox .a-price .a-offscreen",
         "#apex_desktop .priceToPay .a-offscreen",
         ".priceToPay .a-offscreen",
         ".apexPriceToPay .a-offscreen",
+        "#tp_price_block_total_price_ww .a-offscreen",
         "#buybox .a-price .a-offscreen",
         "#buyBoxInner .a-price .a-offscreen",
         "#priceblock_ourprice",
         "#price_inside_buybox",
+        "#kindle-price",
     ]
     for sel in buybox_selectors:
         el = soup.select_one(sel)
