@@ -483,37 +483,52 @@ async def check_single_product(asin: str, url: str):
 
 
 async def check_decodo_quota():
-    """Check Decodo residential proxy bandwidth — logs WARNING if < 200 MB remaining."""
+    """Check Decodo proxy usage via statistics API — logs daily MB and 7-day average.
+    Logs WARNING if today > 200 MB (abnormal spike)."""
     logger.info("=== Decodo quota check started ===")
     api_key = os.environ.get("DECODO_API_KEY", "")
     if not api_key:
         logger.info("DECODO_API_KEY not set — skipping quota check.")
         return
     try:
+        now = datetime.now(timezone.utc)
+        start = (now - timedelta(days=7)).strftime("%Y-%m-%d 00:00:00")
+        end = now.strftime("%Y-%m-%d 23:59:59")
+        today_key = now.strftime("%Y-%m-%d 00:00:00")
+
         async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(
-                "https://api.decodo.com/v2/sub-users?service_type=residential_proxies",
-                headers={"Authorization": api_key},
+            resp = await client.post(
+                "https://api.decodo.com/api/v2/statistics/traffic",
+                headers={"Authorization": api_key, "Content-Type": "application/json"},
+                json={"proxyType": "residential_proxies", "startDate": start, "endDate": end, "groupBy": "day"},
             )
         if resp.status_code != 200:
-            logger.warning(f"Decodo quota API returned {resp.status_code}: {resp.text[:200]}")
+            logger.warning(f"Decodo stats API returned {resp.status_code}: {resp.text[:200]}")
             return
+
         data = resp.json()
-        items = data if isinstance(data, list) else data.get("data", [data])
-        total_limit = sum(i.get("traffic_limit_bytes", 0) or 0 for i in items)
-        total_used  = sum(i.get("traffic_used_bytes",  0) or 0 for i in items)
-        remaining_mb = (total_limit - total_used) / (1024 * 1024)
-        used_mb      = total_used / (1024 * 1024)
-        limit_mb     = total_limit / (1024 * 1024)
-        if remaining_mb < 200:
+        days = data.get("data", [])
+        if not days:
+            logger.warning("Decodo stats API returned empty data.")
+            return
+
+        today_mb = 0.0
+        total_mb = 0.0
+        for day in days:
+            mb = day.get("rx_tx_bytes", 0) / (1024 * 1024)
+            total_mb += mb
+            if day.get("key", "").startswith(now.strftime("%Y-%m-%d")):
+                today_mb = mb
+
+        avg_mb = total_mb / len(days)
+
+        if today_mb > 200:
             logger.warning(
-                f"🚨 DECODO QUOTA LOW: {remaining_mb:.1f} MB remaining "
-                f"({used_mb:.1f} / {limit_mb:.1f} MB used). Add funds to wallet!"
+                f"🚨 DECODO SPIKE: היום {today_mb:.1f} MB (ממוצע 7 ימים: {avg_mb:.1f} MB/day). בדוק deployments או גידול חריג במשתמשים."
             )
         else:
             logger.info(
-                f"✅ Decodo quota: {remaining_mb:.1f} MB remaining "
-                f"({used_mb:.1f} / {limit_mb:.1f} MB used)"
+                f"✅ Decodo: היום {today_mb:.1f} MB | ממוצע 7 ימים: {avg_mb:.1f} MB/day"
             )
     except Exception as e:
         logger.warning(f"Decodo quota check error: {e}")
