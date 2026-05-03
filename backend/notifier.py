@@ -1,4 +1,4 @@
-"""
+﻿"""
 Email notifier — Resend version.
 
 Key changes vs Gmail SMTP version:
@@ -215,7 +215,7 @@ def _send_via_resend(
         logger.error("RESEND_API_KEY not set")
         return False
     resend_client.api_key = api_key
-    from_addr = os.environ.get("FROM_EMAIL", "Amazon Israel Free Ship Alert <alerts@amzfreeil.com>")
+    from_addr = os.environ.get("FROM_EMAIL", "AMZ Free Ship Alert <alerts@amzfreeil.com>")
     payload: dict = {
         "from": from_addr,
         "to": [to],

@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>PREVIEW — לוג התראות מורחב</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --brand: #FF9900; --brand-dark: #ff6a00;
+    --bg: #fffaf1; --surface: #ffffff; --border: #e8e2d8;
+    --text: #172033; --text-muted: #4d5a70;
+    --success: #167d46; --warning: #b45309; --error: #c62828;
+    --radius: 10px; --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+  body { font-family: 'Heebo', Arial, sans-serif; background: var(--bg); color: var(--text); direction: rtl; padding: 32px 24px; }
+
+  /* ── preview banner ── */
+  .preview-banner {
+    background: #172033; color: #FF9900; padding: 10px 20px;
+    border-radius: 8px; font-size: 0.85rem; font-weight: 700;
+    margin-bottom: 24px; text-align: center; letter-spacing: 1px;
+  }
+
+  /* ── section ── */
+  .section { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px 24px; margin-bottom: 32px; }
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+  .section-header h2 { font-size: 1.05rem; }
+
+  /* ── controls row ── */
+  .controls-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .controls-row label { font-size: 0.85rem; color: var(--text-muted); }
+  select.limit-select {
+    padding: 5px 10px; border: 1px solid var(--border); border-radius: 7px;
+    font-size: 0.85rem; background: var(--surface); color: var(--text); cursor: pointer;
+  }
+  select.limit-select:focus { outline: none; border-color: var(--brand); }
+
+  /* ── filter buttons ── */
+  .filter-btn {
+    padding: 5px 14px; border: 1px solid var(--border); border-radius: 20px;
+    background: var(--surface); color: var(--text-muted); font-size: 0.82rem;
+    cursor: pointer; transition: all 0.15s; font-family: inherit;
+  }
+  .filter-btn:hover { border-color: var(--brand); color: var(--brand-dark); }
+  .filter-btn.active { background: var(--brand); color: #111; border-color: var(--brand); font-weight: 600; }
+
+  /* ── table ── */
+  .admin-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  .admin-table th { padding: 10px 14px; text-align: right; background: var(--bg); font-weight: 600; font-size: 0.8rem; color: var(--text-muted); border-bottom: 2px solid var(--border); white-space: nowrap; }
+  .admin-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .admin-table tr:last-child td { border-bottom: none; }
+  .admin-table tr:hover td { background: #fffdf7; }
+  .ltr { direction: ltr; text-align: left; }
+  .truncate { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── badges ── */
+  .status-badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+  .badge-FREE      { background: #e8f5e9; color: var(--success); }
+  .badge-PAID      { background: #fff3e0; color: var(--warning); }
+  .badge-NO_SHIP   { background: #fce8e8; color: var(--error); }
+  .badge-NOT_FOUND { background: #212121; color: #fff; }
+  .badge-UNKNOWN   { background: #f5f5f5; color: #757575; }
+
+  /* ── result cell ── */
+  .result-ok   { color: var(--success); font-weight: 600; }
+  .result-fail { color: var(--error);   font-weight: 600; }
+  .error-detail {
+    display: block; font-size: 0.72rem; color: var(--error);
+    margin-top: 3px; opacity: 0.85;
+  }
+
+  /* ── ASIN link ── */
+  .asin-link { color: var(--brand-dark); font-family: monospace; font-size: 0.82rem; }
+  .asin-link:hover { text-decoration: underline; }
+
+  /* ── email chip ── */
+  .email-chip {
+    display: inline-block; background: #f0f4ff; border: 1px solid #c5cfe8;
+    border-radius: 12px; padding: 2px 8px; font-size: 0.75rem; color: #2c3e7a;
+    direction: ltr;
+  }
+
+  /* ── load-more ── */
+  .load-more-row td {
+    text-align: center; padding: 14px;
+  }
+  .btn-load-more {
+    padding: 7px 22px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--surface); color: var(--text-muted); font-size: 0.85rem;
+    cursor: pointer; transition: all 0.15s; font-family: inherit;
+  }
+  .btn-load-more:hover { border-color: var(--brand); color: var(--brand-dark); background: #fff8ee; }
+
+  /* ── count chip ── */
+  .count-chip {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+    padding: 2px 10px; font-size: 0.78rem; color: var(--text-muted);
+  }
+  .count-chip span { color: var(--text); font-weight: 700; }
+
+  /* ── diff highlight (NEW vs CURRENT) ── */
+  .diff-new  { background: #e8f5e9; border-radius: 4px; padding: 1px 4px; font-size: 0.72rem; color: var(--success); font-weight: 700; margin-right: 4px; }
+  .diff-gone { background: #fce8e8; border-radius: 4px; padding: 1px 4px; font-size: 0.72rem; color: var(--error); font-weight: 700; margin-right: 4px; text-decoration: line-through; }
+
+  /* ── comparison panel ── */
+  .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+  @media (max-width: 700px) { .compare-grid { grid-template-columns: 1fr; } }
+  .compare-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px 20px 14px; }
+  .compare-card h3 { font-size: 0.92rem; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+  .compare-card.current h3 { border-color: #bbb; }
+  .compare-card.new-design h3 { border-color: var(--brand); }
+  .overflow-x { overflow-x: auto; }
+</style>
+</head>
+<body>
+
+<div class="preview-banner">🔍 PREVIEW ONLY — לא שמור לייב</div>
+
+<!-- ════════════════════════════════════════════
+     BEFORE / AFTER  COMPARISON
+     ════════════════════════════════════════════ -->
+<div class="compare-grid">
+
+  <!-- CURRENT -->
+  <div class="compare-card current">
+    <h3>לפני — לוג נוכחי</h3>
+    <div class="overflow-x">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>תאריך</th>
+            <th>משתמש</th>
+            <th>מוצר</th>
+            <th>סטטוס</th>
+            <th>תוצאה</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="ltr">17.4.2026, 8:00:14</td>
+            <td class="ltr truncate">eingal8@gmail.com</td>
+            <td class="truncate">...ck with Rain Cover for Men and Women, Black</td>
+            <td><span class="status-badge badge-FREE">משלוח חינם</span></td>
+            <td style="color:var(--success)">✅ נשלח</td>
+          </tr>
+          <tr>
+            <td class="ltr">17.4.2026, 8:00:07</td>
+            <td class="ltr truncate">lianhorowitz8@gmail.com</td>
+            <td class="truncate">...ses: Coloriez les chiffres et découvrez l'image</td>
+            <td><span class="status-badge badge-FREE">משלוח חינם</span></td>
+            <td style="color:var(--success)">✅ נשלח</td>
+          </tr>
+          <tr>
+            <td class="ltr">16.4.2026, 8:01:33</td>
+            <td class="ltr truncate">david.k@gmail.com</td>
+            <td class="truncate">Apple AirPods Pro (2nd Generation)</td>
+            <td><span class="status-badge badge-PAID">משלוח בתשלום</span></td>
+            <td style="color:var(--error)">❌ נכשל</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- NEW -->
+  <div class="compare-card new-design">
+    <h3>אחרי — לוג מורחב <span class="diff-new">חדש</span></h3>
+
+    <!-- controls row — NEW -->
+    <div class="controls-row">
+      <span class="diff-new">חדש</span>
+      <label>הצג:</label>
+      <select class="limit-select">
+        <option value="50">50 שורות</option>
+        <option value="100" selected>100 שורות</option>
+        <option value="200">200 שורות</option>
+      </select>
+      <button class="filter-btn active" onclick="setFilter('ALL',this)">הכל</button>
+      <button class="filter-btn" onclick="setFilter('OK',this)">✅ הצלחות</button>
+      <button class="filter-btn" onclick="setFilter('FAIL',this)">❌ כישלונות</button>
+      <span class="count-chip"><span id="row-count">3</span> רשומות</span>
+    </div>
+
+    <div class="overflow-x">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>תאריך</th>
+            <th>משתמש</th>
+            <th>אימייל יעד <span class="diff-new">חדש</span></th>
+            <th>מוצר</th>
+            <th>ASIN <span class="diff-new">חדש</span></th>
+            <th>סטטוס</th>
+            <th>תוצאה</th>
+          </tr>
+        </thead>
+        <tbody id="new-tbody">
+          <tr>
+            <td class="ltr" style="white-space:nowrap">17.4.2026, 8:00:14</td>
+            <td class="ltr truncate" style="max-width:130px">eingal8@gmail.com</td>
+            <td><span class="email-chip">eingal8@gmail.com</span></td>
+            <td class="truncate" style="max-width:160px">Backpack with Rain Cover for Men and Women, Black</td>
+            <td class="ltr"><a class="asin-link" href="#">B09WX3TQ79</a></td>
+            <td><span class="status-badge badge-FREE">משלוח חינם</span></td>
+            <td class="result-ok">✅ נשלח</td>
+          </tr>
+          <tr>
+            <td class="ltr" style="white-space:nowrap">17.4.2026, 8:00:07</td>
+            <td class="ltr truncate" style="max-width:130px">lianhorowitz8@gmail.com</td>
+            <td><span class="email-chip">lianhorowitz8@gmail.com</span></td>
+            <td class="truncate" style="max-width:160px">Coloriez les chiffres et découvrez l'image</td>
+            <td class="ltr"><a class="asin-link" href="#">B08MFDB8QJ</a></td>
+            <td><span class="status-badge badge-FREE">משלוח חינם</span></td>
+            <td class="result-ok">✅ נשלח</td>
+          </tr>
+          <tr class="row-fail">
+            <td class="ltr" style="white-space:nowrap">16.4.2026, 8:01:33</td>
+            <td class="ltr truncate" style="max-width:130px">david.k@gmail.com</td>
+            <td><span class="email-chip">alerts@david.co.il</span></td>
+            <td class="truncate" style="max-width:160px">Apple AirPods Pro (2nd Gen)</td>
+            <td class="ltr"><a class="asin-link" href="#">B0BDHWDR12</a></td>
+            <td><span class="status-badge badge-PAID">משלוח בתשלום</span></td>
+            <td class="result-fail">
+              ❌ נכשל
+              <span class="error-detail">SMTP timeout after 30s</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- end compare-grid -->
+
+
+<!-- ════════════════════════════════════════════
+     FULL NEW DESIGN — standalone section
+     ════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <h2>לוג התראות אחרונות</h2>
+  </div>
+
+  <!-- controls -->
+  <div class="controls-row">
+    <label>הצג:</label>
+    <select class="limit-select" onchange="applyFilter()">
+      <option value="50">50 שורות</option>
+      <option value="100" selected>100 שורות</option>
+      <option value="200">200 שורות</option>
+    </select>
+    <button class="filter-btn active" onclick="setFilter2('ALL',this)">הכל</button>
+    <button class="filter-btn" onclick="setFilter2('OK',this)">✅ הצלחות</button>
+    <button class="filter-btn" onclick="setFilter2('FAIL',this)">❌ כישלונות</button>
+    <span class="count-chip"><span id="row-count2">8</span> רשומות</span>
+  </div>
+
+  <div style="overflow-x:auto;">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>תאריך</th>
+          <th>משתמש</th>
+          <th>אימייל יעד</th>
+          <th>מוצר</th>
+          <th>ASIN</th>
+          <th>סטטוס</th>
+          <th>תוצאה</th>
+        </tr>
+      </thead>
+      <tbody id="full-tbody">
+
+        <tr data-ok="1">
+          <td class="ltr" style="white-space:nowrap">17.4.2026, 8:00:14</td>
+          <td class="ltr">eingal8@gmail.com</td>
+          <td><span class="email-chip">eingal8@gmail.com</span></td>
+          <td class="truncate" style="max-width:220px">Backpack with Rain Cover for Men and Women, Black</td>
+          <td class="ltr"><a class="asin-link" href="https://www.amazon.com/dp/B09WX3TQ79" target="_blank">B09WX3TQ79</a></td>
+          <td><span class="status-badge badge-FREE">✅ משלוח חינם</span></td>
+          <td class="result-ok">✅ נשלח</td>
+        </tr>
+
+        <tr data-ok="1">
+          <td class="ltr" style="white-space:nowrap">17.4.2026, 8:00:07</td>
+          <td class="ltr">lianhorowitz8@gmail.com</td>
+          <td><span class="email-chip">lianhorowitz8@gmail.com</span></td>
+          <td class="truncate" style="max-width:220px">Coloriez les chiffres et découvrez l'image</td>
+          <td class="ltr"><a class="asin-link" href="https://www.amazon.com/dp/B08MFDB8QJ" target="_blank">B08MFDB8QJ</a></td>
+          <td><span class="status-badge badge-FREE">✅ משלוח חינם</span></td>
+          <td class="result-ok">✅ נשלח</td>
+        </tr>
+
+        <tr data-ok="0">
+          <td class="ltr" style="white-space:nowrap">16.4.2026, 8:01:33</td>
+          <td class="ltr">david.k@gmail.com</td>
+          <td><span class="email-chip">alerts@david.co.il</span></td>
+          <td class="truncate" style="max-width:220px">Apple AirPods Pro (2nd Generation)</td>
+          <td class="ltr"><a class="asin-link" href="https://www.amazon.com/dp/B0BDHWDR12" target="_blank">B0BDHWDR12</a></td>
+          <td><span class="status-badge badge-PAID">💳 משלוח בתשלום</span></td>
+          <td class="result-fail">
+            ❌ נכשל
+            <span class="error-detail">SMTP timeout after 30s</span>
+          </td>
+        </tr>
+
+        <tr data-ok="1">
+          <td class="ltr" style="white-space:nowrap">16.4.2026, 8:00:58</td>
+          <td class="ltr">miriam.b@hotmail.com</td>
+          <td><span class="email-chip">miriam.b@hotmail.com</span></td>
+          <td class="truncate" style="max-width:220px">Instant Pot Duo 7-in-1 Electric Pressure Cooker</td>
+          <td class="ltr"><a class="asin-link" href="https://www.amazon.com/dp/B00FLYWNYQ" target="_blank">B00FLYWNYQ</a></td>
+          <td><span class="status-badge badge-FREE">✅ משלוח חינם</span></td>
+          <td class="result-ok">✅ נשלח</td>
+        </tr>
+
+        <tr data-ok="1">
+          <td class="ltr" style="white-space:nowrap">15.4.2026, 8:02:11</td>
+          <td class="ltr">noam.levi@gmail.com</td>
+          <td><span class="email-chip">noam@family.il</span></td>
+          <td class="truncate" style="max-width:220px">LEGO Star Wars Millennium Falcon 75257</td>
+          <td class="ltr"><a class="asin-link" href="https://www.amazon.com/dp/B07W3GWS4B" target="_blank">B07W3GWS4B</a></td>
+          <td><span class="status-badge badge-FREE">✅ משלוח חינם</span></td>
+          <td class="result-ok">✅ נשלח</td>
+        </tr>
+
+        <tr data-ok="0">
+          <td class="ltr" style="white-space:nowrap">15.4.2026, 8:01:05</td>
+          <td class="ltr">test.user@proton.me</td>
+          <td><span class="email-chip">test.user@proton.me</span></td>
+          <td class="truncate" style="max-width:220px">Sony WH-1000XM5 Wireless Headphones</td>
+          <td class="ltr"><a class="asin-link" href="https://www.amazon.com/dp/B09XS7JWHH" target="_blank">B09XS7JWHH</a></td>
+          <td><span class="status-badge badge-NO_SHIP">🚫 לא נשלח לארץ</span></td>
+          <td class="result-fail">
+            ❌ נכשל
+            <span class="error-detail">Connection refused: mail.resend.com:465</span>
+          </td>
+        </tr>
+
+        <tr data-ok="1">
+          <td class="ltr" style="white-space:nowrap">14.4.2026, 8:00:42</td>
+          <td class="ltr">yael.cohen@walla.com</td>
+          <td><span class="email-chip">yael.cohen@walla.com</span></td>
+          <td class="truncate" style="max-width:220px">KitchenAid Classic Stand Mixer, 4.5-Qt</td>
+          <td class="ltr"><a class="asin-link" href="https://www.amazon.com/dp/B00005UP2P" target="_blank">B00005UP2P</a></td>
+          <td><span class="status-badge badge-FREE">✅ משלוח חינם</span></td>
+          <td class="result-ok">✅ נשלח</td>
+        </tr>
+
+        <tr data-ok="1">
+          <td class="ltr" style="white-space:nowrap">14.4.2026, 8:00:19</td>
+          <td class="ltr">ronit.sh@gmail.com</td>
+          <td><span class="email-chip">ronit.sh@gmail.com</span></td>
+          <td class="truncate" style="max-width:220px">Ninja AF101 Air Fryer that Crisps, Roasts</td>
+          <td class="ltr"><a class="asin-link" href="https://www.amazon.com/dp/B07FDJMC9Q" target="_blank">B07FDJMC9Q</a></td>
+          <td><span class="status-badge badge-FREE">✅ משלוח חינם</span></td>
+          <td class="result-ok">✅ נשלח</td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+let currentFilter2 = 'ALL';
+
+function setFilter(val, btn) {
+  document.querySelectorAll('.compare-card.new-design .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const rows = document.querySelectorAll('#new-tbody tr');
+  let count = 0;
+  rows.forEach(r => {
+    const ok = r.dataset.ok !== undefined ? r.dataset.ok : '1';
+    // default all visible in new-tbody
+    r.style.display = '';
+    count++;
+  });
+  document.getElementById('row-count').textContent = count;
+}
+
+function setFilter2(val, btn) {
+  currentFilter2 = val;
+  document.querySelectorAll('.section .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const rows = document.querySelectorAll('#full-tbody tr');
+  let count = 0;
+  rows.forEach(r => {
+    const ok = r.dataset.ok;
+    if (val === 'ALL') { r.style.display = ''; count++; }
+    else if (val === 'OK'   && ok === '1') { r.style.display = ''; count++; }
+    else if (val === 'FAIL' && ok === '0') { r.style.display = ''; count++; }
+    else r.style.display = 'none';
+  });
+  document.getElementById('row-count2').textContent = count;
+}
+</script>
+</body>
+</html>
