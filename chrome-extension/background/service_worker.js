@@ -66,7 +66,7 @@ async function handleLogin(email, password) {
 async function handleGoogleLogin() {
   try {
     const configRes = await fetch(`${API_BASE}/auth/google-config`);
-    if (!configRes.ok) return { ok: false, error: 'Google login not available' };
+    if (!configRes.ok) return { ok: false, error: 'כניסה עם Google אינה זמינה כרגע' };
     const { client_id } = await configRes.json();
 
     const redirectUrl = chrome.identity.getRedirectURL();
