@@ -84,6 +84,7 @@ class CheckResult:
     product_name: str = ""
     found_in_aod: bool = False
     last_price: str = ""
+    image_url: str = ""
 
 
 # ── Selectors ─────────────────────────────────────────────────────────────────
@@ -193,6 +194,21 @@ def _extract_price(soup) -> str:
             if txt and any(c.isdigit() for c in txt):
                 # Normalize: ILS42.81 → ILS 42.81 (currency code stuck to digits)
                 return _re.sub(r"([A-Z]{2,})(\d)", r"\1 \2", txt)
+    return ""
+
+
+def _extract_image_url(soup) -> str:
+    """Extract product image URL from parsed Amazon HTML.
+    Tries og:image meta tag first, then #landingImage img src."""
+    og = soup.find("meta", property="og:image")
+    if og and og.get("content"):
+        return og["content"]
+    img = soup.find(id="landingImage")
+    if img and img.get("src") and img["src"].startswith("http"):
+        return img["src"]
+    img = soup.find(id="imgBlkFront")
+    if img and img.get("src") and img["src"].startswith("http"):
+        return img["src"]
     return ""
 
 
@@ -402,8 +418,9 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
 
     status = _classify(raw_text)
     price = _extract_price(soup)
+    image_url = _extract_image_url(soup)
     logger.info(f"[{asin}] httpx: {status.value} | price={price!r} | {raw_text[:120]!r}")
-    return CheckResult(asin, status, raw_text=raw_text, product_name=product_name, last_price=price)
+    return CheckResult(asin, status, raw_text=raw_text, product_name=product_name, last_price=price, image_url=image_url)
 
 
 async def _check_product_httpx(asin: str, url: str, cookies: list) -> CheckResult:
@@ -776,19 +793,21 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
             return CheckResult(asin, ShippingStatus.NO_SHIP, error_message="No delivery block found",
                                product_name=product_name)
 
-        # Extract price from current page HTML
+        # Extract price and image from current page HTML
         pw_price = ""
+        pw_image = ""
         try:
             from bs4 import BeautifulSoup as _BS
             pw_html = await page.content()
             pw_soup = _BS(pw_html, "html.parser")
             pw_price = _extract_price(pw_soup)
+            pw_image = _extract_image_url(pw_soup)
         except Exception:
             pass
 
         logger.info(f"[{asin}] {status.value} | price={pw_price!r} | {raw_text[:120]!r}")
         return CheckResult(asin, status, raw_text=raw_text, product_name=product_name,
-                           found_in_aod=found_in_aod, last_price=pw_price)
+                           found_in_aod=found_in_aod, last_price=pw_price, image_url=pw_image)
 
     except PWTimeout as e:
         return CheckResult(asin, ShippingStatus.ERROR, error_message=f"Timeout: {e}")

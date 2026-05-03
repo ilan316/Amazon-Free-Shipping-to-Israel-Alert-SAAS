@@ -208,7 +208,7 @@ async def public_free_products():
             "asin": p.asin,
             "name": p.name or p.asin,
             "url": f"https://www.amazon.com/dp/{p.asin}?tag={tag}",
-            "image": f"https://images-na.ssl-images-amazon.com/images/P/{p.asin}.01._SL200_.jpg",
+            "image": p.image_url or f"https://images-na.ssl-images-amazon.com/images/P/{p.asin}.01._SL200_.jpg",
             "last_price": p.last_price,
             "found_in_aod": p.found_in_aod,
             "last_checked": p.last_checked.isoformat() if p.last_checked else None,

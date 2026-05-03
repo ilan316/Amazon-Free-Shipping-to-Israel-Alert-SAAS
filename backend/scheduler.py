@@ -47,6 +47,8 @@ async def _update_product(db: AsyncSession, product: Product, result: CheckResul
             product.name = result.product_name
         if result.last_price:
             product.last_price = result.last_price
+        if result.image_url:
+            product.image_url = result.image_url
         await db.commit()
         return False
     elif result.status == ShippingStatus.UNKNOWN:
