@@ -188,6 +188,35 @@ async def public_config():
     return {"google_client_id": os.environ.get("GOOGLE_CLIENT_ID", "")}
 
 
+@app.get("/api/public/free-products")
+async def public_free_products():
+    """Public endpoint — returns all products currently with FREE shipping to Israel.
+    Used by amzfreeil.com/free-products.html (no auth required, CORS open)."""
+    from backend.database import AsyncSessionLocal
+    from backend.models import Product
+    from sqlalchemy import select
+    tag = os.environ.get("AMAZON_AFFILIATE_TAG", "amzfreeil-20").strip()
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(Product)
+            .where(Product.last_status == "FREE")
+            .order_by(Product.last_checked.desc())
+        )
+        products = result.scalars().all()
+    return [
+        {
+            "asin": p.asin,
+            "name": p.name or p.asin,
+            "url": f"https://www.amazon.com/dp/{p.asin}?tag={tag}",
+            "image": f"https://images-na.ssl-images-amazon.com/images/P/{p.asin}.01._SL200_.jpg",
+            "last_price": p.last_price,
+            "found_in_aod": p.found_in_aod,
+            "last_checked": p.last_checked.isoformat() if p.last_checked else None,
+        }
+        for p in products
+    ]
+
+
 @app.get("/system-message")
 async def public_system_message():
     from backend.database import AsyncSessionLocal
