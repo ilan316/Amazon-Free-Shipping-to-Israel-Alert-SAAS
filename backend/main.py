@@ -254,7 +254,7 @@ async def contact_form(request: Request, body: ContactRequest):
     return {"ok": True}
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health():
     job = scheduler.get_job("global_check")
     summary_job = scheduler.get_job("daily_summary")
