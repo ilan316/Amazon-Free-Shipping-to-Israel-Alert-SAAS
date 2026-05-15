@@ -649,9 +649,11 @@ def _classify(text: str) -> ShippingStatus:
     text = re.sub(r'([A-Z]{2,})(\d)', r'\1 \2', text)
     t = text.lower()
 
-    # No buybox — Amazon redirecting to alternatives, product not purchasable directly
+    # No main buybox — product available via third-party offers only
+    if "see all buying options" in t:
+        return ShippingStatus.PAID
     if "see similar items" in t:
-        return ShippingStatus.NOT_FOUND
+        return ShippingStatus.UNKNOWN
 
     # NO_SHIP must be checked FIRST — "cannot be shipped" always wins over any "free delivery" text
     # that may appear elsewhere on the page (recommendations, AOD panel, etc.)
