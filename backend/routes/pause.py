@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from backend.auth import SECRET_KEY, ALGORITHM
 from backend.database import AsyncSessionLocal
-from backend.models import User
+from backend.models import User, UserProduct, Product
 
 router = APIRouter()
 
@@ -119,6 +119,13 @@ def _decode_pause_token(token: str) -> int:
     return int(payload["sub"])
 
 
+def _decode_product_pause_token(token: str) -> tuple[int, str]:
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    if payload.get("type") != "pause_product":
+        raise ValueError("Invalid token type")
+    return int(payload["sub"]), payload["asin"]
+
+
 @router.get("/pause", response_class=HTMLResponse, include_in_schema=False)
 async def pause_explain(token: str = Query(...)):
     """Show explanation page — no action taken yet."""
@@ -127,6 +134,57 @@ async def pause_explain(token: str = Query(...)):
     except (JWTError, ValueError, KeyError):
         return HTMLResponse(_ERROR_HTML, status_code=400)
     return HTMLResponse(_explain_html(token))
+
+
+_PRODUCT_PAUSED_HTML = """<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>מוצר הושהה</title>
+  <style>
+    body {{ margin:0; padding:0; background:#f3f3f3; font-family:Arial,'Segoe UI',sans-serif; }}
+    .box {{ max-width:480px; margin:80px auto; background:#fff; border-radius:12px;
+            padding:40px 32px; text-align:center; box-shadow:0 2px 12px rgba(0,0,0,.08); }}
+    .icon {{ font-size:48px; margin-bottom:16px; }}
+    h1 {{ color:#333; font-size:22px; margin:0 0 12px; }}
+    p {{ color:#666; font-size:15px; line-height:1.6; margin:0 0 24px; }}
+    a.btn {{ display:inline-block; background:#FF9900; color:#111; font-weight:bold;
+             text-decoration:none; padding:12px 28px; border-radius:8px; font-size:15px; }}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="icon">⏸️</div>
+    <h1>הבדיקות למוצר הושהו</h1>
+    <p>לא נבדוק יותר מוצר זה עד שתפעיל אותו מחדש דרך הדשבורד.</p>
+    <a class="btn" href="{app_url}/dashboard">לניהול המוצרים שלי</a>
+  </div>
+</body>
+</html>""".format(app_url=_APP_URL)
+
+
+@router.get("/pause-product", response_class=HTMLResponse, include_in_schema=False)
+async def pause_product(token: str = Query(...)):
+    """Pause a single product from a no-click reminder email."""
+    try:
+        user_id, asin = _decode_product_pause_token(token)
+    except (JWTError, ValueError, KeyError):
+        return HTMLResponse(_ERROR_HTML, status_code=400)
+
+    async with AsyncSessionLocal() as db:
+        product = (await db.execute(select(Product).where(Product.asin == asin))).scalar_one_or_none()
+        if not product:
+            return HTMLResponse(_ERROR_HTML, status_code=404)
+        up = (await db.execute(
+            select(UserProduct).where(UserProduct.user_id == user_id, UserProduct.product_id == product.id)
+        )).scalar_one_or_none()
+        if not up:
+            return HTMLResponse(_ERROR_HTML, status_code=404)
+        up.is_paused = True
+        await db.commit()
+
+    return HTMLResponse(_PRODUCT_PAUSED_HTML)
 
 
 @router.get("/pause/confirm", response_class=HTMLResponse, include_in_schema=False)

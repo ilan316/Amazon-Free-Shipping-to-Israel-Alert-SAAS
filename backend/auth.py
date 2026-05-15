@@ -38,6 +38,11 @@ def create_pause_token(user_id: int) -> str:
     return jwt.encode({"sub": str(user_id), "type": "pause", "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
 
 
+def create_product_pause_token(user_id: int, asin: str) -> str:
+    expire = datetime.utcnow() + timedelta(days=30)
+    return jwt.encode({"sub": str(user_id), "asin": asin, "type": "pause_product", "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
+
+
 async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
     db: Annotated[AsyncSession, Depends(get_db)],

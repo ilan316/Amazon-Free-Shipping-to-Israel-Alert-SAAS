@@ -63,6 +63,7 @@ class UserProduct(Base):
     is_paused: Mapped[bool] = mapped_column(Boolean, default=False)
     paused_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    no_click_reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="user_products")
     product: Mapped["Product"] = relationship(back_populates="user_products")

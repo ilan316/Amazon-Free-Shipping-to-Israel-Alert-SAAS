@@ -11,7 +11,7 @@ import os
 import logging
 from datetime import datetime
 from urllib.parse import urlencode
-from backend.auth import create_pause_token
+from backend.auth import create_pause_token, create_product_pause_token
 
 import resend as resend_client
 
@@ -199,6 +199,12 @@ def _pause_url(user_id: int) -> str:
     base = os.environ.get("APP_BASE_URL", "https://app.amzfreeil.com").rstrip("/")
     token = create_pause_token(user_id)
     return f"{base}/pause?token={token}"
+
+
+def _pause_product_url(user_id: int, asin: str) -> str:
+    base = os.environ.get("APP_BASE_URL", "https://app.amzfreeil.com").rstrip("/")
+    token = create_product_pause_token(user_id, asin)
+    return f"{base}/pause-product?token={token}"
 
 
 # ── Resend sender ─────────────────────────────────────────────────────────────
@@ -656,3 +662,158 @@ def send_daily_summary(user, free_products: list) -> bool:
         "List-Id": "Amazon Israel Alert <alerts.amzfreeil.com>",
     }
     return _send_via_resend(recipient, subject, html_body, text_body, extra_headers=headers)
+
+
+# ── No-click reminder ─────────────────────────────────────────────────────────
+
+def send_no_click_reminder(user, product, days_free: int) -> bool:
+    """
+    Sent once when a FREE product has not been clicked for 7+ days.
+    Warns that checks will be auto-paused in 2 days if no action is taken.
+    """
+    if getattr(user, "notify_email_bounced", False):
+        return False
+
+    lang = getattr(user, "language", "he") or "he"
+    is_rtl = lang == "he"
+    txt_dir = 'dir="rtl"' if is_rtl else ""
+    txt_align = "right" if is_rtl else "left"
+    body_dir = ' dir="rtl"' if is_rtl else ""
+
+    asin = product.asin
+    name = _short(product.name or asin, _MAX_NAME_BODY)
+    name_subject = _short(product.name or asin, _MAX_NAME_SUBJECT)
+    buy_url = _tracking_url(user.id, asin)
+    pause_url = _pause_product_url(user.id, asin)
+    logo_url = os.environ.get("LOGO_URL", "").strip()
+    affiliate_tag = os.environ.get("AMAZON_AFFILIATE_TAG", "").strip()
+    checked_at = datetime.now().strftime("%d/%m/%Y")
+
+    if lang == "he":
+        subject = f"⏰ {name_subject} — חינם כבר {days_free} ימים, עדיין מתכנן לקנות?"
+        preheader = "בעוד יומיים נפסיק לבדוק את המוצר הזה אוטומטית — אלא אם תפעל"
+        heading = f"המוצר הזה חינם כבר {days_free} ימים 🤔"
+        body_text = (
+            f"שמנו לב שלא לחצת על <strong>{name}</strong> מאז שהוא במשלוח חינם.<br><br>"
+            "אם אתה מתכנן לקנות — זה הזמן. המחיר יכול להשתנות בכל רגע.<br>"
+            "אם הוא כבר לא רלוונטי — אין בעיה, נשהה את הבדיקות אוטומטית בעוד יומיים."
+        )
+        btn_buy = "קנה עכשיו — משלוח חינם"
+        btn_pause = "השהה מוצר זה"
+        warning = "⏱️ בעוד יומיים — אם לא תלחץ, הבדיקות למוצר זה יופסקו אוטומטית."
+        footer_txt = f"נבדק: {checked_at} · Amazon Free Shipping to Israel Alert"
+        plain = (
+            f"⏰ {name} חינם כבר {days_free} ימים\n\n"
+            f"קנה עכשיו: {buy_url}\n"
+            f"השהה מוצר: {pause_url}\n\n"
+            f"בעוד יומיים נפסיק לבדוק אוטומטית אם לא תפעל.\n\n{footer_txt}"
+        )
+    else:
+        subject = f"⏰ {name_subject} — free for {days_free} days, still planning to buy?"
+        preheader = "We'll stop checking this product in 2 days — unless you take action"
+        heading = f"This product has been free for {days_free} days 🤔"
+        body_text = (
+            f"We noticed you haven't clicked on <strong>{name}</strong> since it became free shipping.<br><br>"
+            "If you're planning to buy — now's the time. The price can change at any moment.<br>"
+            "If it's no longer relevant — no problem, we'll auto-pause checks in 2 days."
+        )
+        btn_buy = "Buy Now — Free Shipping"
+        btn_pause = "Pause this product"
+        warning = "⏱️ In 2 days — if you don't click, checks for this product will be auto-paused."
+        footer_txt = f"Checked: {checked_at} · Amazon Free Shipping to Israel Alert"
+        plain = (
+            f"⏰ {name} has been free for {days_free} days\n\n"
+            f"Buy now: {buy_url}\n"
+            f"Pause product: {pause_url}\n\n"
+            f"We'll stop checking automatically in 2 days if you take no action.\n\n{footer_txt}"
+        )
+
+    header_brand = (
+        f'<img src="{logo_url}" width="180" alt="Amazon Free shipping to Israel Alert"'
+        f' style="display:block;margin:0 auto 12px;max-width:180px;">'
+        if logo_url
+        else f'<h1 style="margin:0 0 6px;color:#e47911;font-size:22px;font-weight:bold;" {txt_dir}>Amazon Free Shipping 🚚</h1>'
+    )
+
+    disclosure_html = ""
+    if affiliate_tag:
+        disc = "קישור שותף — הקנייה לא עולה לך יותר." if lang == "he" else "Affiliate link — no extra cost to you."
+        disclosure_html = (
+            f'<p style="margin:0 0 12px;font-size:12px;color:#999;font-style:italic;text-align:{txt_align};" {txt_dir}>{disc}</p>'
+        )
+
+    price_html = ""
+    if getattr(product, "last_price", None):
+        price_html = f'<p style="margin:0 0 16px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {product.last_price}</p>'
+
+    html_body = f"""<!DOCTYPE html>
+<html{body_dir}>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    @media only screen and (max-width:600px){{.email-container{{width:100% !important;}}}}
+  </style>
+</head>
+<body{body_dir} style="margin:0;padding:0;background:#f3f3f3;font-family:Arial,'Segoe UI',sans-serif;">
+  <div style="display:none;max-height:0;overflow:hidden;">{preheader}</div>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f3f3;padding:24px 0;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" class="email-container"
+             style="max-width:600px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e8e8e8;">
+        <tr>
+          <td style="background:#ffffff;border-bottom:2px solid #FF9900;padding:24px 24px 18px;text-align:center;">
+            {header_brand}
+            <p style="margin:6px 0 0;font-size:18px;font-weight:bold;color:#333;" {txt_dir}>{heading}</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px;">
+            <p style="margin:0 0 16px;font-size:15px;color:#444;line-height:1.7;text-align:{txt_align};" {txt_dir}>{body_text}</p>
+            <p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:#007600;text-align:{txt_align};" {txt_dir}>
+              ✅ {'משלוח חינם לישראל · הזמנות מעל $49' if lang == 'he' else 'FREE Shipping to Israel · Orders $49+'}
+            </p>
+            {price_html}
+            {disclosure_html}
+            <table cellpadding="0" cellspacing="0" border="0" style="margin:12px 0;">
+              <tr>
+                <td align="center" bgcolor="#FF9900" style="border-radius:6px;">
+                  <a href="{buy_url}"
+                     style="display:inline-block;background:#FF9900;color:#111111;font-family:Arial,sans-serif;
+                            font-size:14px;font-weight:bold;text-decoration:none;padding:11px 28px;
+                            border-radius:6px;white-space:nowrap;"
+                     target="_blank">{btn_buy}</a>
+                </td>
+                <td width="12"></td>
+                <td align="center" style="border-radius:6px;border:1px solid #ccc;">
+                  <a href="{pause_url}"
+                     style="display:inline-block;background:#ffffff;color:#666;font-family:Arial,sans-serif;
+                            font-size:13px;text-decoration:none;padding:10px 20px;border-radius:6px;white-space:nowrap;"
+                     target="_blank">{btn_pause}</a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:20px 0 0;font-size:12px;color:#7a5c00;background:#fff8e1;border-radius:6px;
+                      padding:10px 14px;border-{'right' if is_rtl else 'left'}:3px solid #FF9900;text-align:{txt_align};" {txt_dir}>
+              {warning}
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f8f8f8;border-top:1px solid #eee;padding:14px 24px;text-align:center;">
+            <p style="margin:0;color:#888;font-size:12px;" {txt_dir}>{footer_txt}</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
+    unsubscribe_url = _pause_url(user.id)
+    extra_headers = {
+        "List-Unsubscribe": f"<{unsubscribe_url}>",
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        "List-Id": "Amazon Israel Alert <alerts.amzfreeil.com>",
+    }
+    return _send_via_resend(user.notify_email, subject, html_body, plain, extra_headers=extra_headers)
