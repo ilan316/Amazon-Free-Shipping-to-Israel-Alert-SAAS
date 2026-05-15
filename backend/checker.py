@@ -416,6 +416,9 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
     status = _classify(raw_text)
     price = _extract_price(soup)
     image_url = _extract_image_url(soup)
+    # ILS price = Israel context confirmed by proxy IP — delivery text won't say "Israel" explicitly
+    if status == ShippingStatus.UNKNOWN and price.upper().startswith("ILS"):
+        status = ShippingStatus.PAID
     logger.info(f"[{asin}] httpx: {status.value} | price={price!r} | {raw_text[:120]!r}")
     return CheckResult(asin, status, raw_text=raw_text, product_name=product_name, last_price=price, image_url=image_url)
 
@@ -813,6 +816,9 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
         except Exception:
             pass
 
+        # ILS price = Israel context via proxy IP — delivery text won't say "Israel" explicitly
+        if status == ShippingStatus.UNKNOWN and pw_price.upper().startswith("ILS"):
+            status = ShippingStatus.PAID
         logger.info(f"[{asin}] {status.value} | price={pw_price!r} | {raw_text[:120]!r}")
         return CheckResult(asin, status, raw_text=raw_text, product_name=product_name,
                            found_in_aod=found_in_aod, last_price=pw_price, image_url=pw_image)
