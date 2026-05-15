@@ -341,12 +341,12 @@ async def _try_set_location_httpx(proxy_url: str = "") -> tuple:
 
             logger.info(f"curl_cffi location: verification nav text = {nav_text!r}")
 
-            if "israel" in nav_text or "israel" in resp3.text.lower():
+            if "israel" in nav_text:
                 cookie_list = [{"name": k, "value": v} for k, v in session.cookies.items()]
                 logger.info(f"curl_cffi location: Israel confirmed ✓ ({len(cookie_list)} cookies)")
                 return True, cookie_list
 
-            logger.warning("curl_cffi location: Israel NOT confirmed")
+            logger.warning(f"curl_cffi location: Israel NOT confirmed in nav (nav_text={nav_text!r})")
             return False, []
     except Exception as e:
         logger.warning(f"curl_cffi location: error — {e}")
