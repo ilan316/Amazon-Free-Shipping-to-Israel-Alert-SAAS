@@ -641,8 +641,9 @@ async def _verify_location(page: Page) -> bool:
 # ── Classification ────────────────────────────────────────────────────────────
 
 def _classify(text: str) -> ShippingStatus:
-    # Normalize non-breaking spaces (\xa0) so ILS\xa059.14 becomes ILS 59.14
+    # Normalize non-breaking spaces and ILS/₪ stuck to digits (e.g. ILS75.84 → ILS 75.84)
     text = text.replace('\xa0', ' ')
+    text = re.sub(r'([A-Z]{2,})(\d)', r'\1 \2', text)
     t = text.lower()
 
     # NO_SHIP must be checked FIRST — "cannot be shipped" always wins over any "free delivery" text
