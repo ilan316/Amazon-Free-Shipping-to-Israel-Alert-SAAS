@@ -45,8 +45,7 @@ async def _update_product(db: AsyncSession, product: Product, result: CheckResul
         product.consecutive_errors = 0
         if result.product_name:
             product.name = result.product_name
-        if result.last_price:
-            product.last_price = result.last_price
+        product.last_price = result.last_price  # '' clears stale buybox price
         if result.image_url:
             product.image_url = result.image_url
         await db.commit()
