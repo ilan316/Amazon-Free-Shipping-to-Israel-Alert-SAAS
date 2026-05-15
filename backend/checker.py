@@ -40,9 +40,6 @@ logger = logging.getLogger(__name__)
 
 BROWSER_PROFILE_DIR = os.environ.get("BROWSER_PROFILE_DIR", "/app/browser_profile")
 
-# Residential proxy for httpx location requests (HTTP/HTTPS format)
-NORDVPN_PROXY = os.environ.get("RESIDENTIAL_PROXY", "")
-
 # Residential proxy for Playwright browser (SOCKS5 format with sticky session)
 # Format: socks5h://user-SESSION-country-us:pass@gate.decodo.com:7000
 _PLAYWRIGHT_PROXY_URL = os.environ.get("PLAYWRIGHT_PROXY", "")
@@ -434,7 +431,7 @@ async def _check_product_httpx(asin: str, url: str, cookies: list) -> CheckResul
         "Connection": "keep-alive",
         "Upgrade-Insecure-Requests": "1",
     }
-    proxies = {"https": NORDVPN_PROXY, "http": NORDVPN_PROXY} if NORDVPN_PROXY else {}
+    proxies = {}
     try:
         async with CurlSession(impersonate="chrome120") as session:
             resp = await session.get(
@@ -901,7 +898,7 @@ class BrowserManager:
             # Playwright is NOT used here — it can hang for minutes through proxies.
             # If httpx fails, the first check cycle will retry via refresh_location().
             logger.info("Setting delivery location to Israel (startup via curl_cffi)...")
-            cffi_ok, cookies = await _try_set_location_httpx(proxy_url=NORDVPN_PROXY)
+            cffi_ok, cookies = await _try_set_location_httpx(proxy_url="")
             if cffi_ok and cookies:
                 self._session_cookies = cookies
                 logger.info("Startup: location set to Israel via curl_cffi ✓")
@@ -925,7 +922,7 @@ class BrowserManager:
         Returns True if location is confirmed as Israel, False otherwise.
         """
         # 1. Try curl_cffi (Chrome TLS fingerprint impersonation)
-        cffi_ok, cookies = await _try_set_location_httpx(proxy_url=NORDVPN_PROXY)
+        cffi_ok, cookies = await _try_set_location_httpx(proxy_url="")
         if cffi_ok and cookies:
             self._session_cookies = cookies
             logger.info("Location set to Israel via curl_cffi ✓")
