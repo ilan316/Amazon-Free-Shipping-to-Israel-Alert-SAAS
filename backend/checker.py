@@ -44,6 +44,9 @@ BROWSER_PROFILE_DIR = os.environ.get("BROWSER_PROFILE_DIR", "/app/browser_profil
 # Format: socks5h://user-SESSION-country-us:pass@gate.decodo.com:7000
 _PLAYWRIGHT_PROXY_URL = os.environ.get("PLAYWRIGHT_PROXY", "")
 
+# Same Israeli proxy reused for httpx product checks — gives Israel IP so Amazon shows ILS prices
+_HTTPX_PROXY = os.environ.get("PLAYWRIGHT_PROXY", "")
+
 
 def _parse_playwright_proxy(url: str) -> dict | None:
     """Parse a proxy URL into Playwright's proxy dict format."""
@@ -434,7 +437,7 @@ async def _check_product_httpx(asin: str, url: str, cookies: list) -> CheckResul
         "Connection": "keep-alive",
         "Upgrade-Insecure-Requests": "1",
     }
-    proxies = {}
+    proxies = {"https": _HTTPX_PROXY, "http": _HTTPX_PROXY} if _HTTPX_PROXY else {}
     try:
         async with CurlSession(impersonate="chrome120") as session:
             resp = await session.get(
