@@ -679,9 +679,14 @@ def _classify(text: str) -> ShippingStatus:
     if paid_pat_explicit.search(text) and "israel" in t:
         return ShippingStatus.PAID
 
+    # Explicit "Shipping to Israel" (with or without price) — always PAID
+    if "shipping to israel" in t or "ships to israel" in t:
+        return ShippingStatus.PAID
+
     # Generic paid delivery/shipping: "$X.XX delivery", "ILS X.XX delivery", "ILS X.XX shipping"
+    # Only exclude "free delivery/shipping" — not "Free Returns", "Free trial", etc.
     paid_pat_generic = re.compile(r'(\$|ILS\s+|₪\s*)[\d,]+\.?\d*\s+(delivery|shipping)', re.IGNORECASE)
-    if paid_pat_generic.search(text) and "free" not in t:
+    if paid_pat_generic.search(text) and not re.search(r'free\s+(delivery|shipping)', t):
         return ShippingStatus.PAID
 
     # No recognisable pattern — treat conservatively as not shipping to Israel
