@@ -459,8 +459,9 @@ async def run_automation_emails():
 
 
 async def check_single_product(asin: str, url: str):
-    """Check a single product immediately (used after a user adds it)."""
-    logger.info(f"[{asin}] Immediate first check triggered")
+    """Check a single product immediately (used after a user adds it or manual re-check)."""
+    logger.info(f"[{asin}] Immediate check triggered — refreshing Israel location first")
+    await browser_manager.refresh_location()
     try:
         results = await browser_manager.check_many([(asin, url)])
         check_result = results[0]

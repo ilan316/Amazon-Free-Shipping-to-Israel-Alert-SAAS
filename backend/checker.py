@@ -689,6 +689,11 @@ def _classify(text: str) -> ShippingStatus:
     if paid_pat_generic.search(text) and not re.search(r'free\s+(delivery|shipping)', t):
         return ShippingStatus.PAID
 
+    # Text has delivery info but no Israel signal — location probably wasn't Israel during check
+    us_delivery = re.search(r'\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b', t)
+    if us_delivery and "israel" not in t:
+        return ShippingStatus.UNKNOWN
+
     # No recognisable pattern — treat conservatively as not shipping to Israel
     return ShippingStatus.NO_SHIP
 
@@ -1042,9 +1047,9 @@ class BrowserManager:
                 if result.status == ShippingStatus.NOT_FOUND:
                     logger.warning(f"[{asin}] Product not found on Amazon (404)")
                     return idx, result
-                if result.status == ShippingStatus.ERROR:
+                if result.status in (ShippingStatus.ERROR, ShippingStatus.UNKNOWN):
                     logger.warning(
-                        f"[{asin}] httpx failed ({result.error_message}) — falling back to Playwright"
+                        f"[{asin}] httpx returned {result.status.value} — falling back to Playwright"
                     )
                     result = await self.check(asin, url)
                     if result.status == ShippingStatus.NOT_FOUND:
