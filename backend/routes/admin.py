@@ -1430,13 +1430,13 @@ async def list_send_logs(
     days: int = 30,
 ):
     from datetime import datetime, timedelta, timezone
-    from backend.models import EmailOpen
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+    # Main query: logs + clicks (unchanged logic)
     rows = (await db.execute(
         select(
             EmailSendLog,
             func.count(func.distinct(EmailClick.user_id)).label("clicks"),
-            func.count(func.distinct(EmailOpen.user_id)).label("opens"),
         )
         .where(EmailSendLog.sent_at >= cutoff)
         .outerjoin(EmailClick, (EmailClick.user_id.in_(
@@ -1445,17 +1445,34 @@ async def list_send_logs(
                                           EmailSendRecipient.success == True)
                                )) &
                                (EmailClick.clicked_at >= EmailSendLog.sent_at))
-        .outerjoin(EmailOpen, (EmailOpen.user_id.in_(
-                                   select(EmailSendRecipient.user_id)
-                                   .where(EmailSendRecipient.send_log_id == EmailSendLog.id,
-                                          EmailSendRecipient.success == True)
-                               )) &
-                               (EmailOpen.opened_at >= EmailSendLog.sent_at) &
-                               (EmailOpen.template_name == EmailSendLog.template_name))
         .group_by(EmailSendLog.id)
         .order_by(EmailSendLog.sent_at.desc())
         .limit(500)
     )).all()
+
+    if not rows:
+        return []
+
+    # Separate query: opens per log (match by template_name + time window)
+    log_ids = [r.EmailSendLog.id for r in rows]
+    open_rows = (await db.execute(
+        select(EmailSendRecipient.send_log_id, func.count(func.distinct(EmailOpen.user_id)).label("opens"))
+        .join(EmailOpen, (EmailOpen.user_id == EmailSendRecipient.user_id) &
+                         (EmailOpen.template_name == (
+                             select(EmailSendLog.template_name)
+                             .where(EmailSendLog.id == EmailSendRecipient.send_log_id)
+                             .scalar_subquery()
+                         )) &
+                         (EmailOpen.opened_at >= (
+                             select(EmailSendLog.sent_at)
+                             .where(EmailSendLog.id == EmailSendRecipient.send_log_id)
+                             .scalar_subquery()
+                         )))
+        .where(EmailSendRecipient.send_log_id.in_(log_ids), EmailSendRecipient.success == True)
+        .group_by(EmailSendRecipient.send_log_id)
+    )).all()
+    opens_by_log = {r.send_log_id: r.opens for r in open_rows}
+
     return [
         {
             "id": r.EmailSendLog.id,
@@ -1466,7 +1483,7 @@ async def list_send_logs(
             "sent_count": r.EmailSendLog.sent_count,
             "failed_count": r.EmailSendLog.failed_count,
             "clicks": r.clicks,
-            "opens": r.opens,
+            "opens": opens_by_log.get(r.EmailSendLog.id, 0),
         }
         for r in rows
     ]
