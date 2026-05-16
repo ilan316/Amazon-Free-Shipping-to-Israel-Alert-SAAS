@@ -1155,6 +1155,48 @@ async def send_test_no_click_email(
     return {"sent": ok, "to": dest_email, "asin": product.asin}
 
 
+@router.get("/quick-log")
+async def quick_log(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = 50,
+):
+    """Fast unified log: last N email send events with per-recipient details."""
+    from backend.models import EmailSendLog, EmailSendRecipient
+    from sqlalchemy import select
+    from datetime import timezone, timedelta
+    israel = timezone(timedelta(hours=3))
+
+    logs = (await db.execute(
+        select(EmailSendLog).order_by(EmailSendLog.sent_at.desc()).limit(limit)
+    )).scalars().all()
+
+    log_ids = [l.id for l in logs]
+    recipients = (await db.execute(
+        select(EmailSendRecipient).where(EmailSendRecipient.send_log_id.in_(log_ids))
+    )).scalars().all()
+
+    recip_by_log: dict[int, list] = {}
+    for r in recipients:
+        recip_by_log.setdefault(r.send_log_id, []).append({
+            "email": r.email,
+            "success": r.success,
+        })
+
+    return [
+        {
+            "id": l.id,
+            "template": l.template_name,
+            "audience": l.audience,
+            "sent_at": l.sent_at.astimezone(israel).strftime("%d/%m/%Y %H:%M") if l.sent_at else None,
+            "sent": l.sent_count,
+            "failed": l.failed_count,
+            "recipients": recip_by_log.get(l.id, []),
+        }
+        for l in logs
+    ]
+
+
 # ── Email Templates ───────────────────────────────────────────────────────────
 
 class EmailTemplateBody(BaseModel):
