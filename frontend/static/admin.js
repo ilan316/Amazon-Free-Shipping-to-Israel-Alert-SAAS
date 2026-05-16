@@ -616,7 +616,7 @@ function renderAdminProducts() {
   updateBulkDeleteBtn();
 
   // Update filter button labels with counts
-  const counts = { FREE: 0, PAID: 0, NO_SHIP: 0, NOT_FOUND: 0 };
+  const counts = { FREE: 0, PAID: 0, NO_SHIP: 0, NOT_FOUND: 0, UNKNOWN: 0 };
   _allAdminProducts.forEach(p => {
     if (counts[p.last_status] !== undefined) counts[p.last_status]++;
   });
@@ -626,6 +626,7 @@ function renderAdminProducts() {
     PAID:      `💳 משלוח בתשלום${counts.PAID > 0 ? ` (${counts.PAID})` : ''}`,
     NO_SHIP:   `🚫 לא נשלח לארץ${counts.NO_SHIP > 0 ? ` (${counts.NO_SHIP})` : ''}`,
     NOT_FOUND: `❌ מוצר לא קיים${counts.NOT_FOUND > 0 ? ` (${counts.NOT_FOUND})` : ''}`,
+    UNKNOWN:   `⚠️ שגיאה${counts.UNKNOWN > 0 ? ` (${counts.UNKNOWN})` : ''}`,
   };
   document.querySelectorAll('.admin-filter-btn[data-filter]').forEach(btn => {
     const f = btn.getAttribute('data-filter');
