@@ -1100,6 +1100,31 @@ async def send_test_click_email(
     return {"sent": ok, "to": dest, "tracking_url": tracking}
 
 
+@router.post("/send-test-no-click-email")
+async def send_test_no_click_email(
+    admin: Annotated[User, Depends(get_current_admin)],
+    to: str | None = None,
+    db: Annotated[AsyncSession, Depends(get_db)] = None,
+):
+    from backend.notifier import send_no_click_reminder
+    from backend.models import Product
+    from sqlalchemy import select
+
+    product = (await db.execute(select(Product).limit(1))).scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="אין מוצרים בDB לבדיקה")
+
+    dest_email = to or admin.notify_email
+    original_email = admin.notify_email
+    admin.notify_email = dest_email
+    try:
+        ok = send_no_click_reminder(admin, product, days_free=7)
+    finally:
+        admin.notify_email = original_email
+
+    return {"sent": ok, "to": dest_email, "asin": product.asin}
+
+
 # ── Email Templates ───────────────────────────────────────────────────────────
 
 class EmailTemplateBody(BaseModel):
