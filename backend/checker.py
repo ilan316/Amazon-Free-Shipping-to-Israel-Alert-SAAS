@@ -130,8 +130,23 @@ DELIVERY_BLOCK_SELECTORS = [
     "#price-shipping-message",
     "#exports_feature_div",
     "#shippingMessageInsideBuyBox_feature_div",
+    "#availability",
+    "#availabilityInsideBuyBox_feature_div",
     "#buybox",
     "#buyBoxInner",
+]
+
+# Phrases that definitively mean NO_SHIP regardless of where they appear in the HTML
+_NO_SHIP_PHRASES = [
+    "this item cannot be shipped to your selected delivery location",
+    "item can't be shipped to your selected delivery location",
+    "cannot be shipped to your selected delivery location",
+    "item cannot be shipped to your selected delivery location",
+    "this item does not ship to your selected location",
+    "doesn't ship to israel",
+    "does not ship to israel",
+    "cannot be shipped to israel",
+    "not available for shipping to israel",
 ]
 
 CAPTCHA_SELECTORS = [
@@ -383,6 +398,17 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
     if not product_name:
         logger.warning(f"[{asin}] httpx: productTitle not found — continuing without name.")
 
+    # Safety scan: check the raw HTML for definitive NO_SHIP phrases before any DOM parsing.
+    # Covers cases where the message lives in #availability or other elements not in the selector list.
+    html_lower = html.lower()
+    for phrase in _NO_SHIP_PHRASES:
+        if phrase in html_lower:
+            price = _extract_price(soup)
+            image_url = _extract_image_url(soup)
+            logger.info(f"[{asin}] httpx: NO_SHIP (phrase scan) | {phrase!r}")
+            return CheckResult(asin, ShippingStatus.NO_SHIP, raw_text=phrase,
+                               product_name=product_name, last_price=price, image_url=image_url)
+
     # Delivery text — same selector priority as Playwright path
     delivery_ids = [
         "mir-layout-DELIVERY_BLOCK",
@@ -392,6 +418,8 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
         "price-shipping-message",
         "exports_feature_div",
         "shippingMessageInsideBuyBox_feature_div",
+        "availability",
+        "availabilityInsideBuyBox_feature_div",
         "buybox",
         "buyBoxInner",
     ]
@@ -816,6 +844,7 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
         # Extract price and image from current page HTML
         pw_price = ""
         pw_image = ""
+        pw_html = ""
         try:
             from bs4 import BeautifulSoup as _BS
             pw_html = await page.content()
@@ -824,6 +853,15 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
             pw_image = _extract_image_url(pw_soup)
         except Exception:
             pass
+
+        # Safety scan: check full HTML for NO_SHIP phrases that may not appear in the delivery blocks.
+        if status != ShippingStatus.NO_SHIP and pw_html:
+            pw_html_lower = pw_html.lower()
+            for phrase in _NO_SHIP_PHRASES:
+                if phrase in pw_html_lower:
+                    logger.info(f"[{asin}] Playwright: NO_SHIP (phrase scan) | {phrase!r}")
+                    return CheckResult(asin, ShippingStatus.NO_SHIP, raw_text=phrase,
+                                       product_name=product_name, last_price=pw_price, image_url=pw_image)
 
         # ILS price = Israel context via proxy IP — delivery text won't say "Israel" explicitly
         if status == ShippingStatus.UNKNOWN and pw_price.upper().startswith("ILS"):
