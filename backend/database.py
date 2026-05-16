@@ -124,6 +124,17 @@ async def create_tables():
                 "ALTER TABLE user_products ADD COLUMN IF NOT EXISTS no_click_reminder_sent_at TIMESTAMP WITH TIME ZONE"
             )
         )
+        # Open tracking: make template_id nullable, add template_name
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE email_opens ALTER COLUMN template_id DROP NOT NULL"
+            )
+        )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE email_opens ADD COLUMN IF NOT EXISTS template_name VARCHAR(100)"
+            )
+        )
         # Mark users who already received the activation template manually so automation skips them
         await conn.execute(
             __import__("sqlalchemy").text("""

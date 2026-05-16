@@ -1171,10 +1171,10 @@ async function loadSendLogs() {
   if (!tbody) return;
   const days = document.getElementById("send-log-days")?.value || 30;
   const res = await apiFetch(`/admin/email-send-logs?days=${days}`);
-  if (!res || !res.ok) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--error);padding:16px;">שגיאה בטעינה</td></tr>'; return; }
+  if (!res || !res.ok) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--error);padding:16px;">שגיאה בטעינה</td></tr>'; return; }
   const logs = await res.json();
   if (!logs.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">לא נשלחו מיילים עדיין</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">לא נשלחו מיילים עדיין</td></tr>';
     return;
   }
   const audienceLabel = { all: "כל המשתמשים", active: "פעילים", vacation: "חופשה", inactive: "מושהים", single: "בודד", self: "בדיקה" };
@@ -1193,13 +1193,14 @@ async function loadSendLogs() {
         <span style="font-size:0.78rem;color:var(--success);">✅ ${l.sent_count}</span>
         ${l.failed_count > 0 ? `<span style="font-size:0.78rem;color:var(--error);margin-right:6px;">❌ ${l.failed_count}</span>` : ""}
       </td>
+      <td style="text-align:center;font-weight:600;">${l.opens > 0 ? `👁 ${l.opens}` : "—"}</td>
       <td style="text-align:center;font-weight:600;">${l.clicks > 0 ? `🖱 ${l.clicks}` : "—"}</td>
       <td style="text-align:center;" onclick="event.stopPropagation()">
         <button onclick="deleteSendLog(${l.id})" style="background:none;border:none;cursor:pointer;color:var(--error);font-size:1rem;padding:2px 6px;" title="מחק">🗑</button>
       </td>
     </tr>
     <tr id="send-log-detail-${l.id}" style="display:none;">
-      <td colspan="6" style="padding:0;background:var(--bg);">
+      <td colspan="7" style="padding:0;background:var(--bg);">
         <div id="send-log-detail-inner-${l.id}" style="padding:12px 20px;font-size:0.82rem;"></div>
       </td>
     </tr>`;

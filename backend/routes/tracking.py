@@ -101,32 +101,36 @@ async def track_email_open(
     db: Annotated[AsyncSession, Depends(get_db)],
     uid: int | None = None,
     tid: int | None = None,
+    tn: str | None = None,
 ):
     try:
-        if uid and tid:
+        if uid and (tid or tn):
             ua = request.headers.get("User-Agent", "")
             if _is_bot(ua):
-                logger.info(f"email-open BLOCKED (bot UA): uid={uid} tid={tid} ua={ua[:120]}")
+                logger.info(f"email-open BLOCKED (bot UA): uid={uid} tid={tid} tn={tn} ua={ua[:120]}")
             else:
-                logger.info(f"email-open ALLOWED: uid={uid} tid={tid} ua={ua[:120]}")
+                logger.info(f"email-open ALLOWED: uid={uid} tid={tid} tn={tn} ua={ua[:120]}")
                 ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
                 if ip:
                     ip = ip.split(",")[0].strip()[:64]
-                # Dedup: ignore if same user already opened this template in the last 10 min
                 from datetime import datetime, timezone
                 cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
+                dedup_filter = [
+                    EmailOpen.user_id == uid,
+                    EmailOpen.opened_at >= cutoff,
+                ]
+                if tid:
+                    dedup_filter.append(EmailOpen.template_id == tid)
+                elif tn:
+                    dedup_filter.append(EmailOpen.template_name == tn)
                 recent = (await db.execute(
-                    select(EmailOpen).where(
-                        EmailOpen.user_id == uid,
-                        EmailOpen.template_id == tid,
-                        EmailOpen.opened_at >= cutoff,
-                    ).limit(1)
+                    select(EmailOpen).where(*dedup_filter).limit(1)
                 )).scalar_one_or_none()
                 if not recent:
-                    db.add(EmailOpen(user_id=uid, template_id=tid, ip=ip))
+                    db.add(EmailOpen(user_id=uid, template_id=tid, template_name=tn, ip=ip))
                     await db.commit()
                 else:
-                    logger.debug(f"email-open ignored (dedup): uid={uid} tid={tid}")
+                    logger.debug(f"email-open ignored (dedup): uid={uid} tid={tid} tn={tn}")
     except Exception as exc:
         logger.warning(f"Failed to record email open: {exc}")
 

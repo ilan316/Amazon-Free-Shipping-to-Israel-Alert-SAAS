@@ -118,7 +118,8 @@ class EmailOpen(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    template_id: Mapped[int] = mapped_column(Integer, ForeignKey("email_templates.id", ondelete="CASCADE"), nullable=False)
+    template_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("email_templates.id", ondelete="CASCADE"), nullable=True)
+    template_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
 

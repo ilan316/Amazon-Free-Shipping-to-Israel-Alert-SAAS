@@ -195,6 +195,14 @@ def _wrap_responsive(html_body: str, is_rtl: bool = True) -> str:
 </html>"""
 
 
+def _open_pixel(user_id: int, template_name: str, template_id: int | None = None) -> str:
+    base = os.environ.get("APP_BASE_URL", "https://app.amzfreeil.com").rstrip("/")
+    params = f"uid={user_id}&tn={template_name}"
+    if template_id:
+        params += f"&tid={template_id}"
+    return f'<img src="{base}/track/email-open?{params}" width="1" height="1" style="display:none;border:0;" alt="">'
+
+
 def _pause_url(user_id: int) -> str:
     base = os.environ.get("APP_BASE_URL", "https://app.amzfreeil.com").rstrip("/")
     token = create_pause_token(user_id)
@@ -655,6 +663,8 @@ def send_daily_summary(user, free_products: list) -> bool:
 </body>
 </html>"""
 
+    html_body = html_body.replace("</body>", f"{_open_pixel(user.id, 'daily_summary')}\n</body>")
+
     unsubscribe_url = _pause_url(user.id)
     headers = {
         "List-Unsubscribe": f"<{unsubscribe_url}>",
@@ -809,6 +819,8 @@ def send_no_click_reminder(user, product, days_free: int) -> bool:
   </table>
 </body>
 </html>"""
+
+    html_body = html_body.replace("</body>", f"{_open_pixel(user.id, 'no_click_reminder')}\n</body>")
 
     unsubscribe_url = _pause_url(user.id)
     extra_headers = {

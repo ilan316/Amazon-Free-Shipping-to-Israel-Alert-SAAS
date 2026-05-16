@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database import AsyncSessionLocal
 from backend.models import Product, User, UserProduct, NotificationLog, EmailTemplate, EmailSendLog, EmailSendRecipient
 from backend.checker import browser_manager, ShippingStatus, CheckResult
-from backend.notifier import send_daily_summary, send_no_click_reminder, _send_via_resend, _wrap_responsive
+from backend.notifier import send_daily_summary, send_no_click_reminder, _send_via_resend, _wrap_responsive, _open_pixel
 
 logger = logging.getLogger(__name__)
 
@@ -171,15 +171,25 @@ async def run_daily_summary():
         )
         users = users_result.scalars().all()
 
+        now = datetime.now(timezone.utc)
+        send_log = EmailSendLog(
+            template_id=None,
+            template_name="daily_summary",
+            sent_at=now,
+            audience="all",
+            sent_count=0,
+            failed_count=0,
+        )
+        db.add(send_log)
+        await db.flush()
+
         sent = 0
         for user in users:
-            now = datetime.now(timezone.utc)
             free_products_result = await db.execute(
                 select(Product, UserProduct.custom_name)
                 .join(UserProduct, Product.id == UserProduct.product_id)
                 .where(
                     UserProduct.user_id == user.id,
-                    # Not paused, OR pause has expired
                     or_(
                         UserProduct.is_paused == False,
                         (UserProduct.paused_until != None) & (UserProduct.paused_until <= now),
@@ -187,12 +197,13 @@ async def run_daily_summary():
                     Product.last_status == ShippingStatus.FREE.value,
                 )
             )
-            free_products = free_products_result.all()  # list of (Product, custom_name)
+            free_products = free_products_result.all()
 
             if not free_products:
                 continue
 
             success = send_daily_summary(user, free_products)
+            db.add(EmailSendRecipient(send_log_id=send_log.id, user_id=user.id, email=user.notify_email, success=success))
 
             for product, _ in free_products:
                 db.add(NotificationLog(
@@ -204,10 +215,14 @@ async def run_daily_summary():
                     error_msg=None if success else "send failed",
                 ))
 
-            await db.commit()
             if success:
                 sent += 1
+                send_log.sent_count += 1
                 logger.info(f"[user {user.id}] Summary sent — {len(free_products)} free product(s).")
+            else:
+                send_log.failed_count += 1
+
+            await db.commit()
 
     logger.info(f"=== Daily summary complete — {sent} email(s) sent ===")
 
@@ -343,6 +358,7 @@ async def _run_automation_flow(
         )).scalar() or 0
         raw_body = _auto_substitute(tpl.body, u, count, label=audience)
         wrapped = _wrap_responsive(raw_body, is_rtl=True)
+        wrapped = wrapped.replace("</body>", f"{_open_pixel(u.id, tpl.name, tpl.id)}\n</body>")
         ok = _send_via_resend(
             u.notify_email,
             _auto_substitute(tpl.subject, u, count, label=audience),
