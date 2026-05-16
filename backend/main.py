@@ -127,7 +127,7 @@ async def lifespan(app: FastAPI):
         trigger="cron", hour=9, minute=0, timezone="Asia/Jerusalem", misfire_grace_time=600
     ))
     _upsert_job(run_no_click_automation, "no_click_automation", dict(
-        trigger="cron", hour=10, minute=0, timezone="Asia/Jerusalem", misfire_grace_time=600
+        trigger="cron", hour=9, minute=0, timezone="Asia/Jerusalem", misfire_grace_time=600
     ))
     _upsert_job(check_decodo_quota, "decodo_quota_check", dict(
         trigger="cron", hour=7, minute=30, timezone="Asia/Jerusalem", misfire_grace_time=600
