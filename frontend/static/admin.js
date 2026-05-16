@@ -650,9 +650,6 @@ function renderAdminProducts() {
       <td style="text-align:center;font-size:0.82rem;color:#B12704;font-weight:bold;" dir="ltr">${p.last_price || '—'}</td>
       <td style="text-align:center;">${p.watchers}</td>
       <td class="ltr">${p.last_checked ? formatDate(p.last_checked) : "—"}</td>
-      <td style="text-align:center;color:${p.consecutive_errors > 0 ? 'var(--error)' : 'var(--text-muted)'}">
-        ${p.consecutive_errors}
-      </td>
       <td class="truncate ltr" style="max-width:200px;font-size:0.78rem;color:var(--text-muted);"
           title="${p.raw_text ? p.raw_text.replace(/"/g,'&quot;') : ''}">
         ${p.raw_text ? p.raw_text.substring(0, 60) + (p.raw_text.length > 60 ? '…' : '') : '—'}
