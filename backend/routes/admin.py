@@ -1100,6 +1100,36 @@ async def send_test_click_email(
     return {"sent": ok, "to": dest, "tracking_url": tracking}
 
 
+@router.get("/no-click-reminder-log")
+async def no_click_reminder_log(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    from backend.models import UserProduct, Product
+    from sqlalchemy import select
+    from datetime import datetime, timezone, timedelta
+    israel = timezone(timedelta(hours=3))
+    today_il = datetime.now(israel).date()
+    rows = (await db.execute(
+        select(UserProduct, User.email, Product.asin, Product.name)
+        .join(User, User.id == UserProduct.user_id)
+        .join(Product, Product.id == UserProduct.product_id)
+        .where(UserProduct.no_click_reminder_sent_at.isnot(None))
+        .order_by(UserProduct.no_click_reminder_sent_at.desc())
+    )).all()
+    return [
+        {
+            "email": email,
+            "asin": asin,
+            "name": (name or "")[:50],
+            "sent_at_il": up.no_click_reminder_sent_at.astimezone(israel).strftime("%Y-%m-%d %H:%M"),
+            "today": up.no_click_reminder_sent_at.astimezone(israel).date() == today_il,
+            "is_paused": up.is_paused,
+        }
+        for up, email, asin, name in rows
+    ]
+
+
 @router.post("/send-test-no-click-email")
 async def send_test_no_click_email(
     admin: Annotated[User, Depends(get_current_admin)],
