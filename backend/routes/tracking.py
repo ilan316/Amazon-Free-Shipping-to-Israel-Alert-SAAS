@@ -127,7 +127,7 @@ async def track_email_open(
                     select(EmailOpen).where(*dedup_filter).limit(1)
                 )).scalar_one_or_none()
                 if not recent:
-                    db.add(EmailOpen(user_id=uid, template_id=tid, template_name=tn, ip=ip))
+                    db.add(EmailOpen(user_id=uid, template_id=tid, template_name=tn[:100] if tn else None, ip=ip))
                     await db.commit()
                 else:
                     logger.debug(f"email-open ignored (dedup): uid={uid} tid={tid} tn={tn}")
