@@ -448,8 +448,12 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
     price = _extract_price(soup)
     image_url = _extract_image_url(soup)
     # ILS price = Israel context confirmed by proxy IP — delivery text won't say "Israel" explicitly
-    if status == ShippingStatus.UNKNOWN and price.upper().startswith("ILS"):
-        status = ShippingStatus.PAID
+    # NO_SHIP from default fallback (no pattern matched) + ILS price = product IS reachable, defer to Playwright
+    if price.upper().startswith("ILS"):
+        if status == ShippingStatus.UNKNOWN:
+            status = ShippingStatus.PAID
+        elif status == ShippingStatus.NO_SHIP:
+            status = ShippingStatus.UNKNOWN  # triggers Playwright fallback
     logger.info(f"[{asin}] httpx: {status.value} | price={price!r} | {raw_text[:120]!r}")
     return CheckResult(asin, status, raw_text=raw_text, product_name=product_name, last_price=price, image_url=image_url)
 
@@ -729,6 +733,11 @@ def _classify(text: str) -> ShippingStatus:
     # Text has delivery info but no Israel signal — location probably wasn't Israel during check
     us_delivery = re.search(r'\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b', t)
     if us_delivery and "israel" not in t:
+        return ShippingStatus.UNKNOWN
+
+    # Availability-only text (no shipping details) — via Israeli proxy Amazon shows local stock info
+    # ILS price check in caller will upgrade to PAID if applicable
+    if any(p in t for p in ("in stock", "available to ship", "usually ships", "in stock.")):
         return ShippingStatus.UNKNOWN
 
     # No recognisable pattern — treat conservatively as not shipping to Israel
