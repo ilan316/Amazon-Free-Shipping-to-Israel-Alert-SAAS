@@ -400,10 +400,14 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
 
     # Safety scan: check the raw HTML for definitive NO_SHIP phrases before any DOM parsing.
     # Covers cases where the message lives in #availability or other elements not in the selector list.
+    # Exception: ILS price means the product IS purchasable from Israel — phrase may be in a hidden/JS element.
     html_lower = html.lower()
     for phrase in _NO_SHIP_PHRASES:
         if phrase in html_lower:
             price = _extract_price(soup)
+            if price.upper().startswith("ILS"):
+                logger.info(f"[{asin}] httpx: phrase scan found NO_SHIP but ILS price={price!r} overrides — continuing")
+                break
             image_url = _extract_image_url(soup)
             logger.info(f"[{asin}] httpx: NO_SHIP (phrase scan) | {phrase!r}")
             return CheckResult(asin, ShippingStatus.NO_SHIP, raw_text=phrase,
@@ -855,7 +859,8 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
             pass
 
         # Safety scan: check full HTML for NO_SHIP phrases that may not appear in the delivery blocks.
-        if status != ShippingStatus.NO_SHIP and pw_html:
+        # Exception: ILS price means the product IS purchasable from Israel — phrase may be in hidden/JS element.
+        if status != ShippingStatus.NO_SHIP and pw_html and not pw_price.upper().startswith("ILS"):
             pw_html_lower = pw_html.lower()
             for phrase in _NO_SHIP_PHRASES:
                 if phrase in pw_html_lower:
