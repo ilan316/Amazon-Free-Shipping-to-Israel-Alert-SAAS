@@ -549,17 +549,8 @@ async def run_no_click_automation():
             {"cutoff_remind": now - timedelta(days=7)},
         )).fetchall()
 
-        # Create send log upfront so we can attach recipients
-        send_log = EmailSendLog(
-            template_id=None,
-            template_name="no_click_reminder",
-            sent_at=now,
-            audience="no_click_automation",
-            sent_count=0,
-            failed_count=0,
-        )
-        db.add(send_log)
-        await db.flush()
+        send_log = None
+        recipients_buffer = []
 
         for row in phase1_rows:
             up_id, user_id, product_id, first_free_at = row
@@ -574,7 +565,7 @@ async def run_no_click_automation():
 
             days_free = (now - first_free_at).days
             ok = send_no_click_reminder(user, product, days_free)
-            db.add(EmailSendRecipient(send_log_id=send_log.id, user_id=user_id, email=user.notify_email, success=ok))
+            recipients_buffer.append((user_id, user.notify_email, ok))
             if ok:
                 up = (await db.execute(
                     __import__("sqlalchemy").select(UserProduct).where(UserProduct.id == up_id)
@@ -583,11 +574,23 @@ async def run_no_click_automation():
                     up.no_click_reminder_sent_at = now
                 reminded += 1
                 logger.info(f"No-click reminder sent user_id={user_id} asin={product.asin} days_free={days_free}")
-            else:
-                send_log.failed_count += 1
             await asyncio.sleep(0.55)
 
-        send_log.sent_count = reminded
+        if recipients_buffer:
+            failed_count = sum(1 for _, _, ok in recipients_buffer if not ok)
+            send_log = EmailSendLog(
+                template_id=None,
+                template_name="no_click_reminder",
+                sent_at=now,
+                audience="no_click_automation",
+                sent_count=reminded,
+                failed_count=failed_count,
+            )
+            db.add(send_log)
+            await db.flush()
+            for uid, email, ok in recipients_buffer:
+                db.add(EmailSendRecipient(send_log_id=send_log.id, user_id=uid, email=email, success=ok))
+
         await db.commit()
 
     logger.info(f"=== No-click automation complete — reminded: {reminded}, auto-paused: {paused} ===")
