@@ -447,13 +447,9 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
     status = _classify(raw_text)
     price = _extract_price(soup)
     image_url = _extract_image_url(soup)
-    # ILS price = Israel context confirmed by proxy IP — delivery text won't say "Israel" explicitly
-    # NO_SHIP from default fallback (no pattern matched) + ILS price = product IS reachable, defer to Playwright
-    if price.upper().startswith("ILS"):
-        if status == ShippingStatus.UNKNOWN:
-            status = ShippingStatus.PAID
-        elif status == ShippingStatus.NO_SHIP:
-            status = ShippingStatus.UNKNOWN  # triggers Playwright fallback
+    # ILS price = product is purchasable from Israel → only FREE or PAID, never NO_SHIP/UNKNOWN
+    if price.upper().startswith("ILS") and status not in (ShippingStatus.FREE,):
+        status = ShippingStatus.PAID
     logger.info(f"[{asin}] httpx: {status.value} | price={price!r} | {raw_text[:120]!r}")
     return CheckResult(asin, status, raw_text=raw_text, product_name=product_name, last_price=price, image_url=image_url)
 
@@ -735,11 +731,6 @@ def _classify(text: str) -> ShippingStatus:
     if us_delivery and "israel" not in t:
         return ShippingStatus.UNKNOWN
 
-    # Availability-only text (no shipping details) — via Israeli proxy Amazon shows local stock info
-    # ILS price check in caller will upgrade to PAID if applicable
-    if any(p in t for p in ("in stock", "available to ship", "usually ships", "in stock.")):
-        return ShippingStatus.UNKNOWN
-
     # No recognisable pattern — treat conservatively as not shipping to Israel
     return ShippingStatus.NO_SHIP
 
@@ -872,8 +863,8 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
                     return CheckResult(asin, ShippingStatus.NO_SHIP, raw_text=phrase,
                                        product_name=product_name, last_price=pw_price, image_url=pw_image)
 
-        # ILS price = Israel context via proxy IP — delivery text won't say "Israel" explicitly
-        if status == ShippingStatus.UNKNOWN and pw_price.upper().startswith("ILS"):
+        # ILS price = product is purchasable from Israel → only FREE or PAID, never NO_SHIP/UNKNOWN
+        if pw_price.upper().startswith("ILS") and status not in (ShippingStatus.FREE,):
             status = ShippingStatus.PAID
         logger.info(f"[{asin}] {status.value} | price={pw_price!r} | {raw_text[:120]!r}")
         return CheckResult(asin, status, raw_text=raw_text, product_name=product_name,
