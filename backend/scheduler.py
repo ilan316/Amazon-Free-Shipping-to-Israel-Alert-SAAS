@@ -172,18 +172,10 @@ async def run_daily_summary():
         users = users_result.scalars().all()
 
         now = datetime.now(timezone.utc)
-        send_log = EmailSendLog(
-            template_id=None,
-            template_name="daily_summary",
-            sent_at=now,
-            audience="all",
-            sent_count=0,
-            failed_count=0,
-        )
-        db.add(send_log)
-        await db.flush()
-
+        send_log = None
+        recipients_buffer = []
         sent = 0
+
         for user in users:
             free_products_result = await db.execute(
                 select(Product, UserProduct.custom_name)
@@ -203,7 +195,7 @@ async def run_daily_summary():
                 continue
 
             success = send_daily_summary(user, free_products)
-            db.add(EmailSendRecipient(send_log_id=send_log.id, user_id=user.id, email=user.notify_email, success=success))
+            recipients_buffer.append((user, success))
 
             for product, _ in free_products:
                 db.add(NotificationLog(
@@ -217,11 +209,24 @@ async def run_daily_summary():
 
             if success:
                 sent += 1
-                send_log.sent_count += 1
                 logger.info(f"[user {user.id}] Summary sent — {len(free_products)} free product(s).")
-            else:
-                send_log.failed_count += 1
 
+            await db.commit()
+
+        if recipients_buffer:
+            failed_count = sum(1 for _, ok in recipients_buffer if not ok)
+            send_log = EmailSendLog(
+                template_id=None,
+                template_name="daily_summary",
+                sent_at=now,
+                audience="all",
+                sent_count=sent,
+                failed_count=failed_count,
+            )
+            db.add(send_log)
+            await db.flush()
+            for user, ok in recipients_buffer:
+                db.add(EmailSendRecipient(send_log_id=send_log.id, user_id=user.id, email=user.notify_email, success=ok))
             await db.commit()
 
     logger.info(f"=== Daily summary complete — {sent} email(s) sent ===")
