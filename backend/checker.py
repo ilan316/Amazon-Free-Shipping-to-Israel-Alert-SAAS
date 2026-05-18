@@ -703,6 +703,24 @@ def _classify(text: str) -> ShippingStatus:
     if any(p in t for p in no_ship):
         return ShippingStatus.NO_SHIP
 
+    # Explicit paid shipping to Israel with price — check BEFORE free delivery,
+    # because the delivery block may contain BOTH a "FREE delivery if you spend X" upsell
+    # AND "ILS X.XX Shipping to Israel" for the actual product. The explicit price wins.
+    paid_pat_explicit = re.compile(
+        r'(\$|ILS\s+|₪\s*)[\d,]+\.[\d]{2}.{0,40}israel|israel.{0,40}(\$|ILS\s+|₪\s*)[\d,]+\.[\d]{2}',
+        re.IGNORECASE,
+    )
+    if paid_pat_explicit.search(text) and "israel" in t:
+        return ShippingStatus.PAID
+
+    # Conditional free shipping ("if you spend X", "on orders over X") — NOT free for this product
+    conditional_free = re.search(
+        r'free delivery.{0,60}(if you spend|on orders? over|on qualifying orders?|on eligible orders?)',
+        t,
+    )
+    if conditional_free:
+        return ShippingStatus.PAID
+
     # Explicit: Amazon clearly states free delivery to Israel
     if "free delivery" in t and "to israel" in t:
         return ShippingStatus.FREE
@@ -710,15 +728,6 @@ def _classify(text: str) -> ShippingStatus:
     # Fallback: When IL is the active delivery location, Amazon shows generic eligible text
     if "free delivery" in t and any(p in t for p in ("eligible orders", "eligible international", "eligible items")):
         return ShippingStatus.FREE
-
-    # Paid shipping/delivery with explicit Israel mention — handles $ and ILS/₪
-    # e.g. "$19.54 Shipping to Israel" or "ILS 59.14 Shipping to Israel"
-    paid_pat_explicit = re.compile(
-        r'(\$|ILS\s+|₪\s*)[\d,]+\.[\d]{2}.{0,40}israel|israel.{0,40}(\$|ILS\s+|₪\s*)[\d,]+\.[\d]{2}',
-        re.IGNORECASE,
-    )
-    if paid_pat_explicit.search(text) and "israel" in t:
-        return ShippingStatus.PAID
 
     # Explicit "Shipping to Israel" (with or without price) — always PAID
     if "shipping to israel" in t or "ships to israel" in t:
