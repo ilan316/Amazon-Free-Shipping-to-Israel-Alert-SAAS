@@ -25,6 +25,7 @@ async def get_me(
     base = UserResponse.model_validate(current_user)
     data = base.model_dump()
     data["effective_product_limit"] = effective_limit
+    data["is_google_account"] = bool(current_user.google_id)
     return data
 
 

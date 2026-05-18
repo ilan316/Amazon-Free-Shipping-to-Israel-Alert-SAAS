@@ -33,6 +33,7 @@ class UserResponse(BaseModel):
     vacation_mode: bool = False
     max_products: int | None = None
     effective_product_limit: int | None = None
+    is_google_account: bool = False
 
     model_config = {"from_attributes": True}
 
