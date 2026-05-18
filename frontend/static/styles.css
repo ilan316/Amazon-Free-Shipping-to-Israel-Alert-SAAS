@@ -53,7 +53,7 @@ a:hover { text-decoration: underline; }
 .navbar-links {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   padding: 4px 24px;
   gap: 16px;
   font-size: 0.9rem;
