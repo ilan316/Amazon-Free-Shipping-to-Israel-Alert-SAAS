@@ -85,7 +85,7 @@ _DAILY_TIPS: dict[str, list[str]] = {
         "פריטים מתחת ל-$49 גובים דמי משלוח — בדקו אם הוספת פריט נוסף חוסכת כסף.",
         "מחיר נמוך מדי? בדקו שהמוכר הוא <bdi>Amazon</bdi> ולא <bdi>Third-party</bdi> עם מדיניות החזרה שונה.",
         '<bdi>"Ships from and sold by Amazon.com"</bdi> = המחיר שתראו כאן הוא אמיתי וכולל <bdi>Prime</bdi>.',
-        'פילטר <bdi>"4 stars and up"</bdi> + <bdi>Sort by "Most Recent"</bdi> = ביקורות אמינות.',
+        'מיין לפי <bdi>"4 stars and up"</bdi> + <bdi>Sort by "Most Recent"</bdi> = ביקורות אמינות.',
         "<bdi>Keepa.com</bdi> מציג היסטוריית מחיר חינם — לעולם אל תקנו בלי לבדוק.",
         "ספרים אנגליים מאמזון — לרוב זולים משמעותית מחנויות בישראל, כולל משלוח.",
         "תוספי תזונה מ-<bdi>iHerb</bdi> מול <bdi>Amazon</bdi> — השוו מחירים, לעיתים יש הפרש גדול.",
