@@ -7,14 +7,15 @@ function setToken(t) { localStorage.setItem("jwt", t); }
 function clearToken() { localStorage.removeItem("jwt"); }
 
 async function apiFetch(path, options = {}) {
+  const { skipAuthRedirect, ...fetchOptions } = options;
   const token = getToken();
   const headers = {
     "Content-Type": "application/json",
     ...(token ? { "Authorization": `Bearer ${token}` } : {}),
-    ...((options.headers) || {}),
+    ...((fetchOptions.headers) || {}),
   };
-  const res = await fetch(API + path, { ...options, headers });
-  if (res.status === 401) {
+  const res = await fetch(API + path, { ...fetchOptions, headers });
+  if (res.status === 401 && !skipAuthRedirect) {
     clearToken();
     window.location = "/";
     return null;

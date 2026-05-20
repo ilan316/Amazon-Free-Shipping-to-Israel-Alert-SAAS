@@ -474,6 +474,7 @@ a:hover{text-decoration:underline}
         if (!emailVal || !passVal) { showAlert(alertEl, "נא למלא את כל השדות"); return; }
         const res = await apiFetch("/auth/login", {
           method: "POST",
+          skipAuthRedirect: true,
           body: JSON.stringify({
             email: emailVal,
             password: passVal,
