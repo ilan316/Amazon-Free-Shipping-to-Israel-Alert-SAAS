@@ -619,8 +619,9 @@ function renderAdminProducts() {
   const counts = { FREE: 0, PAID: 0, NO_SHIP: 0, NOT_FOUND: 0, UNKNOWN: 0 };
   let pausedCount = 0;
   _allAdminProducts.forEach(p => {
-    if (counts[p.last_status] !== undefined) counts[p.last_status]++;
-    if (p.paused_watchers > 0) pausedCount++;
+    const fp = p.paused_watchers > 0 && p.paused_watchers === p.watchers;
+    if (!fp && counts[p.last_status] !== undefined) counts[p.last_status]++;
+    if (fp) pausedCount++;
   });
   const lblMap = {
     ALL:       `הכל (${_allAdminProducts.length})`,
@@ -636,11 +637,12 @@ function renderAdminProducts() {
     if (lblMap[f]) btn.textContent = lblMap[f];
   });
 
+  const fullyPaused = p => p.paused_watchers > 0 && p.paused_watchers === p.watchers;
   const filtered = _adminFilter === 'ALL'
     ? _allAdminProducts
     : _adminFilter === 'PAUSED'
-      ? _allAdminProducts.filter(p => p.paused_watchers > 0)
-      : _allAdminProducts.filter(p => p.last_status === _adminFilter);
+      ? _allAdminProducts.filter(fullyPaused)
+      : _allAdminProducts.filter(p => p.last_status === _adminFilter && !fullyPaused(p));
 
   if (!filtered.length) {
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:24px;">אין מוצרים</td></tr>';
