@@ -79,12 +79,21 @@ async def run_global_check_cycle():
     logger.info("=== Check cycle started ===")
     # Israeli residential proxy provides location automatically — no cookie setup needed
     async with AsyncSessionLocal() as db:
+        now = datetime.now(timezone.utc)
         result = await db.execute(
             select(Product).where(
                 Product.id.in_(
                     select(UserProduct.product_id)
                     .join(User, UserProduct.user_id == User.id)
-                    .where(User.is_active == True, User.vacation_mode == False, User.is_admin == False)
+                    .where(
+                        User.is_active == True,
+                        User.vacation_mode == False,
+                        User.is_admin == False,
+                        or_(
+                            UserProduct.is_paused == False,
+                            (UserProduct.paused_until != None) & (UserProduct.paused_until <= now),
+                        ),
+                    )
                     .distinct()
                 )
             )
