@@ -82,6 +82,7 @@ async def run_global_check_cycle():
         now = datetime.now(timezone.utc)
         result = await db.execute(
             select(Product).where(
+                Product.last_status != ShippingStatus.NOT_FOUND.value,
                 Product.id.in_(
                     select(UserProduct.product_id)
                     .join(User, UserProduct.user_id == User.id)
