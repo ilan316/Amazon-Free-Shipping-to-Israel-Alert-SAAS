@@ -786,6 +786,23 @@ async def delete_product(
     return {"deleted": product_id}
 
 
+@router.post("/sync-vacation-pauses")
+async def sync_vacation_pauses(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Pause all products of users currently in vacation mode."""
+    from sqlalchemy import update as sa_update
+    vacation_ids = (await db.execute(
+        select(User.id).where(User.vacation_mode == True, User.is_admin == False)
+    )).scalars().all()
+    result = await db.execute(
+        sa_update(UserProduct).where(UserProduct.user_id.in_(vacation_ids)).values(is_paused=True)
+    )
+    await db.commit()
+    return {"vacation_users": len(vacation_ids), "products_paused": result.rowcount}
+
+
 @router.delete("/products-orphans")
 async def delete_orphan_products(
     admin: Annotated[User, Depends(get_current_admin)],
