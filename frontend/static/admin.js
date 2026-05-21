@@ -617,8 +617,10 @@ function renderAdminProducts() {
 
   // Update filter button labels with counts
   const counts = { FREE: 0, PAID: 0, NO_SHIP: 0, NOT_FOUND: 0, UNKNOWN: 0 };
+  let pausedCount = 0;
   _allAdminProducts.forEach(p => {
     if (counts[p.last_status] !== undefined) counts[p.last_status]++;
+    if (p.paused_watchers > 0) pausedCount++;
   });
   const lblMap = {
     ALL:       `הכל (${_allAdminProducts.length})`,
@@ -627,6 +629,7 @@ function renderAdminProducts() {
     NO_SHIP:   `🚫 לא נשלח לארץ${counts.NO_SHIP > 0 ? ` (${counts.NO_SHIP})` : ''}`,
     NOT_FOUND: `❌ מוצר לא קיים${counts.NOT_FOUND > 0 ? ` (${counts.NOT_FOUND})` : ''}`,
     UNKNOWN:   `⚠️ שגיאה${counts.UNKNOWN > 0 ? ` (${counts.UNKNOWN})` : ''}`,
+    PAUSED:    `⏸ בהשהייה${pausedCount > 0 ? ` (${pausedCount})` : ''}`,
   };
   document.querySelectorAll('.admin-filter-btn[data-filter]').forEach(btn => {
     const f = btn.getAttribute('data-filter');
@@ -635,7 +638,9 @@ function renderAdminProducts() {
 
   const filtered = _adminFilter === 'ALL'
     ? _allAdminProducts
-    : _allAdminProducts.filter(p => p.last_status === _adminFilter);
+    : _adminFilter === 'PAUSED'
+      ? _allAdminProducts.filter(p => p.paused_watchers > 0)
+      : _allAdminProducts.filter(p => p.last_status === _adminFilter);
 
   if (!filtered.length) {
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:24px;">אין מוצרים</td></tr>';
@@ -648,7 +653,7 @@ function renderAdminProducts() {
       <td class="truncate">${p.name || "—"}</td>
       <td><span class="status-badge badge-${p.last_status}">${statusLabel(p.last_status)}</span></td>
       <td style="text-align:center;font-size:0.82rem;color:#B12704;font-weight:bold;" dir="ltr">${p.last_price || '—'}</td>
-      <td style="text-align:center;">${p.watchers}</td>
+      <td style="text-align:center;">${p.watchers}${p.paused_watchers > 0 ? ` <span title="${p.paused_watchers} עוקבים בהשהייה" style="font-size:0.78rem;color:#888;cursor:help;">⏸${p.paused_watchers}</span>` : ''}</td>
       <td class="ltr">
         ${p.last_checked ? formatDate(p.last_checked) : "—"}
         ${p.consecutive_errors >= 5 ? `<span title="${p.consecutive_errors} שגיאות ברצף — המוצר חסום" style="margin-right:4px;cursor:help;">🚫</span>` : ''}

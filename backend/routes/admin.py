@@ -338,6 +338,14 @@ async def list_products(
     )
     watcher_map = {row.product_id: row.cnt for row in watcher_rows}
 
+    # Batch-fetch paused watcher counts
+    paused_rows = await db.execute(
+        select(UserProduct.product_id, func.count().label("cnt"))
+        .where(UserProduct.is_paused == True)
+        .group_by(UserProduct.product_id)
+    )
+    paused_map = {row.product_id: row.cnt for row in paused_rows}
+
     return [
         {
             "id": p.id,
@@ -348,6 +356,7 @@ async def list_products(
             "last_checked": p.last_checked.isoformat() if p.last_checked else None,
             "consecutive_errors": p.consecutive_errors,
             "watchers": watcher_map.get(p.id, 0),
+            "paused_watchers": paused_map.get(p.id, 0),
             "raw_text": p.raw_text[:200] if p.raw_text else "",
             "last_price": p.last_price or "",
         }
