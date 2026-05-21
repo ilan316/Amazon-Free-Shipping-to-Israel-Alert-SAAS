@@ -651,7 +651,10 @@ function renderAdminProducts() {
       <td style="text-align:center;"><input type="checkbox" class="product-checkbox" value="${p.id}" onchange="updateBulkDeleteBtn()"></td>
       <td class="ltr"><a href="${p.url}" target="_blank">${p.asin}</a></td>
       <td class="truncate">${p.name || "—"}</td>
-      <td><span class="status-badge badge-${p.last_status}">${statusLabel(p.last_status)}</span></td>
+      <td>${p.paused_watchers > 0 && p.paused_watchers === p.watchers
+        ? '<span class="status-badge" style="background:#f0f0f0;color:#888;border:1px solid #ccc;">⏸ בהשהייה</span>'
+        : `<span class="status-badge badge-${p.last_status}">${statusLabel(p.last_status)}</span>`
+      }</td>
       <td style="text-align:center;font-size:0.82rem;color:#B12704;font-weight:bold;" dir="ltr">${p.last_price || '—'}</td>
       <td style="text-align:center;">${p.watchers}${p.paused_watchers > 0 ? ` <span title="${p.paused_watchers} עוקבים בהשהייה" style="font-size:0.78rem;color:#888;cursor:help;">⏸${p.paused_watchers}</span>` : ''}</td>
       <td class="ltr">
