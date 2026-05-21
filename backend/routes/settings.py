@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
-from sqlalchemy import select
+from sqlalchemy import select, update
 
-from backend.models import User, Product, NotificationLog, SystemSetting
+from backend.models import User, Product, NotificationLog, SystemSetting, UserProduct
 from backend.auth import get_current_user, verify_password, hash_password
 from backend.schemas import UserResponse, UpdateSettingsRequest, ChangePasswordRequest, DeleteAccountRequest, MessageResponse
 
@@ -94,7 +94,11 @@ async def set_vacation_mode(
     current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),
 ):
-    current_user.vacation_mode = bool(body.get("vacation_mode", False))
+    vacation = bool(body.get("vacation_mode", False))
+    current_user.vacation_mode = vacation
+    await db.execute(
+        update(UserProduct).where(UserProduct.user_id == current_user.id).values(is_paused=vacation)
+    )
     await db.commit()
     await db.refresh(current_user)
     return current_user

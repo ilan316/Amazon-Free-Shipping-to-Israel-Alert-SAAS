@@ -20,7 +20,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from backend.models import SystemSetting
 
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import AsyncSessionLocal
@@ -316,6 +316,9 @@ async def run_inactivity_check():
         for user in to_vacation:
             user.vacation_mode = True
             user.automation_reengagement_sent_at = None
+            await db.execute(
+                update(UserProduct).where(UserProduct.user_id == user.id).values(is_paused=True)
+            )
             logger.info(f"[inactivity] User {user.id} → vacation_mode (inactive {days}+ days)")
 
         if tpl and to_warn:
