@@ -645,13 +645,14 @@ function renderAdminProducts() {
       : _allAdminProducts.filter(p => p.last_status === _adminFilter && !fullyPaused(p));
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:24px;">אין מוצרים</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:24px;">אין מוצרים</td></tr>';
     return;
   }
   tbody.innerHTML = filtered.map(p => `
     <tr>
       <td style="text-align:center;"><input type="checkbox" class="product-checkbox" value="${p.id}" onchange="updateBulkDeleteBtn()"></td>
       <td class="ltr"><a href="${p.url}" target="_blank">${p.asin}</a></td>
+      <td style="text-align:center;padding:3px 6px;"><img src="https://images-na.ssl-images-amazon.com/images/P/${p.asin}.01._SL50_.jpg" alt="" width="44" height="44" style="object-fit:contain;border-radius:4px;border:1px solid #eee;display:block;" onerror="this.style.display='none'"></td>
       <td class="truncate">${p.name || "—"}</td>
       <td>${p.paused_watchers > 0 && p.paused_watchers === p.watchers
         ? '<span class="status-badge" style="background:#f0f0f0;color:#888;border:1px solid #ccc;">⏸ בהשהייה</span>'
