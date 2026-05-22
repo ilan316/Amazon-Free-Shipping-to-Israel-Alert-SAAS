@@ -359,6 +359,7 @@ async def list_products(
             "paused_watchers": paused_map.get(p.id, 0),
             "raw_text": p.raw_text[:200] if p.raw_text else "",
             "last_price": p.last_price or "",
+            "image_url": p.image_url or f"https://images-na.ssl-images-amazon.com/images/P/{p.asin}.01._SL100_.jpg",
         }
         for p in products
     ]
