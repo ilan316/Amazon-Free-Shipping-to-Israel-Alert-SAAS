@@ -494,7 +494,7 @@ async def run_automation_emails():
 async def run_no_click_automation():
     """
     Two-phase no-click automation for FREE products:
-    Phase 1 — 7+ days FREE, no click → send one reminder email.
+    Phase 1 — 3+ days FREE, no click → send one reminder email.
     Phase 2 — reminder sent 2+ days ago, still no click → auto-pause product.
     """
     logger.info("=== No-click automation started ===")
@@ -537,7 +537,7 @@ async def run_no_click_automation():
 
         await db.commit()
 
-        # Phase 1: send reminder to users with 7+ days FREE and no click at all
+        # Phase 1: send reminder to users with 3+ days FREE and no click at all
         phase1_rows = (await db.execute(
             __import__("sqlalchemy").text("""
                 SELECT up.id, up.user_id, up.product_id,
@@ -564,7 +564,7 @@ async def run_no_click_automation():
                 GROUP BY up.id, up.user_id, up.product_id
                 HAVING MIN(nl.sent_at) <= :cutoff_remind
             """),
-            {"cutoff_remind": now - timedelta(days=7)},
+            {"cutoff_remind": now - timedelta(days=3)},
         )).fetchall()
 
         send_log = None
