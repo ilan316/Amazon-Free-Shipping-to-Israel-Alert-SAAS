@@ -124,6 +124,11 @@ async def create_tables():
                 "ALTER TABLE user_products ADD COLUMN IF NOT EXISTS no_click_reminder_sent_at TIMESTAMP WITH TIME ZONE"
             )
         )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE products ADD COLUMN IF NOT EXISTS free_since TIMESTAMP WITH TIME ZONE"
+            )
+        )
         # Open tracking: make template_id nullable, add template_name
         await conn.execute(
             __import__("sqlalchemy").text(

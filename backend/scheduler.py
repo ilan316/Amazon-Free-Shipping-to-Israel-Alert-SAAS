@@ -39,6 +39,10 @@ async def _update_product(db: AsyncSession, product: Product, result: CheckResul
 
     if result.status in (ShippingStatus.FREE, ShippingStatus.PAID, ShippingStatus.NO_SHIP, ShippingStatus.NOT_FOUND):
         # Definitive result — update visible status
+        if result.status == ShippingStatus.FREE and product.last_status != ShippingStatus.FREE.value:
+            product.free_since = datetime.now(timezone.utc)
+        elif result.status != ShippingStatus.FREE:
+            product.free_since = None
         product.last_status = result.status.value
         product.raw_text = result.raw_text or ""
         product.found_in_aod = result.found_in_aod
@@ -538,19 +542,17 @@ async def run_no_click_automation():
 
         await db.commit()
 
-        # Phase 1: send reminder to users with 3+ days FREE and no click at all
+        # Phase 1: send reminder to users with 3+ consecutive days FREE and no click at all
         phase1_rows = (await db.execute(
             __import__("sqlalchemy").text("""
                 SELECT up.id, up.user_id, up.product_id,
-                       MIN(nl.sent_at) AS first_free_at
+                       p.free_since AS first_free_at
                 FROM user_products up
                 JOIN products p ON p.id = up.product_id
                 JOIN users u ON u.id = up.user_id
-                JOIN notification_log nl
-                  ON nl.user_id = up.user_id
-                 AND nl.product_id = up.product_id
-                 AND nl.status = 'FREE'
                 WHERE p.last_status = 'FREE'
+                  AND p.free_since IS NOT NULL
+                  AND p.free_since <= :cutoff_remind
                   AND up.is_paused = FALSE
                   AND up.no_click_reminder_sent_at IS NULL
                   AND u.is_active = TRUE
@@ -562,8 +564,6 @@ async def run_no_click_automation():
                       SELECT 1 FROM email_clicks ec
                       WHERE ec.user_id = up.user_id AND ec.asin = p.asin
                   )
-                GROUP BY up.id, up.user_id, up.product_id
-                HAVING MIN(nl.sent_at) <= :cutoff_remind
             """),
             {"cutoff_remind": now - timedelta(days=3)},
         )).fetchall()
