@@ -561,7 +561,7 @@ def send_daily_summary(user, free_products: list) -> bool:
     for p, custom_name in free_products:
         name = _short(custom_name or p.name or p.asin, _MAX_NAME_BODY)
         url = _tracking_url(user.id, p.asin)
-        img_url = f"https://images-na.ssl-images-amazon.com/images/P/{p.asin}.01._SL100_.jpg"
+        img_url = p.image_url or f"https://images-na.ssl-images-amazon.com/images/P/{p.asin}.01._SL100_.jpg"
         price_html = ""
         if getattr(p, "last_price", None):
             price_note = "מחיר באמזון (לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl else "Amazon price (excl. shipping, taxes & fees)"
