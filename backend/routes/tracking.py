@@ -29,6 +29,10 @@ _BOT_UA_FRAGMENTS = (
 
 _CLICK_DEDUP_MINUTES = 5
 
+# Apple Mail Privacy Protection: Apple pre-fetches images on delivery (not on open).
+# Detected by Apple's allocated IP block (17.0.0.0/8) or AppleMail UA strings.
+_APPLE_MPP_UA_FRAGMENTS = ("applemail", "apple mail")
+
 
 def _is_bot(ua: str) -> bool:
     """Return True if User-Agent looks like an email security scanner or bot."""
@@ -36,6 +40,14 @@ def _is_bot(ua: str) -> bool:
         return True
     lower = ua.lower()
     return any(frag in lower for frag in _BOT_UA_FRAGMENTS)
+
+
+def _is_apple_mpp(ua: str, ip: str | None) -> bool:
+    """Return True if this open looks like an Apple MPP pre-fetch (not a real user open)."""
+    if ip and ip.startswith("17."):
+        return True
+    ua_lower = ua.lower()
+    return any(frag in ua_lower for frag in _APPLE_MPP_UA_FRAGMENTS)
 
 _ALLOWED_PREFIXES = (
     "https://www.amazon.com/",
@@ -109,10 +121,13 @@ async def track_email_open(
             if _is_bot(ua):
                 logger.info(f"email-open BLOCKED (bot UA): uid={uid} tid={tid} tn={tn} ua={ua[:120]}")
             else:
-                logger.info(f"email-open ALLOWED: uid={uid} tid={tid} tn={tn} ua={ua[:120]}")
+                suspicious = _is_apple_mpp(ua, None)  # IP checked after extraction
                 ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
                 if ip:
                     ip = ip.split(",")[0].strip()[:64]
+                    if ip.startswith("17."):
+                        suspicious = True
+                logger.info(f"email-open {'SUSPICIOUS(MPP)' if suspicious else 'ALLOWED'}: uid={uid} tid={tid} tn={tn} ua={ua[:120]} ip={ip}")
                 from datetime import datetime, timezone
                 cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
                 dedup_filter = [
@@ -127,7 +142,12 @@ async def track_email_open(
                     select(EmailOpen).where(*dedup_filter).limit(1)
                 )).scalar_one_or_none()
                 if not recent:
-                    db.add(EmailOpen(user_id=uid, template_id=tid, template_name=tn[:100] if tn else None, ip=ip))
+                    db.add(EmailOpen(
+                        user_id=uid, template_id=tid,
+                        template_name=tn[:100] if tn else None,
+                        ip=ip, user_agent=ua[:300] if ua else None,
+                        is_suspicious=suspicious,
+                    ))
                     await db.commit()
                 else:
                     logger.debug(f"email-open ignored (dedup): uid={uid} tid={tid} tn={tn}")

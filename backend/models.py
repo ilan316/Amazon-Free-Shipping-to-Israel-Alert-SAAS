@@ -122,6 +122,8 @@ class EmailOpen(Base):
     template_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    is_suspicious: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class EmailSendLog(Base):

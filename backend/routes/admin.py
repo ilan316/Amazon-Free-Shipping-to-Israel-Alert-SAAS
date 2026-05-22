@@ -1558,21 +1558,27 @@ async def get_send_log_recipients(
         clicked_ids = {row[0] for row in clicked_result.all()}
 
         opened_result = await db.execute(
-            select(EmailOpen.user_id)
+            select(EmailOpen.user_id, EmailOpen.is_suspicious)
             .where(
                 EmailOpen.user_id.in_(success_user_ids),
                 EmailOpen.template_name == log.template_name,
                 EmailOpen.opened_at >= log.sent_at,
             )
-            .distinct()
         )
-        opened_ids = {row[0] for row in opened_result.all()}
+        # Per user: suspicious=False wins if any confirmed open exists
+        opened_map: dict[int, bool] = {}
+        for uid, is_susp in opened_result.all():
+            if uid not in opened_map:
+                opened_map[uid] = is_susp
+            elif not is_susp:
+                opened_map[uid] = False
 
     return [
         {
             "id": r.id, "user_id": r.user_id, "email": r.email,
             "success": r.success,
-            "opened": (r.user_id in opened_ids) if r.success else False,
+            "opened": (r.user_id in opened_map) if r.success else False,
+            "opened_suspicious": opened_map.get(r.user_id, False) if r.success else False,
             "clicked": (r.user_id in clicked_ids) if r.success else False,
         }
         for r in rows

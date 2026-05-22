@@ -135,6 +135,16 @@ async def create_tables():
                 "ALTER TABLE email_opens ADD COLUMN IF NOT EXISTS template_name VARCHAR(100)"
             )
         )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE email_opens ADD COLUMN IF NOT EXISTS user_agent VARCHAR(300)"
+            )
+        )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE email_opens ADD COLUMN IF NOT EXISTS is_suspicious BOOLEAN NOT NULL DEFAULT FALSE"
+            )
+        )
         # Mark users who already received the activation template manually so automation skips them
         await conn.execute(
             __import__("sqlalchemy").text("""
