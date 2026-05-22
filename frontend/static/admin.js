@@ -652,7 +652,7 @@ function renderAdminProducts() {
     <tr>
       <td style="text-align:center;"><input type="checkbox" class="product-checkbox" value="${p.id}" onchange="updateBulkDeleteBtn()"></td>
       <td class="ltr"><a href="${p.url}" target="_blank">${p.asin}</a></td>
-      <td style="text-align:center;padding:3px 6px;"><img src="https://images-na.ssl-images-amazon.com/images/P/${p.asin}.01._SL50_.jpg" alt="" width="44" height="44" style="object-fit:contain;border-radius:4px;border:1px solid #eee;display:block;" onerror="this.style.display='none'"></td>
+      <td style="text-align:center;padding:3px 6px;"><img src="https://images-na.ssl-images-amazon.com/images/P/${p.asin}.01._SL100_.jpg" alt="" width="60" height="60" style="object-fit:contain;border-radius:6px;border:1px solid #eee;display:block;" onerror="this.style.display='none'"></td>
       <td class="truncate">${p.name || "—"}</td>
       <td>${p.paused_watchers > 0 && p.paused_watchers === p.watchers
         ? '<span class="status-badge" style="background:#f0f0f0;color:#888;border:1px solid #ccc;">⏸ בהשהייה</span>'
