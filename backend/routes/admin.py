@@ -1545,6 +1545,7 @@ async def get_send_log_recipients(
 
     success_user_ids = [r.user_id for r in rows if r.user_id and r.success]
     clicked_ids: set[int] = set()
+    opened_ids: set[int] = set()
     if success_user_ids:
         clicked_result = await db.execute(
             select(EmailClick.user_id)
@@ -1556,10 +1557,22 @@ async def get_send_log_recipients(
         )
         clicked_ids = {row[0] for row in clicked_result.all()}
 
+        opened_result = await db.execute(
+            select(EmailOpen.user_id)
+            .where(
+                EmailOpen.user_id.in_(success_user_ids),
+                EmailOpen.template_name == log.template_name,
+                EmailOpen.opened_at >= log.sent_at,
+            )
+            .distinct()
+        )
+        opened_ids = {row[0] for row in opened_result.all()}
+
     return [
         {
             "id": r.id, "user_id": r.user_id, "email": r.email,
             "success": r.success,
+            "opened": (r.user_id in opened_ids) if r.success else False,
             "clicked": (r.user_id in clicked_ids) if r.success else False,
         }
         for r in rows

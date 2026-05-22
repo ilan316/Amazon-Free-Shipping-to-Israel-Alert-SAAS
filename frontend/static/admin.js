@@ -1257,16 +1257,18 @@ async function toggleSendLogDetail(logId, templateId, sentAt, clickedRow) {
   const rowBg = r => {
     if (!r.success) return "#fef2f2";
     if (r.clicked) return "#f0fdf4";
+    if (r.opened) return "#eff6ff";
     return "";
   };
 
   inner.innerHTML = `
     <div style="display:flex;justify-content:center;">
-    <table style="border-collapse:collapse;font-size:0.82rem;margin-bottom:8px;min-width:320px;max-width:520px;width:auto;">
+    <table style="border-collapse:collapse;font-size:0.82rem;margin-bottom:8px;min-width:360px;max-width:560px;width:auto;">
       <thead>
         <tr style="border-bottom:2px solid var(--border);color:var(--text-muted);font-size:0.75rem;">
           <th style="text-align:right;padding:4px 10px;font-weight:600;">מייל</th>
           <th style="text-align:center;padding:4px 10px;font-weight:600;width:56px;">נשלח</th>
+          <th style="text-align:center;padding:4px 10px;font-weight:600;width:56px;">פתח</th>
           <th style="text-align:center;padding:4px 10px;font-weight:600;width:56px;">לחץ</th>
         </tr>
       </thead>
@@ -1275,6 +1277,7 @@ async function toggleSendLogDetail(logId, templateId, sentAt, clickedRow) {
           <tr style="border-bottom:1px solid var(--border);background:${rowBg(r)};">
             <td style="padding:4px 10px;direction:ltr;text-align:left;">${r.email}</td>
             <td style="text-align:center;padding:4px 10px;">${r.success ? "✅" : "❌"}</td>
+            <td style="text-align:center;padding:4px 10px;">${r.opened ? "👁" : "—"}</td>
             <td style="text-align:center;padding:4px 10px;">${r.clicked ? "✅" : "—"}</td>
           </tr>`).join("")}
       </tbody>
