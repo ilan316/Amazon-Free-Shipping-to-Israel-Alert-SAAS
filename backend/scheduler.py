@@ -197,6 +197,7 @@ async def run_daily_summary():
                         (UserProduct.paused_until != None) & (UserProduct.paused_until <= now),
                     ),
                     Product.last_status == ShippingStatus.FREE.value,
+                    UserProduct.no_click_reminder_sent_at == None,
                 )
             )
             free_products = free_products_result.all()
