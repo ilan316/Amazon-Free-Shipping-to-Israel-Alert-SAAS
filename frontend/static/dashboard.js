@@ -187,6 +187,7 @@ function renderProducts() {
     const linkUrl     = p.affiliate_url || p.url;
 
 
+    const isAutoPaused = p.is_paused && p.paused_reason === 'auto';
     const pausedUntilDate = p.paused_until
       ? new Date(p.paused_until).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' })
       : null;
@@ -204,7 +205,6 @@ function renderProducts() {
         ${pauseBtnLabel}
       </button>`;
 
-    const isAutoPaused = p.is_paused && p.paused_reason === 'auto';
     const badgeHtml = p.is_paused
       ? (isAutoPaused
           ? '<span class="status-badge badge-auto-paused" title="המוצר היה חינם 5 ימים ולא לחצת על הקישור — הושהה אוטומטית">⏸ הושהה אוטומטית</span>'
