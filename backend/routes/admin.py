@@ -360,6 +360,7 @@ async def list_products(
             "raw_text": p.raw_text[:200] if p.raw_text else "",
             "last_price": p.last_price or "",
             "image_url": p.image_url or f"https://images-na.ssl-images-amazon.com/images/P/{p.asin}.01._SL100_.jpg",
+            "status_since": p.status_since.isoformat() if p.status_since else None,
         }
         for p in products
     ]

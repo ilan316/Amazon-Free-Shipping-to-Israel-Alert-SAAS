@@ -74,6 +74,7 @@ class ProductResponse(BaseModel):
     raw_text: str = ""
     affiliate_url: str = ""
     last_price: str | None = None
+    status_since: datetime | None = None
 
     model_config = {"from_attributes": True}
 

@@ -1,5 +1,17 @@
 let _analyticsLoaded = false;
 
+function nextCheckLabel(p) {
+  if (!p.status_since || !['PAID', 'NO_SHIP'].includes(p.last_status)) return null;
+  const cycle = p.last_status === 'PAID' ? 14 : 21;
+  const daysSince = Math.floor((Date.now() - new Date(p.status_since)) / 86400000);
+  const dayInCycle = daysSince % cycle;
+  if (dayInCycle < 7) return null;
+  const daysUntil = cycle - dayInCycle;
+  const next = new Date();
+  next.setDate(next.getDate() + daysUntil);
+  return `⏸ ${next.toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' })} (יום ${dayInCycle}/${cycle})`;
+}
+
 function switchTab(name, btn) {
   document.querySelectorAll(".admin-tab").forEach(t => t.classList.remove("active"));
   document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
@@ -663,6 +675,7 @@ function renderAdminProducts() {
       <td class="ltr">
         ${p.last_checked ? formatDate(p.last_checked) : "—"}
         ${p.consecutive_errors >= 5 ? `<span title="${p.consecutive_errors} שגיאות ברצף — המוצר חסום" style="margin-right:4px;cursor:help;">🚫</span>` : ''}
+        ${nextCheckLabel(p) ? `<br><span style="font-size:0.75rem;color:#e67e00;">${nextCheckLabel(p)}</span>` : ''}
       </td>
       <td class="truncate ltr" style="max-width:200px;font-size:0.78rem;color:var(--text-muted);"
           title="${p.raw_text ? p.raw_text.replace(/"/g,'&quot;') : ''}">

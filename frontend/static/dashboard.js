@@ -5,6 +5,18 @@ let checkingAsins = new Set();
 let currentFilter = 'ALL';
 let userLimit = null;
 
+function nextCheckLabel(p) {
+  if (!p.status_since || !['PAID', 'NO_SHIP'].includes(p.last_status)) return null;
+  const cycle = p.last_status === 'PAID' ? 14 : 21;
+  const daysSince = Math.floor((Date.now() - new Date(p.status_since)) / 86400000);
+  const dayInCycle = daysSince % cycle;
+  if (dayInCycle < 7) return null;
+  const daysUntil = cycle - dayInCycle;
+  const next = new Date();
+  next.setDate(next.getDate() + daysUntil);
+  return `הבדיקה הבאה: ${next.toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' })}`;
+}
+
 const STATUS_TOOLTIP = {
   FREE:      "משלוח חינם לישראל זמין",
   PAID:      "משלוח לישראל בתשלום",
@@ -165,6 +177,7 @@ function renderProducts() {
     const checkedStr  = isChecking
       ? '<span style="color:var(--brand-dark)">⏳ בודק עכשיו...</span>'
       : (p.last_checked ? `בדיקה אחרונה: ${formatDate(p.last_checked)}` : "טרם נבדק");
+    const nextCheck   = !isChecking ? nextCheckLabel(p) : null;
     const notifiedStr = p.last_notified ? `התראה: ${formatDate(p.last_notified)}` : "";
     const aodNote     = p.found_in_aod ? '<span title="נמצא בכל אפשרויות הקנייה">⚠️</span>' : "";
     const badgeStatus = p.is_paused ? 'UNKNOWN'
@@ -219,6 +232,7 @@ function renderProducts() {
         <!-- שורה 2: בדיקה אחרונה (ימין) | ASIN LTR (שמאל) -->
         <div class="card-row-meta">
           <span class="card-meta-checked">${checkedStr}${notifiedStr ? ' · ' + notifiedStr : ''}</span>
+          ${nextCheck ? `<span class="card-meta-next-check" style="font-size:11px;color:#e67e00;display:block;margin-top:2px;">⏸ ${nextCheck}</span>` : ''}
           <span class="card-meta-asin" dir="ltr">ASIN: ${p.asin}</span>
         </div>
         ${p.last_price && !['NO_SHIP','NOT_FOUND'].includes(p.last_status) ? `<div class="card-row-price" style="margin-top:3px;font-size:12px;">

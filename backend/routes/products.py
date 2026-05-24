@@ -122,6 +122,7 @@ async def list_products(
             raw_text=p.raw_text or "",
             affiliate_url=_aff_url,
             last_price=p.last_price or None,
+            status_since=p.status_since,
         ))
     return items
 
