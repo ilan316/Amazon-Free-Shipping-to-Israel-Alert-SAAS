@@ -197,7 +197,7 @@ async def public_free_products():
     from sqlalchemy import select
     from datetime import datetime, timedelta, timezone
     tag = os.environ.get("AMAZON_AFFILIATE_TAG", "amzfreeil-20").strip()
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=26)
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(Product)
