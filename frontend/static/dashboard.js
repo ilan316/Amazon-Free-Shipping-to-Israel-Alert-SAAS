@@ -191,10 +191,10 @@ function renderProducts() {
       ? new Date(p.paused_until).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' })
       : null;
     const pauseBtnLabel = p.is_paused
-      ? (pausedUntilDate ? `▶ מושהה עד ${pausedUntilDate}` : '▶ מושהה ∞')
+      ? (isAutoPaused ? '▶ חדש מעקב' : (pausedUntilDate ? `▶ מושהה עד ${pausedUntilDate}` : '▶ בטל השהייה'))
       : '⏸ השהה';
     const pauseBtnTitle = p.is_paused
-      ? (pausedUntilDate ? `לחץ לביטול השהייה (עד ${pausedUntilDate})` : 'השהייה ללא הגבלה — לחץ לביטול')
+      ? (isAutoPaused ? 'לחץ לחידוש המעקב' : (pausedUntilDate ? `לחץ לביטול השהייה (עד ${pausedUntilDate})` : 'השהייה ללא הגבלה — לחץ לביטול'))
       : 'השהה מעקב';
     const pauseBtn = `
       <button
@@ -244,6 +244,7 @@ function renderProducts() {
         </div>` : ''}
 
         <!-- שורה 3: סטטוס | השהה | בדוק | הסר -->
+        ${isAutoPaused ? `<div style="font-size:0.78rem;color:#e65100;margin-bottom:4px;">הושהה אוטומטית — לא לחצת על הקישור 5 ימים</div>` : ''}
         <div class="card-row-actions">
           ${badgeHtml}
           ${pauseBtn}
