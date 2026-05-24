@@ -193,13 +193,19 @@ async def public_free_products():
     """Public endpoint — returns all products currently with FREE shipping to Israel.
     Used by amzfreeil.com/free-products.html (no auth required, CORS open)."""
     from backend.database import AsyncSessionLocal
-    from backend.models import Product
-    from sqlalchemy import select
+    from backend.models import Product, UserProduct
+    from sqlalchemy import select, exists
     tag = os.environ.get("AMAZON_AFFILIATE_TAG", "amzfreeil-20").strip()
     async with AsyncSessionLocal() as db:
+        # Only return products with at least one active (non-paused) watcher.
+        # Products paused by all watchers have a stale last_status — no checks run on them.
+        active_watcher = exists().where(
+            (UserProduct.product_id == Product.id) & (UserProduct.is_paused == False)
+        )
         result = await db.execute(
             select(Product)
             .where(Product.last_status == "FREE")
+            .where(active_watcher)
             .order_by(Product.last_checked.desc())
         )
         products = result.scalars().all()
