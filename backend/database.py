@@ -139,6 +139,11 @@ async def create_tables():
                 "ALTER TABLE products ADD COLUMN IF NOT EXISTS status_since TIMESTAMP WITH TIME ZONE"
             )
         )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "UPDATE products SET status_since = NOW() WHERE status_since IS NULL AND last_status IN ('PAID', 'NO_SHIP')"
+            )
+        )
         # Open tracking: make template_id nullable, add template_name
         await conn.execute(
             __import__("sqlalchemy").text(
