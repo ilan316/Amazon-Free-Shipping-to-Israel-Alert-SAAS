@@ -20,13 +20,13 @@ import os
 from datetime import datetime, timedelta, timezone
 from backend.models import SystemSetting
 
-from sqlalchemy import select, func, or_, update
+from sqlalchemy import select, func, or_, update, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import AsyncSessionLocal
-from backend.models import Product, User, UserProduct, NotificationLog, EmailTemplate, EmailSendLog, EmailSendRecipient
+from backend.models import Product, User, UserProduct, NotificationLog, EmailTemplate, EmailSendLog, EmailSendRecipient, EmailClick
 from backend.checker import browser_manager, ShippingStatus, CheckResult
-from backend.notifier import send_daily_summary, send_no_click_reminder, _send_via_resend, _wrap_responsive, _open_pixel
+from backend.notifier import send_daily_summary, _send_via_resend, _wrap_responsive, _open_pixel
 
 logger = logging.getLogger(__name__)
 
@@ -172,9 +172,45 @@ async def run_global_check_cycle():
 
 
 async def run_daily_summary():
-    """Send one daily summary email per user listing all their FREE products."""
+    """Send one daily summary email per user listing all their FREE products.
+
+    Pre-step: auto-pause products free for 5+ days with no click from the user.
+    Warning badges (days 3-4 free, no click) are passed to send_daily_summary().
+    """
     logger.info("=== Daily summary started ===")
     async with AsyncSessionLocal() as db:
+        now = datetime.now(timezone.utc)
+        cutoff_pause = now - timedelta(days=5)
+        cutoff_warn  = now - timedelta(days=3)
+
+        # Auto-pause products free 5+ days with no click from tracking user
+        auto_pause_rows = (await db.execute(text("""
+            SELECT up.id, up.user_id, p.asin
+            FROM user_products up
+            JOIN products p ON p.id = up.product_id
+            JOIN users u ON u.id = up.user_id
+            WHERE up.is_paused = FALSE
+              AND p.last_status = 'FREE'
+              AND p.free_since IS NOT NULL
+              AND p.free_since <= :cutoff_pause
+              AND u.is_active = TRUE
+              AND u.is_admin = FALSE
+              AND NOT EXISTS (
+                  SELECT 1 FROM email_clicks ec
+                  WHERE ec.user_id = up.user_id AND ec.asin = p.asin
+              )
+        """), {"cutoff_pause": cutoff_pause})).fetchall()
+
+        auto_paused = 0
+        for row in auto_pause_rows:
+            up = (await db.execute(select(UserProduct).where(UserProduct.id == row[0]))).scalar_one_or_none()
+            if up:
+                up.is_paused = True
+                auto_paused += 1
+                logger.info(f"Auto-paused user_id={row[1]} asin={row[2]} (5+ days free, no click)")
+        if auto_paused:
+            await db.commit()
+
         users_result = await db.execute(
             select(User).where(
                 User.is_active == True,
@@ -185,12 +221,16 @@ async def run_daily_summary():
         )
         users = users_result.scalars().all()
 
-        now = datetime.now(timezone.utc)
         send_log = None
         recipients_buffer = []
         sent = 0
 
         for user in users:
+            # Clicked ASINs for this user (any time)
+            clicked_asins = {r.asin for r in (await db.execute(
+                select(EmailClick.asin).where(EmailClick.user_id == user.id).distinct()
+            )).all()}
+
             free_products_result = await db.execute(
                 select(Product, UserProduct.custom_name)
                 .join(UserProduct, Product.id == UserProduct.product_id)
@@ -201,7 +241,6 @@ async def run_daily_summary():
                         (UserProduct.paused_until != None) & (UserProduct.paused_until <= now),
                     ),
                     Product.last_status == ShippingStatus.FREE.value,
-                    UserProduct.no_click_reminder_sent_at == None,
                 )
             )
             free_products = free_products_result.all()
@@ -209,7 +248,15 @@ async def run_daily_summary():
             if not free_products:
                 continue
 
-            success = send_daily_summary(user, free_products)
+            # Build pause warnings for products free 3-4 days with no click
+            pause_warnings = {}
+            for product, _ in free_products:
+                if product.free_since and product.free_since <= cutoff_warn and product.asin not in clicked_asins:
+                    days_free = (now - product.free_since).days
+                    days_until_pause = max(1, 5 - days_free)
+                    pause_warnings[product.asin] = days_until_pause
+
+            success = send_daily_summary(user, free_products, pause_warnings=pause_warnings)
             recipients_buffer.append((user, success))
 
             for product, _ in free_products:
@@ -224,7 +271,7 @@ async def run_daily_summary():
 
             if success:
                 sent += 1
-                logger.info(f"[user {user.id}] Summary sent — {len(free_products)} free product(s).")
+                logger.info(f"[user {user.id}] Summary sent — {len(free_products)} free product(s), {len(pause_warnings)} with pause warning.")
 
             await db.commit()
 
@@ -244,7 +291,7 @@ async def run_daily_summary():
                 db.add(EmailSendRecipient(send_log_id=send_log.id, user_id=user.id, email=user.notify_email, success=ok))
             await db.commit()
 
-    logger.info(f"=== Daily summary complete — {sent} email(s) sent ===")
+    logger.info(f"=== Daily summary complete — {sent} email(s) sent, {auto_paused} product(s) auto-paused ===")
 
 
 async def _notify_admin_of_errors(failed_items: list):
@@ -495,124 +542,6 @@ async def run_automation_emails():
         f"reminder: {reminder_sent}, expansion: {expansion_sent} ==="
     )
 
-
-async def run_no_click_automation():
-    """
-    Two-phase no-click automation for FREE products:
-    Phase 1 — 3+ days FREE, no click → send one reminder email.
-    Phase 2 — reminder sent 2+ days ago, still no click → auto-pause product.
-    """
-    logger.info("=== No-click automation started ===")
-    reminded = paused = 0
-
-    async with AsyncSessionLocal() as db:
-        now = datetime.now(timezone.utc)
-
-        # Phase 2 first: pause products where reminder was sent 2+ days ago with no click
-        phase2_rows = (await db.execute(
-            __import__("sqlalchemy").text("""
-                SELECT up.id, up.user_id, p.asin
-                FROM user_products up
-                JOIN products p ON p.id = up.product_id
-                JOIN users u ON u.id = up.user_id
-                WHERE up.no_click_reminder_sent_at IS NOT NULL
-                  AND up.no_click_reminder_sent_at <= :cutoff_pause
-                  AND up.is_paused = FALSE
-                  AND p.last_status = 'FREE'
-                  AND u.is_active = TRUE
-                  AND u.is_admin = FALSE
-                  AND NOT EXISTS (
-                      SELECT 1 FROM email_clicks ec
-                      WHERE ec.user_id = up.user_id
-                        AND ec.asin = p.asin
-                        AND ec.clicked_at >= up.no_click_reminder_sent_at
-                  )
-            """),
-            {"cutoff_pause": now - timedelta(days=2)},
-        )).fetchall()
-
-        for row in phase2_rows:
-            up = (await db.execute(
-                __import__("sqlalchemy").select(UserProduct).where(UserProduct.id == row[0])
-            )).scalar_one_or_none()
-            if up:
-                up.is_paused = True
-                paused += 1
-                logger.info(f"Auto-paused user_id={row[1]} asin={row[2]} (no click after reminder)")
-
-        await db.commit()
-
-        # Phase 1: send reminder to users with 3+ consecutive days FREE and no click at all
-        phase1_rows = (await db.execute(
-            __import__("sqlalchemy").text("""
-                SELECT up.id, up.user_id, up.product_id,
-                       p.free_since AS first_free_at
-                FROM user_products up
-                JOIN products p ON p.id = up.product_id
-                JOIN users u ON u.id = up.user_id
-                WHERE p.last_status = 'FREE'
-                  AND p.free_since IS NOT NULL
-                  AND p.free_since <= :cutoff_remind
-                  AND up.is_paused = FALSE
-                  AND up.no_click_reminder_sent_at IS NULL
-                  AND u.is_active = TRUE
-                  AND u.is_verified = TRUE
-                  AND u.vacation_mode = FALSE
-                  AND u.notify_email_bounced = FALSE
-                  AND u.is_admin = FALSE
-                  AND NOT EXISTS (
-                      SELECT 1 FROM email_clicks ec
-                      WHERE ec.user_id = up.user_id AND ec.asin = p.asin
-                  )
-            """),
-            {"cutoff_remind": now - timedelta(days=3)},
-        )).fetchall()
-
-        send_log = None
-        recipients_buffer = []
-
-        for row in phase1_rows:
-            up_id, user_id, product_id, first_free_at = row
-            user = (await db.execute(
-                __import__("sqlalchemy").select(User).where(User.id == user_id)
-            )).scalar_one_or_none()
-            product = (await db.execute(
-                __import__("sqlalchemy").select(Product).where(Product.id == product_id)
-            )).scalar_one_or_none()
-            if not user or not product:
-                continue
-
-            days_free = (now - first_free_at).days
-            ok = send_no_click_reminder(user, product, days_free)
-            recipients_buffer.append((user_id, user.notify_email, ok))
-            if ok:
-                up = (await db.execute(
-                    __import__("sqlalchemy").select(UserProduct).where(UserProduct.id == up_id)
-                )).scalar_one_or_none()
-                if up:
-                    up.no_click_reminder_sent_at = now
-                reminded += 1
-                logger.info(f"No-click reminder sent user_id={user_id} asin={product.asin} days_free={days_free}")
-            await asyncio.sleep(0.55)
-
-        if recipients_buffer:
-            failed_count = sum(1 for _, _, ok in recipients_buffer if not ok)
-            send_log = EmailSendLog(
-                template_id=None,
-                template_name="no_click_reminder",
-                sent_at=now,
-                audience="no_click_automation",
-                sent_count=reminded,
-                failed_count=failed_count,
-            )
-            db.add(send_log)
-            await db.flush()
-            for uid, email, ok in recipients_buffer:
-                db.add(EmailSendRecipient(send_log_id=send_log.id, user_id=uid, email=email, success=ok))
-
-        await db.commit()
-
-    logger.info(f"=== No-click automation complete — reminded: {reminded}, auto-paused: {paused} ===")
 
 
 async def check_single_product(asin: str, url: str):

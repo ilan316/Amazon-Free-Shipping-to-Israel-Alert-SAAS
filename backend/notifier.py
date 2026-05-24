@@ -514,7 +514,7 @@ def send_user_alert(user, product, result) -> bool:
 
 # ── Daily summary ─────────────────────────────────────────────────────────────
 
-def send_daily_summary(user, free_products: list) -> bool:
+def send_daily_summary(user, free_products: list, pause_warnings: dict = None) -> bool:
     """
     Send a daily digest email listing all FREE products for a user.
     free_products: list of ORM Product objects with last_status == FREE
@@ -566,6 +566,14 @@ def send_daily_summary(user, free_products: list) -> bool:
         if getattr(p, "last_price", None):
             price_note = "מחיר באמזון (לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl else "Amazon price (excl. shipping, taxes & fees)"
             price_html = f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {p.last_price} <span style="font-size:11px;color:#888;font-weight:normal;">({price_note})</span></p>'
+        warning_html = ""
+        if pause_warnings and p.asin in pause_warnings:
+            days_left = pause_warnings[p.asin]
+            if lang == "he":
+                warn_txt = "יושהה מחר אם לא תלחץ" if days_left == 1 else f"יושהה בעוד {days_left} ימים אם לא תלחץ"
+            else:
+                warn_txt = "Will be paused tomorrow if not clicked" if days_left == 1 else f"Will be paused in {days_left} days if not clicked"
+            warning_html = f'<p style="margin:0 0 8px;font-size:12px;font-weight:bold;color:#E47911;text-align:{txt_align};" {txt_dir}>⏰ {warn_txt}</p>'
         product_rows += f"""
         <table width="100%" cellpadding="0" cellspacing="0"
                style="background:#ffffff;border:1px solid #e8e8e8;border-radius:10px;margin-bottom:12px;">
@@ -586,7 +594,7 @@ def send_daily_summary(user, free_products: list) -> bool:
               <p style="margin:0 0 8px;font-size:12px;color:#666;text-align:{txt_align};">ASIN: {p.asin}</p>
               {price_html}
               <p style="margin:0 0 10px;font-size:13px;font-weight:bold;color:#007600;text-align:{txt_align};" {txt_dir}>{_t(lang, "shipping_badge")}</p>
-              <div style="text-align:{txt_align};">{_cta_btn(url, _t(lang, "btn_buy"), txt_align)}</div>
+              {warning_html}<div style="text-align:{txt_align};">{_cta_btn(url, _t(lang, "btn_buy"), txt_align)}</div>
             </td>
           </tr>
         </table>"""

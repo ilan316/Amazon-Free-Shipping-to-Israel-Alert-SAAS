@@ -1127,60 +1127,6 @@ async def send_test_click_email(
     return {"sent": ok, "to": dest, "tracking_url": tracking}
 
 
-@router.get("/no-click-reminder-log")
-async def no_click_reminder_log(
-    admin: Annotated[User, Depends(get_current_admin)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
-    from backend.models import UserProduct, Product
-    from sqlalchemy import select
-    from datetime import datetime, timezone, timedelta
-    israel = timezone(timedelta(hours=3))
-    today_il = datetime.now(israel).date()
-    rows = (await db.execute(
-        select(UserProduct, User.email, Product.asin, Product.name)
-        .join(User, User.id == UserProduct.user_id)
-        .join(Product, Product.id == UserProduct.product_id)
-        .where(UserProduct.no_click_reminder_sent_at.isnot(None))
-        .order_by(UserProduct.no_click_reminder_sent_at.desc())
-    )).all()
-    return [
-        {
-            "email": email,
-            "asin": asin,
-            "name": (name or "")[:50],
-            "sent_at_il": up.no_click_reminder_sent_at.astimezone(israel).strftime("%Y-%m-%d %H:%M"),
-            "today": up.no_click_reminder_sent_at.astimezone(israel).date() == today_il,
-            "is_paused": up.is_paused,
-        }
-        for up, email, asin, name in rows
-    ]
-
-
-@router.post("/send-test-no-click-email")
-async def send_test_no_click_email(
-    admin: Annotated[User, Depends(get_current_admin)],
-    to: str | None = None,
-    db: Annotated[AsyncSession, Depends(get_db)] = None,
-):
-    from backend.notifier import send_no_click_reminder
-    from backend.models import Product
-    from sqlalchemy import select
-
-    product = (await db.execute(select(Product).limit(1))).scalar_one_or_none()
-    if not product:
-        raise HTTPException(status_code=404, detail="אין מוצרים בDB לבדיקה")
-
-    dest_email = to or admin.notify_email
-    original_email = admin.notify_email
-    admin.notify_email = dest_email
-    try:
-        ok = send_no_click_reminder(admin, product, days_free=7)
-    finally:
-        admin.notify_email = original_email
-
-    return {"sent": ok, "to": dest_email, "asin": product.asin}
-
 
 @router.get("/quick-log")
 async def quick_log(
