@@ -200,7 +200,7 @@ async def public_free_products():
         # Only return products with at least one active (non-paused) watcher.
         # Products paused by all watchers have a stale last_status — no checks run on them.
         active_watcher = exists().where(
-            (UserProduct.product_id == Product.id) & (UserProduct.is_paused == False)
+            (UserProduct.product_id == Product.id) & (UserProduct.is_paused.isnot(True))
         )
         result = await db.execute(
             select(Product)
