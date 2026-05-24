@@ -71,6 +71,7 @@ class ProductResponse(BaseModel):
     added_at: datetime
     is_paused: bool = False
     paused_until: datetime | None = None
+    paused_reason: str | None = None
     raw_text: str = ""
     affiliate_url: str = ""
     last_price: str | None = None

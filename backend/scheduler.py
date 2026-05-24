@@ -220,6 +220,7 @@ async def run_daily_summary():
             up = (await db.execute(select(UserProduct).where(UserProduct.id == row[0]))).scalar_one_or_none()
             if up:
                 up.is_paused = True
+                up.paused_reason = "auto"
                 auto_paused += 1
                 logger.info(f"Auto-paused user_id={row[1]} asin={row[2]} (5+ days free, no click)")
         if auto_paused:

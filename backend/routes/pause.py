@@ -182,6 +182,7 @@ async def pause_product(token: str = Query(...)):
         if not up:
             return HTMLResponse(_ERROR_HTML, status_code=404)
         up.is_paused = True
+        up.paused_reason = "manual"
         await db.commit()
 
     return HTMLResponse(_PRODUCT_PAUSED_HTML)
@@ -202,7 +203,7 @@ async def pause_confirm(token: str = Query(...)):
             return HTMLResponse(_ERROR_HTML, status_code=404)
         user.vacation_mode = True
         await db.execute(
-            update(UserProduct).where(UserProduct.user_id == user.id).values(is_paused=True)
+            update(UserProduct).where(UserProduct.user_id == user.id).values(is_paused=True, paused_reason="manual")
         )
         await db.commit()
 

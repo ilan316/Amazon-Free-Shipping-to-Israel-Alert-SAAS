@@ -119,6 +119,7 @@ async def list_products(
             last_notified=last_notified_map.get(p.id),
             added_at=up.added_at,
             is_paused=up.is_paused,
+            paused_reason=up.paused_reason,
             raw_text=p.raw_text or "",
             affiliate_url=_aff_url,
             last_price=p.last_price or None,
@@ -291,6 +292,7 @@ async def toggle_pause(
     if currently_paused:
         up.is_paused = False
         up.paused_until = None
+        up.paused_reason = None
         await db.commit()
         return MessageResponse(message=f"Product {asin} is now פעיל")
 
@@ -308,6 +310,7 @@ async def toggle_pause(
 
     up.is_paused = True
     up.paused_until = paused_until
+    up.paused_reason = "manual"
     await db.commit()
     suffix = f" עד {body.until}" if paused_until else " ללא הגבלת זמן"
     return MessageResponse(message=f"Product {asin} is now מושהה{suffix}")

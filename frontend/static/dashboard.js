@@ -204,8 +204,11 @@ function renderProducts() {
         ${pauseBtnLabel}
       </button>`;
 
+    const isAutoPaused = p.is_paused && p.paused_reason === 'auto';
     const badgeHtml = p.is_paused
-      ? '<span class="status-badge badge-paused">⏸ מושהה</span>'
+      ? (isAutoPaused
+          ? '<span class="status-badge badge-auto-paused" title="המוצר היה חינם 5 ימים ולא לחצת על הקישור — הושהה אוטומטית">⏸ הושהה אוטומטית</span>'
+          : '<span class="status-badge badge-paused" title="המוצר בהשהייה ידנית">⏸ מושהה</span>')
       : (isChecking || p.last_status === 'UNKNOWN' || p.last_status === 'ERROR')
         ? '<span class="status-badge badge-UNKNOWN">טרם נבדק</span>'
         : `<span class="status-badge badge-${p.last_status}" title="${tooltip}">${statusLabel(p.last_status)}</span>`

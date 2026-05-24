@@ -64,6 +64,7 @@ class UserProduct(Base):
     custom_name: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_paused: Mapped[bool] = mapped_column(Boolean, default=False)
     paused_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    paused_reason: Mapped[str | None] = mapped_column(String(20), nullable=True)
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     no_click_reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
