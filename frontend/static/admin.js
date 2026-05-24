@@ -676,7 +676,7 @@ function renderAdminProducts() {
       <td style="text-align:center;padding:3px 6px;"><img src="${p.image_url}" alt="" width="60" height="60" style="object-fit:contain;border-radius:6px;border:1px solid #eee;display:block;" onerror="this.style.display='none'"></td>
       <td class="truncate">${p.name || "—"}</td>
       <td>${p.paused_watchers > 0 && p.paused_watchers === p.watchers
-        ? '<span class="status-badge" style="background:#f0f0f0;color:#888;border:1px solid #ccc;">⏸ בהשהייה</span>'
+        ? '<span class="status-badge" style="background:#f0f0f0;color:#888;border:1px solid #ccc;" title="כל העוקבים של מוצר זה בהשהייה — לא נעשית בדיקה">⏸ בהשהייה</span>'
         : `<span class="status-badge badge-${p.last_status}" title="${STATUS_TOOLTIP[p.last_status] || ''}">${statusLabel(p.last_status)}</span>`
       }</td>
       <td style="text-align:center;font-size:0.82rem;color:#B12704;font-weight:bold;" dir="ltr">${p.last_price || '—'}</td>
