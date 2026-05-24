@@ -1,5 +1,14 @@
 let _analyticsLoaded = false;
 
+const STATUS_TOOLTIP = {
+  FREE:      "אמזון שולח מוצר זה לישראל ללא עלות משלוח — ניתן להזמין ישירות",
+  PAID:      "אמזון שולח לישראל, אך המשלוח כרוך בתשלום נוסף. כדאי לבדוק את עלות המשלוח לפני הרכישה",
+  NO_SHIP:   "אמזון לא שולח מוצר זה ישירות לישראל. ניתן לרכוש דרך חברת שליחויות (כתובת אמריקאית)",
+  NOT_FOUND: "המוצר לא נמצא באמזון — ייתכן שהוסר, הועתק ל-ASIN אחר, או ה-ASIN שגוי",
+  UNKNOWN:   "לא ניתן לקבוע סטטוס — הבדיקה הסתיימה ללא תוצאה ברורה",
+  ERROR:     "שגיאה בבדיקה האחרונה (קפצ'ה או תקלה זמנית) — תנסה שוב בקרוב",
+};
+
 function nextCheckLabel(p) {
   if (!p.status_since || !['PAID', 'NO_SHIP'].includes(p.last_status)) return null;
   const cycle = p.last_status === 'PAID' ? 14 : 21;
@@ -369,7 +378,7 @@ async function loadNotificationsLog() {
       <td>${sameEmail ? '<span style="color:var(--text-muted);font-size:0.8rem;">זהה</span>' : emailToHtml}</td>
       <td class="truncate" style="max-width:200px;">${l.product_name}</td>
       <td class="ltr"><a href="${asinUrl}" target="_blank" style="color:var(--brand-dark);font-family:monospace;font-size:0.82rem;">${l.asin}</a></td>
-      <td><span class="status-badge badge-${l.status}">${statusLabel(l.status)}</span></td>
+      <td><span class="status-badge badge-${l.status}" title="${STATUS_TOOLTIP[l.status] || ''}">${statusLabel(l.status)}</span></td>
       <td style="color:${l.success ? 'var(--success)' : 'var(--error)'};font-weight:600;">
         ${l.success ? '✅ נשלח' : '❌ נכשל'}${errorHtml}
       </td>
@@ -532,7 +541,7 @@ async function toggleUserProducts(userId, email) {
             <tr style="border-bottom:1px solid var(--border);">
               <td dir="ltr" style="padding:5px 8px;"><a href="${p.url}" target="_blank" style="color:var(--brand-dark);font-family:monospace;">${p.asin}</a></td>
               <td class="truncate" style="padding:5px 8px;max-width:220px;">${p.custom_name || p.name || '—'}</td>
-              <td style="text-align:center;padding:5px 8px;"><span class="status-badge badge-${p.last_status}">${statusLabel(p.last_status)}</span></td>
+              <td style="text-align:center;padding:5px 8px;"><span class="status-badge badge-${p.last_status}" title="${STATUS_TOOLTIP[p.last_status] || ''}">${statusLabel(p.last_status)}</span></td>
               <td dir="ltr" style="text-align:center;padding:5px 8px;font-size:0.82rem;color:#B12704;font-weight:bold;">${p.last_price || '—'}</td>
               <td style="text-align:center;padding:5px 8px;">${p.is_paused ? '⏸' : ''}</td>
               <td dir="ltr" style="padding:5px 8px;white-space:nowrap;">${p.added_at ? new Date(p.added_at).toLocaleDateString('he-IL') : '—'}</td>
@@ -668,7 +677,7 @@ function renderAdminProducts() {
       <td class="truncate">${p.name || "—"}</td>
       <td>${p.paused_watchers > 0 && p.paused_watchers === p.watchers
         ? '<span class="status-badge" style="background:#f0f0f0;color:#888;border:1px solid #ccc;">⏸ בהשהייה</span>'
-        : `<span class="status-badge badge-${p.last_status}">${statusLabel(p.last_status)}</span>`
+        : `<span class="status-badge badge-${p.last_status}" title="${STATUS_TOOLTIP[p.last_status] || ''}">${statusLabel(p.last_status)}</span>`
       }</td>
       <td style="text-align:center;font-size:0.82rem;color:#B12704;font-weight:bold;" dir="ltr">${p.last_price || '—'}</td>
       <td style="text-align:center;">${p.watchers}${p.paused_watchers > 0 ? ` <span title="${p.paused_watchers} עוקבים בהשהייה" style="font-size:0.78rem;color:#888;cursor:help;">⏸${p.paused_watchers}</span>` : ''}</td>
