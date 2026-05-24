@@ -43,6 +43,8 @@ async def _update_product(db: AsyncSession, product: Product, result: CheckResul
             product.free_since = datetime.now(timezone.utc)
         elif result.status != ShippingStatus.FREE:
             product.free_since = None
+        if result.status.value != product.last_status:
+            product.status_since = datetime.now(timezone.utc)
         product.last_status = result.status.value
         product.raw_text = result.raw_text or ""
         product.found_in_aod = result.found_in_aod
@@ -56,6 +58,8 @@ async def _update_product(db: AsyncSession, product: Product, result: CheckResul
         return False
     elif result.status == ShippingStatus.UNKNOWN:
         # Delivery text found but unclassifiable — update status visibly, not a scraping failure
+        if result.status.value != product.last_status:
+            product.status_since = datetime.now(timezone.utc)
         product.last_status = result.status.value
         product.raw_text = result.raw_text or ""
         product.consecutive_errors = 0
@@ -124,6 +128,16 @@ async def run_global_check_cycle():
                         error_message=f"Product blocked after {MAX_CONSECUTIVE_ERRORS} consecutive errors — no longer being checked.")))
                     product.consecutive_errors += 1
                     await db.commit()
+            elif product.last_status in ("PAID", "NO_SHIP") and product.status_since:
+                # Alternating check schedule:
+                # PAID:    7 days check / 7 days skip  (cycle=14)
+                # NO_SHIP: 7 days check / 14 days skip (cycle=21)
+                days = (now - product.status_since).days
+                cycle = 14 if product.last_status == "PAID" else 21
+                if days % cycle >= 7:
+                    logger.debug(f"[{product.asin}] Skipping — {product.last_status} day {days % cycle}/{cycle} (rest phase)")
+                else:
+                    to_check.append(product)
             else:
                 to_check.append(product)
 
