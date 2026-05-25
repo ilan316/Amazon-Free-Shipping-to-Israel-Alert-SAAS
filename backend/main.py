@@ -113,6 +113,23 @@ async def lifespan(app: FastAPI):
     # error that occurs during Railway rolling restarts when two processes both try
     # to DELETE+INSERT the same job simultaneously.
     daily_hour = int(os.environ.get("DAILY_SUMMARY_HOUR", "8"))
+
+    # Clean up stale APScheduler job references before loading from DB
+    _stale_job_ids = ["no_click_automation"]
+    if _db_url and _stale_job_ids:
+        try:
+            from sqlalchemy import create_engine, text as _sql_text
+            _sync_url = _db_url.replace("+asyncpg", "")
+            _sync_engine = create_engine(_sync_url, pool_pre_ping=False)
+            with _sync_engine.connect() as _conn:
+                for _jid in _stale_job_ids:
+                    _conn.execute(_sql_text("DELETE FROM apscheduler_jobs WHERE id = :id"), {"id": _jid})
+                _conn.commit()
+            _sync_engine.dispose()
+            logger.info(f"Cleaned up stale APScheduler jobs: {_stale_job_ids}")
+        except Exception as _e:
+            logger.debug(f"Stale job cleanup skipped: {_e}")
+
     scheduler.start()
 
     from backend.scheduler import run_inactivity_check, run_automation_emails, check_decodo_quota
