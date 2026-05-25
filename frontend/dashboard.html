@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800&family=Rubik:wght@500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=13">
+  <link rel="stylesheet" href="/static/styles.css?v=14">
 
 </head>
 <body>
@@ -124,6 +124,32 @@
     <!-- Product list -->
     <div id="products-list" class="products-list"></div>
 
+    <!-- FAQ accordion -->
+    <div class="faq-section">
+      <button class="faq-toggle" onclick="toggleFaq(this)">
+        <span>❓ שאלות נפוצות על הבדיקות</span>
+        <span class="faq-arrow">▼</span>
+      </button>
+      <div class="faq-body" style="display:none;">
+        <div class="faq-item">
+          <strong>כמה פעמים נבדק מוצר?</strong>
+          <p>מוצרים עם משלוח בתשלום (💳) נבדקים כל ~14 יום. מוצרים שלא נשלחים לארץ (🚫) נבדקים כל ~21 יום. מוצרים עם משלוח חינם נבדקים בתדירות גבוהה יותר. ניתן לבדוק מוצר ידנית בכל עת.</p>
+        </div>
+        <div class="faq-item">
+          <strong>מה זה "הושהה אוטומטית"?</strong>
+          <p>כשמוצר מראה משלוח חינם ולא לחצת על הקישור שלו במשך 5 ימים — המערכת מניחה שאתה לא מעוניין כרגע ומשהה את המעקב. לחץ "▶ חדש מעקב" כדי להמשיך לקבל התראות.</p>
+        </div>
+        <div class="faq-item">
+          <strong>מתי אקבל מייל?</strong>
+          <p>מייל נשלח אוטומטית ברגע שהמצב של מוצר משתנה למשלוח חינם. לא נשלחים מיילים כפולים — רק שינוי סטטוס מפעיל התראה.</p>
+        </div>
+        <div class="faq-item">
+          <strong>מה ההבדל בין "משלוח בתשלום" ל"לא נשלח לארץ"?</strong>
+          <p>💳 משלוח בתשלום — אמזון שולח לישראל אך גובה דמי משלוח. 🚫 לא נשלח לארץ — אמזון לא מציע משלוח ישיר לישראל כלל, ניתן להיעזר בחברת שליחויות עם כתובת אמריקאית.</p>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <footer style="text-align:center; padding:20px 16px; font-size:0.8rem; color:var(--text-muted);">
@@ -132,7 +158,7 @@
   </footer>
 
   <script src="/static/app.js?v=12"></script>
-  <script src="/static/dashboard.js?v=12"></script>
+  <script src="/static/dashboard.js?v=13"></script>
   <script>
     requireAuth();
 

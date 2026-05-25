@@ -513,6 +513,89 @@ a:hover { text-decoration: underline; }
 
 .btn-remove:hover { border-color: var(--error); color: var(--error); }
 
+/* ── Info popup (auto-pause explanation) ─────────────────────────────────── */
+.info-popup {
+  position: fixed;
+  bottom: 80px;
+  right: 50%;
+  transform: translateX(50%);
+  z-index: 10000;
+  background: #172033;
+  color: #fff;
+  border-radius: 10px;
+  padding: 14px 16px 14px 40px;
+  max-width: 320px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+  direction: rtl;
+  text-align: right;
+}
+.info-popup button {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+.info-popup button:hover { color: #fff; }
+.btn-info {
+  background: none;
+  border: none;
+  font-size: 0.78rem;
+  color: #e65100;
+  cursor: pointer;
+  padding: 0 4px;
+  font-family: inherit;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  vertical-align: middle;
+}
+.btn-info:hover { color: #bf360c; }
+
+/* ── FAQ accordion ────────────────────────────────────────────────────────── */
+.faq-section {
+  margin-top: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.faq-toggle {
+  width: 100%;
+  background: #f8f4ec;
+  border: none;
+  padding: 14px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+  font-family: inherit;
+  direction: rtl;
+  text-align: right;
+}
+.faq-toggle:hover { background: #f0ebe0; }
+.faq-arrow { font-size: 0.75rem; color: var(--text-muted); }
+.faq-body {
+  background: var(--surface);
+  padding: 0 18px;
+}
+.faq-item {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+  direction: rtl;
+}
+.faq-item:last-child { border-bottom: none; }
+.faq-item strong { font-size: 0.9rem; display: block; margin-bottom: 6px; }
+.faq-item p { font-size: 0.85rem; color: var(--text-muted); margin: 0; line-height: 1.6; }
+
 /* ── Empty state ──────────────────────────────────────────────────────────── */
 .empty-state {
   text-align: center;

@@ -207,7 +207,7 @@ function renderProducts() {
 
     const badgeHtml = p.is_paused
       ? (isAutoPaused
-          ? '<span class="status-badge badge-auto-paused" title="המוצר היה חינם 5 ימים ולא לחצת על הקישור — הושהה אוטומטית">⏸ הושהה אוטומטית</span>'
+          ? '<span class="status-badge badge-auto-paused">⏸ הושהה אוטומטית <button class="btn-info" onclick="showInfoPopup(\'המוצר היה חינם 5 ימים ולא לחצת על הקישור — המערכת השהתה את המעקב אוטומטית. לחץ ▶ חדש מעקב כדי לחזור לעקוב.\')">?</button></span>'
           : '<span class="status-badge badge-paused" title="המוצר בהשהייה ידנית">⏸ מושהה</span>')
       : (isChecking || p.last_status === 'UNKNOWN' || p.last_status === 'ERROR')
         ? '<span class="status-badge badge-UNKNOWN">טרם נבדק</span>'
@@ -253,6 +253,32 @@ function renderProducts() {
 
       </div>`;
   }).join("");
+}
+
+// ── Info popup ────────────────────────────────────────────────────────────────
+
+function showInfoPopup(text) {
+  document.getElementById('info-popup')?.remove();
+  const pop = document.createElement('div');
+  pop.id = 'info-popup';
+  pop.className = 'info-popup';
+  pop.innerHTML = `<span>${text}</span><button onclick="document.getElementById('info-popup').remove()">✕</button>`;
+  document.body.appendChild(pop);
+  setTimeout(() => {
+    document.addEventListener('click', function h(e) {
+      if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('click', h); }
+    });
+  }, 50);
+}
+
+// ── FAQ accordion ─────────────────────────────────────────────────────────────
+
+function toggleFaq(btn) {
+  const body = btn.nextElementSibling;
+  const arrow = btn.querySelector('.faq-arrow');
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (arrow) arrow.textContent = open ? '▼' : '▲';
 }
 
 // ── CSV Export ────────────────────────────────────────────────────────────────
