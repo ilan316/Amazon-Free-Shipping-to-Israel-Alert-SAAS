@@ -713,21 +713,17 @@ def _classify(text: str) -> ShippingStatus:
     if paid_pat_explicit.search(text) and "israel" in t:
         return ShippingStatus.PAID
 
-    # Conditional free shipping ("if you spend X", "on orders over X") — NOT free for this product
-    conditional_free = re.search(
-        r'free delivery.{0,60}(if you spend|on orders? over|on qualifying orders?|on eligible orders?)',
-        t,
-    )
-    if conditional_free:
-        return ShippingStatus.PAID
-
-    # Explicit: Amazon clearly states free delivery to Israel
-    if "free delivery" in t and "to israel" in t:
-        return ShippingStatus.FREE
-
-    # Fallback: When IL is the active delivery location, Amazon shows generic eligible text
-    if "free delivery" in t and any(p in t for p in ("eligible orders", "eligible international", "eligible items")):
-        return ShippingStatus.FREE
+    # FREE shipping to Israel — two Amazon phrasings:
+    # 1. Products ≥ $49: "FREE delivery [date] to Israel"
+    # 2. Products < $49: "FREE delivery [date] to Israel on eligible orders over $49"
+    # Both mean the product participates in the free-shipping program.
+    # "if you spend X more" is an upsell banner — NOT a product-level free shipping indicator.
+    upsell = re.search(r'free delivery.{0,60}if you spend', t)
+    if not upsell:
+        if "free delivery" in t and "to israel" in t:
+            return ShippingStatus.FREE
+        if "free delivery" in t and any(p in t for p in ("eligible orders", "eligible international", "eligible items")):
+            return ShippingStatus.FREE
 
     # Explicit "Shipping to Israel" (with or without price) — always PAID
     if "shipping to israel" in t or "ships to israel" in t:
