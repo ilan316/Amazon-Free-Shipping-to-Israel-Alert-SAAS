@@ -36,6 +36,8 @@ class SyncProduct(BaseModel):
     url: str = ""
     category: str = ""
     found_at: str = ""
+    last_price: str = ""
+    image_url: str = ""
 
 
 class SyncRequest(BaseModel):
@@ -69,6 +71,8 @@ async def sync_products(
             source="scanner",
             raw_text="",
             consecutive_errors=0,
+            last_price=p.last_price or None,
+            image_url=p.image_url or None,
         )
         stmt = stmt.on_conflict_do_update(
             index_elements=["asin"],
@@ -79,6 +83,8 @@ async def sync_products(
                 "last_checked": now,
                 "source": "scanner",
                 "consecutive_errors": 0,
+                "last_price": stmt.excluded.last_price,
+                "image_url": stmt.excluded.image_url,
             },
         )
         result = await db.execute(stmt)
