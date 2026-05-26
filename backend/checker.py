@@ -950,7 +950,7 @@ class BrowserManager:
             # Playwright is NOT used here — it can hang for minutes through proxies.
             # If httpx fails, the first check cycle will retry via refresh_location().
             logger.info("Setting delivery location to Israel (startup via curl_cffi)...")
-            cffi_ok, cookies = await _try_set_location_httpx(proxy_url="")
+            cffi_ok, cookies = await _try_set_location_httpx(proxy_url=_HTTPX_PROXY)
             if cffi_ok and cookies:
                 self._session_cookies = cookies
                 logger.info("Startup: location set to Israel via curl_cffi ✓")
@@ -974,7 +974,7 @@ class BrowserManager:
         Returns True if location is confirmed as Israel, False otherwise.
         """
         # 1. Try curl_cffi (Chrome TLS fingerprint impersonation)
-        cffi_ok, cookies = await _try_set_location_httpx(proxy_url="")
+        cffi_ok, cookies = await _try_set_location_httpx(proxy_url=_HTTPX_PROXY)
         if cffi_ok and cookies:
             self._session_cookies = cookies
             logger.info("Location set to Israel via curl_cffi ✓")
