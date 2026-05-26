@@ -703,26 +703,16 @@ def _classify(text: str) -> ShippingStatus:
     if any(p in t for p in no_ship):
         return ShippingStatus.NO_SHIP
 
-    # FREE shipping to Israel — must be checked BEFORE paid patterns.
-    # Amazon uses two phrasings (both mean the product ships free to Israel):
+    # FREE shipping to Israel — two Amazon phrasings, both valid:
     #   ≥$49 products: "FREE delivery [date] to Israel"
     #   <$49 products: "FREE delivery [date] to Israel on eligible orders over ILS 142.48"
-    # The ILS threshold amount must NOT be confused with a shipping price.
-    # Only "if you spend X more" is a cart-level upsell, not product-level free shipping.
+    # "if you spend X more" is a cart-level upsell banner — not product-level free shipping.
     upsell = re.search(r'free delivery.{0,60}if you spend', t)
     if not upsell:
         if "free delivery" in t and "to israel" in t:
             return ShippingStatus.FREE
         if "free delivery" in t and any(p in t for p in ("eligible orders", "eligible international", "eligible items")):
             return ShippingStatus.FREE
-
-    # Explicit paid shipping price to Israel — only reached when no FREE signal above.
-    paid_pat_explicit = re.compile(
-        r'(\$|ILS\s+|₪\s*)[\d,]+\.[\d]{2}.{0,40}israel|israel.{0,40}(\$|ILS\s+|₪\s*)[\d,]+\.[\d]{2}',
-        re.IGNORECASE,
-    )
-    if paid_pat_explicit.search(text) and "israel" in t:
-        return ShippingStatus.PAID
 
     # Explicit "Shipping to Israel" (with or without price) — always PAID
     if "shipping to israel" in t or "ships to israel" in t:
