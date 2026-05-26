@@ -578,44 +578,99 @@ async def send_telegram(message: str) -> bool:
 
 
 async def run_telegram_report():
-    """Daily Telegram status report — runs at TELEGRAM_REPORT_HOUR (Israel time)."""
+    """Daily Telegram status report — mirrors the GitHub Actions railway-monitor workflow.
+    Queries Railway GraphQL for deployments + log errors in the last 24h."""
     logger.info("=== Telegram report started ===")
-    async with AsyncSessionLocal() as db:
-        now = datetime.now(timezone.utc)
-        since = now - timedelta(hours=24)
 
-        total_products = (await db.execute(select(func.count(Product.id)))).scalar() or 0
-        free_products = (await db.execute(
-            select(func.count(Product.id)).where(Product.last_status == "FREE")
-        )).scalar() or 0
-        error_products = (await db.execute(
-            select(func.count(Product.id)).where(Product.consecutive_errors > 0)
-        )).scalar() or 0
-        active_users = (await db.execute(
-            select(func.count(User.id)).where(User.is_active == True, User.is_admin == False)
-        )).scalar() or 0
+    railway_token = os.environ.get("RAILWAY_TOKEN", "")
+    project_id = os.environ.get("RAILWAY_PROJECT_ID", "")
+    service_id = os.environ.get("RAILWAY_SERVICE_ID", "")
+    env_id = os.environ.get("RAILWAY_ENVIRONMENT_ID", "")
+    railway_url = "https://backboard.railway.app/graphql/v2"
 
-        from backend.models import NotificationLog
-        emails_sent = (await db.execute(
-            select(func.count(NotificationLog.id)).where(
-                NotificationLog.success == True,
-                NotificationLog.notified_at >= since,
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(hours=24)
+    since_str = since.strftime("%Y-%m-%dT%H:%M:%SZ")
+    current_time = now.strftime("%Y-%m-%d %H:%M UTC")
+
+    if not railway_token:
+        await send_telegram(f"Railway Monitor - aware-wisdom\n\nStatus: ERROR\nFailed: RAILWAY_TOKEN not set\nTime: {current_time}")
+        return
+
+    headers = {
+        "Authorization": f"Bearer {railway_token}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            # Deployments in last 24h
+            dep_resp = await client.post(railway_url, headers=headers, json={"query":
+                f'{{ deployments(input: {{ projectId: "{project_id}", serviceId: "{service_id}" }}) '
+                f'{{ edges {{ node {{ id status createdAt }} }} }} }}'
+            })
+            deployments = dep_resp.json().get("data", {}).get("deployments", {}).get("edges", [])
+            recent = [d["node"] for d in deployments
+                      if datetime.fromisoformat(d["node"]["createdAt"].replace("Z", "+00:00")) >= since]
+            failed = [d for d in recent if d["status"] in ("FAILED", "CRASHED")]
+
+            # Fetch logs with pagination
+            all_logs = []
+            after_date = since_str
+            while True:
+                log_resp = await client.post(railway_url, headers=headers, json={"query":
+                    f'{{ environmentLogs(environmentId: "{env_id}", afterDate: "{after_date}", beforeLimit: 500) '
+                    f'{{ message severity timestamp }} }}'
+                })
+                page = log_resp.json().get("data", {}).get("environmentLogs", [])
+                if not page:
+                    break
+                all_logs.extend(page)
+                if len(page) < 500:
+                    break
+                last_ts = page[-1].get("timestamp", "")
+                if not last_ts or last_ts == after_date:
+                    break
+                after_date = last_ts
+
+            # Filter to last 24h only
+            all_logs = [l for l in all_logs if l.get("timestamp") and
+                        datetime.fromisoformat(l["timestamp"].replace("Z", "+00:00")) >= since]
+
+            keywords = ["error", "fatal", "crash", "exception", "unhandled", "timeout"]
+            errors_found = [l.get("message", "")[:120] for l in all_logs
+                            if any(k in l.get("message", "").lower() for k in keywords)]
+
+        if not failed and not errors_found:
+            message = (
+                f"Railway Monitor - aware-wisdom\n\n"
+                f"Status: OK\n"
+                f"Period: Last 24 hours\n"
+                f"Total logs checked: {len(all_logs)}\n"
+                f"Deployments: {len(recent)} total, 0 failed\n"
+                f"Errors in logs: None\n"
+                f"Time: {current_time}"
             )
-        )).scalar() or 0
+        else:
+            top_errors = "\n".join(errors_found[:5]) if errors_found else "None"
+            message = (
+                f"Railway Monitor - aware-wisdom\n\n"
+                f"Status: WARNING\n"
+                f"Period: Last 24 hours\n"
+                f"Total logs checked: {len(all_logs)}\n"
+                f"Deployments: {len(recent)} total, {len(failed)} failed\n"
+                f"Errors in logs: {len(errors_found)}\n"
+                f"Top issues:\n{top_errors}\n"
+                f"Time: {current_time}"
+            )
 
-    lines = [
-        "📊 amzfreeil — דוח יומי",
-        "",
-        f"👥 משתמשים פעילים: {active_users}",
-        f"📦 מוצרים במעקב: {total_products}",
-        f"✅ משלוח חינם כרגע: {free_products}",
-        f"⚠️ שגיאות בדיקה: {error_products}",
-        f"📧 מיילים נשלחו (24ש): {emails_sent}",
-        "",
-        f"🕐 {now.strftime('%Y-%m-%d %H:%M')} UTC",
-    ]
-    await send_telegram("\n".join(lines))
-    logger.info("=== Telegram report sent ===")
+        await send_telegram(message)
+        logger.info(f"=== Telegram report sent — {len(all_logs)} logs checked, {len(errors_found)} errors ===")
+
+    except Exception as e:
+        msg = f"Railway Monitor - aware-wisdom\n\nStatus: ERROR\nFailed: {str(e)}\nTime: {current_time}"
+        await send_telegram(msg)
+        logger.error(f"Telegram report error: {e}")
 
 
 async def check_single_product(asin: str, url: str):
