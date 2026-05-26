@@ -39,6 +39,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 from backend.database import create_tables, fix_gmail_template, seed_default_templates
 from backend.routes import auth, products, settings, admin as admin_routes, tracking, pause as pause_route, webhooks as webhooks_route
+from backend.routes import internal as internal_routes
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -204,6 +205,7 @@ app.include_router(admin_routes.router)
 app.include_router(tracking.router)
 app.include_router(pause_route.router)
 app.include_router(webhooks_route.router)
+app.include_router(internal_routes.router, prefix="/internal")
 
 
 @app.get("/api/config")
@@ -221,11 +223,17 @@ async def public_free_products():
     from datetime import datetime, timedelta, timezone
     tag = os.environ.get("AMAZON_AFFILIATE_TAG", "amzfreeil-20").strip()
     cutoff = datetime.now(timezone.utc) - timedelta(hours=26)
+    from sqlalchemy import or_
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(Product)
             .where(Product.last_status == "FREE")
-            .where(Product.last_checked >= cutoff)
+            .where(
+                or_(
+                    Product.source == "scanner",
+                    Product.last_checked >= cutoff,
+                )
+            )
             .order_by(Product.last_checked.desc())
         )
         products = result.scalars().all()

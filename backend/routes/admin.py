@@ -810,10 +810,13 @@ async def delete_orphan_products(
     admin: Annotated[User, Depends(get_current_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Delete all products with 0 watchers."""
+    """Delete all user-source products with 0 watchers. Scanner products are never deleted here."""
     watched_ids = select(UserProduct.product_id).distinct()
     orphans_result = await db.execute(
-        select(Product.id, Product.asin).where(Product.id.not_in(watched_ids))
+        select(Product.id, Product.asin).where(
+            Product.source == "user",
+            Product.id.not_in(watched_ids),
+        )
     )
     orphans = orphans_result.all()
     if not orphans:

@@ -237,6 +237,11 @@ async def create_tables():
                   AND body LIKE '%display:flex%'
             """)
         )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE products ADD COLUMN IF NOT EXISTS source VARCHAR(20) NOT NULL DEFAULT 'user'"
+            )
+        )
         # Mark admin accounts as having received automation emails so they're never emailed as regular users
         await conn.execute(
             __import__("sqlalchemy").text("""

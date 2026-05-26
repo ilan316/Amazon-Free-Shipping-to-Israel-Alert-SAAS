@@ -49,6 +49,7 @@ class Product(Base):
     free_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    source: Mapped[str] = mapped_column(String(20), nullable=False, default="user")
 
     user_products: Mapped[list["UserProduct"]] = relationship(back_populates="product", cascade="all, delete-orphan")
     notifications: Mapped[list["NotificationLog"]] = relationship(back_populates="product", cascade="all, delete-orphan")
