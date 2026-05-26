@@ -559,6 +559,65 @@ async def run_automation_emails():
 
 
 
+async def send_telegram(message: str) -> bool:
+    """Send a Telegram message. Returns True on success."""
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
+    if not token or not chat_id:
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": int(chat_id), "text": message},
+            )
+        return resp.status_code == 200
+    except Exception as e:
+        logger.warning(f"Telegram send failed: {e}")
+        return False
+
+
+async def run_telegram_report():
+    """Daily Telegram status report — runs at TELEGRAM_REPORT_HOUR (Israel time)."""
+    logger.info("=== Telegram report started ===")
+    async with AsyncSessionLocal() as db:
+        now = datetime.now(timezone.utc)
+        since = now - timedelta(hours=24)
+
+        total_products = (await db.execute(select(func.count(Product.id)))).scalar() or 0
+        free_products = (await db.execute(
+            select(func.count(Product.id)).where(Product.last_status == "FREE")
+        )).scalar() or 0
+        error_products = (await db.execute(
+            select(func.count(Product.id)).where(Product.consecutive_errors > 0)
+        )).scalar() or 0
+        active_users = (await db.execute(
+            select(func.count(User.id)).where(User.is_active == True, User.is_admin == False)
+        )).scalar() or 0
+
+        from backend.models import NotificationLog
+        emails_sent = (await db.execute(
+            select(func.count(NotificationLog.id)).where(
+                NotificationLog.success == True,
+                NotificationLog.notified_at >= since,
+            )
+        )).scalar() or 0
+
+    lines = [
+        "📊 amzfreeil — דוח יומי",
+        "",
+        f"👥 משתמשים פעילים: {active_users}",
+        f"📦 מוצרים במעקב: {total_products}",
+        f"✅ משלוח חינם כרגע: {free_products}",
+        f"⚠️ שגיאות בדיקה: {error_products}",
+        f"📧 מיילים נשלחו (24ש): {emails_sent}",
+        "",
+        f"🕐 {now.strftime('%Y-%m-%d %H:%M')} UTC",
+    ]
+    await send_telegram("\n".join(lines))
+    logger.info("=== Telegram report sent ===")
+
+
 async def check_single_product(asin: str, url: str):
     """Check a single product immediately (used after a user adds it or manual re-check)."""
     logger.info(f"[{asin}] Immediate check triggered")

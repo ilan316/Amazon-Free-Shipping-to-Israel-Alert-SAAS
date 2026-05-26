@@ -1,8 +1,6 @@
-name: Railway Log Monitor
+name: Railway Log Monitor (disabled — replaced by in-app APScheduler)
 
 on:
-  schedule:
-    - cron: '0 5 * * *'
   workflow_dispatch:
 
 jobs:
