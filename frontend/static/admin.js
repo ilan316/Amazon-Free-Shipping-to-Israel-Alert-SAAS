@@ -1232,7 +1232,9 @@ async function loadSendLogs() {
   const tbody = document.getElementById("send-log-body");
   if (!tbody) return;
   const days = document.getElementById("send-log-days")?.value || 30;
-  const res = await apiFetch(`/admin/email-send-logs?days=${days}`);
+  const email = (document.getElementById("send-log-email")?.value || "").trim();
+  const emailParam = email ? `&email=${encodeURIComponent(email)}` : "";
+  const res = await apiFetch(`/admin/email-send-logs?days=${days}${emailParam}`);
   if (!res || !res.ok) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--error);padding:16px;">שגיאה בטעינה</td></tr>'; return; }
   const logs = await res.json();
   if (!logs.length) {

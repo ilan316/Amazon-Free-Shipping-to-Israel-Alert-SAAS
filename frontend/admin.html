@@ -438,6 +438,10 @@
               <option value="90">90 ימים</option>
               <option value="365">שנה</option>
             </select>
+            <input id="send-log-email" type="email" placeholder="חפש לפי מייל..." dir="ltr"
+              oninput="clearTimeout(window._sendLogEmailTimer); window._sendLogEmailTimer = setTimeout(loadSendLogs, 400)"
+              style="padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;font-family:monospace;width:220px;">
+            <button onclick="document.getElementById('send-log-email').value='';loadSendLogs()" title="נקה חיפוש" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;padding:0 4px;">✕</button>
           </div>
           <div style="overflow-x:auto;">
             <table class="admin-table">

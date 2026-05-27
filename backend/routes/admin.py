@@ -1487,9 +1487,17 @@ async def list_send_logs(
     admin: Annotated[User, Depends(get_current_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
     days: int = 30,
+    email: str | None = None,
 ):
     from datetime import datetime, timedelta, timezone
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+    base_filter = [EmailSendLog.sent_at >= cutoff]
+    if email:
+        email_log_ids = select(EmailSendRecipient.send_log_id).where(
+            EmailSendRecipient.email == email.strip().lower()
+        )
+        base_filter.append(EmailSendLog.id.in_(email_log_ids))
 
     # Main query: logs + clicks (unchanged logic)
     rows = (await db.execute(
@@ -1497,7 +1505,7 @@ async def list_send_logs(
             EmailSendLog,
             func.count(func.distinct(EmailClick.user_id)).label("clicks"),
         )
-        .where(EmailSendLog.sent_at >= cutoff)
+        .where(*base_filter)
         .outerjoin(EmailClick, (EmailClick.user_id.in_(
                                    select(EmailSendRecipient.user_id)
                                    .where(EmailSendRecipient.send_log_id == EmailSendLog.id,
