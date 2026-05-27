@@ -48,20 +48,6 @@
 
     <div id="system-banner" style="display:none; background:#fff3cd; border:1px solid #ffc107; border-radius:8px; padding:10px 20px; text-align:center; font-size:0.9rem; color:#856404; direction:rtl; margin-bottom:16px;"></div>
 
-    <div class="dashboard-header">
-      <div>
-        <h1 style="display:flex;align-items:center;gap:10px;">המוצרים שלי <span id="limit-badge" style="display:none;"></span></h1>
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <div id="products-counter" class="products-counter"></div>
-          <button id="csv-btn" onclick="exportUserCSV()" style="display:none;padding:3px 10px;font-size:0.78rem;font-weight:600;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;font-family:inherit;color:var(--text-muted);">⬇ CSV</button>
-        </div>
-      </div>
-      <div style="text-align:left;">
-<div id="next-check-display" class="next-check-display"></div>
-      </div>
-    </div>
-
-
     <!-- Chrome Extension Banner -->
     <div class="ext-banner" style="margin-bottom:10px;">
       <div class="ext-banner-inner">
@@ -74,7 +60,7 @@
       </div>
     </div>
 
-    <div id="ext-banner" class="ext-banner">
+    <div id="ext-banner" class="ext-banner" style="margin-bottom:16px;">
       <div class="ext-banner-inner">
         <span class="ext-banner-icon">🧩</span>
         <div class="ext-banner-text">
@@ -83,6 +69,19 @@
         </div>
         <a href="https://chromewebstore.google.com/detail/amazon-israel-free-ship-a/mbickhgdhofaefhibfbgpacejhbelddn"
            target="_blank" class="btn-ext">הורד לכרום</a>
+      </div>
+    </div>
+
+    <div class="dashboard-header">
+      <div>
+        <h1 style="display:flex;align-items:center;gap:10px;">המוצרים שלי <span id="limit-badge" style="display:none;"></span></h1>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div id="products-counter" class="products-counter"></div>
+          <button id="csv-btn" onclick="exportUserCSV()" style="display:none;padding:3px 10px;font-size:0.78rem;font-weight:600;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;font-family:inherit;color:var(--text-muted);">⬇ CSV</button>
+        </div>
+      </div>
+      <div style="text-align:left;">
+<div id="next-check-display" class="next-check-display"></div>
       </div>
     </div>
 
