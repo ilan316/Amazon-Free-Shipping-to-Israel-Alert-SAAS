@@ -1102,9 +1102,11 @@ class BrowserManager:
                 if result.status == ShippingStatus.NOT_FOUND:
                     logger.warning(f"[{asin}] Product not found on Amazon (404)")
                     return idx, result
-                if result.status in (ShippingStatus.ERROR, ShippingStatus.UNKNOWN):
+                if result.status in (ShippingStatus.ERROR, ShippingStatus.UNKNOWN) or (
+                    result.status == ShippingStatus.NO_SHIP and not result.last_price
+                ):
                     logger.warning(
-                        f"[{asin}] httpx returned {result.status.value} — falling back to Playwright"
+                        f"[{asin}] httpx returned {result.status.value} (price={result.last_price!r}) — falling back to Playwright"
                     )
                     result = await self.check(asin, url)
                     if result.status == ShippingStatus.NOT_FOUND:
