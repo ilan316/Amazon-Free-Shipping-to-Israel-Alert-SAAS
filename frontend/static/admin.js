@@ -829,6 +829,17 @@ async function cleanOrphans() {
   await loadProducts(); await loadStats();
 }
 
+async function reclassifyAll() {
+  const btn = document.getElementById("btn-reclassify");
+  if (btn) { btn.textContent = "⏳ מסווג..."; btn.disabled = true; }
+  const res = await apiFetch("/admin/reclassify-all", { method: "POST" });
+  if (btn) { btn.textContent = "🔄 סווג מחדש לפי לוגים"; btn.disabled = false; }
+  if (!res || !res.ok) { alert("שגיאה בסיווג מחדש"); return; }
+  const data = await res.json();
+  alert(`סווגו מחדש: ${data.total} מוצרים\nשונו: ${data.changed}`);
+  await loadProducts(); await loadStats();
+}
+
 async function checkSingleProduct(productId) {
   const btn = document.getElementById(`chk-${productId}`);
   if (btn) { btn.textContent = "⏳"; btn.disabled = true; }
