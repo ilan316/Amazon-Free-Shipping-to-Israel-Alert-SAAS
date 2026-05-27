@@ -446,15 +446,21 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
 
     price = _extract_price(soup)
     image_url = _extract_image_url(soup)
+
+    # Rule 1: No ILS price → doesn't ship to Israel
+    if not price.upper().startswith("ILS"):
+        logger.info(f"[{asin}] httpx: NO_SHIP (no ILS price) | price={price!r}")
+        return CheckResult(asin, ShippingStatus.NO_SHIP, raw_text=raw_text or "",
+                           product_name=product_name, last_price=price, image_url=image_url)
+
+    # Rule 2: Has ILS price → ships to Israel. Check FREE or PAID.
     if not raw_text:
-        # ILS price means the product IS reachable from Israel — can't be NO_SHIP
-        fallback = ShippingStatus.PAID if price.upper().startswith("ILS") else ShippingStatus.NO_SHIP
-        return CheckResult(asin, fallback, error_message="No delivery block found",
+        logger.info(f"[{asin}] httpx: PAID (ILS price, no delivery block) | price={price!r}")
+        return CheckResult(asin, ShippingStatus.PAID, error_message="No delivery block found",
                            product_name=product_name, last_price=price, image_url=image_url)
 
     status = _classify(raw_text)
-    # ILS price = product is purchasable from Israel → only FREE or PAID, never NO_SHIP/UNKNOWN
-    if price.upper().startswith("ILS") and status not in (ShippingStatus.FREE,):
+    if status != ShippingStatus.FREE:
         status = ShippingStatus.PAID
     logger.info(f"[{asin}] httpx: {status.value} | price={price!r} | {raw_text[:120]!r}")
     return CheckResult(asin, status, raw_text=raw_text, product_name=product_name, last_price=price, image_url=image_url)
@@ -732,8 +738,8 @@ def _classify(text: str) -> ShippingStatus:
     if us_delivery and "israel" not in t:
         return ShippingStatus.UNKNOWN
 
-    # No recognisable pattern — treat conservatively as not shipping to Israel
-    return ShippingStatus.NO_SHIP
+    # No recognisable FREE pattern — ILS price confirmed so default to PAID
+    return ShippingStatus.PAID
 
 
 # ── Delivery text reading ─────────────────────────────────────────────────────
@@ -851,26 +857,21 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
         except Exception:
             pass
 
-        if not raw_text:
-            # ILS price means the product IS reachable from Israel — can't be NO_SHIP
-            fallback = ShippingStatus.PAID if pw_price.upper().startswith("ILS") else ShippingStatus.NO_SHIP
-            return CheckResult(asin, fallback, error_message="No delivery block found",
+        # Rule 1: No ILS price → doesn't ship to Israel
+        if not pw_price.upper().startswith("ILS"):
+            logger.info(f"[{asin}] Playwright: NO_SHIP (no ILS price) | price={pw_price!r}")
+            return CheckResult(asin, ShippingStatus.NO_SHIP, raw_text=raw_text or "",
                                product_name=product_name, last_price=pw_price, image_url=pw_image)
 
-        # Safety scan: check full HTML for NO_SHIP phrases that may not appear in the delivery blocks.
-        # Exception: ILS price means the product IS purchasable from Israel — phrase may be in hidden/JS element.
-        if status != ShippingStatus.NO_SHIP and pw_html and not pw_price.upper().startswith("ILS"):
-            pw_html_lower = pw_html.lower()
-            for phrase in _NO_SHIP_PHRASES:
-                if phrase in pw_html_lower:
-                    logger.info(f"[{asin}] Playwright: NO_SHIP (phrase scan) | {phrase!r}")
-                    return CheckResult(asin, ShippingStatus.NO_SHIP, raw_text=phrase,
-                                       product_name=product_name, last_price=pw_price, image_url=pw_image)
+        # Rule 2: Has ILS price → ships to Israel. Check FREE or PAID.
+        if not raw_text:
+            logger.info(f"[{asin}] Playwright: PAID (ILS price, no delivery block) | price={pw_price!r}")
+            return CheckResult(asin, ShippingStatus.PAID, error_message="No delivery block found",
+                               product_name=product_name, last_price=pw_price, image_url=pw_image)
 
-        # ILS price = product is purchasable from Israel → only FREE or PAID, never NO_SHIP/UNKNOWN
-        if pw_price.upper().startswith("ILS") and status not in (ShippingStatus.FREE,):
+        if status != ShippingStatus.FREE:
             status = ShippingStatus.PAID
-        logger.info(f"[{asin}] {status.value} | price={pw_price!r} | {raw_text[:120]!r}")
+        logger.info(f"[{asin}] Playwright: {status.value} | price={pw_price!r} | {raw_text[:120]!r}")
         return CheckResult(asin, status, raw_text=raw_text, product_name=product_name,
                            found_in_aod=found_in_aod, last_price=pw_price, image_url=pw_image)
 
