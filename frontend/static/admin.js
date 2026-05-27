@@ -81,7 +81,12 @@ async function loadClickStats() {
         const m = s && s.match(/(\d{2}:\d{2})\s+(\d{2})\/(\d{2})\/(\d{4})/);
         return m ? `${m[2]}/${m[3]} ${m[1]}` : s;
       };
-      const asinLabels = {"automation_activation":"הפעלה 📨","automation_reminder":"תזכורת 🔔","automation_expansion":"הרחבה 📦","cta":"📧 CTA"};
+      const isRealAsin = asin => /^[A-Z0-9]{10}$/.test(asin);
+      const productClicks = data.recent.filter(r => isRealAsin(r.asin));
+      if (!productClicks.length) {
+        byAsin.innerHTML = '<span style="color:var(--text-muted)">אין לחיצות על מוצרים עדיין</span>';
+        return;
+      }
       byAsin.innerHTML = `
         <table style="width:100%;min-width:360px;border-collapse:collapse;font-size:0.82rem;margin-top:8px;">
           <thead>
@@ -93,10 +98,10 @@ async function loadClickStats() {
             </tr>
           </thead>
           <tbody>
-            ${data.recent.map(r => `
+            ${productClicks.map(r => `
               <tr style="border-bottom:1px solid var(--border);" id="click-row-${r.id}">
                 <td dir="ltr" style="padding:6px 8px;">${r.user_email}</td>
-                <td style="padding:6px 8px;">${asinLabels[r.asin] ? `<span style="color:var(--brand-dark);font-size:0.8rem;">${asinLabels[r.asin]}</span>` : `<a href="https://www.amazon.com/dp/${r.asin}" target="_blank" style="color:var(--brand-dark);font-family:monospace;">${r.asin}</a>`}</td>
+                <td style="padding:6px 8px;"><a href="https://www.amazon.com/dp/${r.asin}" target="_blank" style="color:var(--brand-dark);font-family:monospace;">${r.asin}</a></td>
                 <td dir="ltr" style="padding:6px 8px;white-space:nowrap;">${fmtClick(r.clicked_at)}</td>
                 <td style="padding:6px 8px;font-family:monospace;color:var(--text-muted);">${r.ip}</td>
                 <td style="padding:6px 8px;"><button onclick="deleteClick(${r.id})" style="background:none;border:none;cursor:pointer;color:var(--error);font-size:1rem;" title="מחק">🗑</button></td>
