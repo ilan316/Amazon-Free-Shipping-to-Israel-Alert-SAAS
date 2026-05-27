@@ -240,7 +240,7 @@ function renderProducts() {
         </div>
         ${p.last_price && !['NO_SHIP','NOT_FOUND'].includes(p.last_status) ? `<div class="card-row-price" style="margin-top:3px;font-size:12px;">
           <span style="color:#B12704;font-weight:bold;">💰 ${escHtml(p.last_price)}</span>
-          <span style="color:#999;font-size:11px;margin-right:4px;">(מחיר המוצר בלבד - לא כולל משלוח, מיסים ועלויות שונות)</span>
+          <span style="color:#999;font-size:11px;margin-right:4px;">${p.last_status === 'FREE' ? '(כולל משלוח חינם — לא כולל מכס ומע"מ במידה וחל)' : '(מחיר המוצר בלבד - לא כולל משלוח, מיסים ועלויות שונות)'}</span>
         </div>` : ''}
 
         <!-- שורה 3: סטטוס | השהה | בדוק | הסר -->
