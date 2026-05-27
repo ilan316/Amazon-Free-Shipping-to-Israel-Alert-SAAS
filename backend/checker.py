@@ -706,11 +706,12 @@ def _classify(text: str) -> ShippingStatus:
     # FREE shipping to Israel — two Amazon phrasings, both valid:
     #   ≥$49 products: "FREE delivery [date] to Israel"
     #   <$49 products: "FREE delivery [date] to Israel on eligible orders over ILS 142.48"
+    # Direct "free delivery ... to Israel" always wins, even if an upsell banner is also present.
+    if re.search(r'free delivery.{0,150}to israel', t):
+        return ShippingStatus.FREE
     # "if you spend X more" is a cart-level upsell banner — not product-level free shipping.
     upsell = re.search(r'free delivery.{0,60}if you spend', t)
     if not upsell:
-        if "free delivery" in t and "to israel" in t:
-            return ShippingStatus.FREE
         if "free delivery" in t and any(p in t for p in ("eligible orders", "eligible international", "eligible items")):
             return ShippingStatus.FREE
 
