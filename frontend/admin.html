@@ -408,7 +408,10 @@
         <!-- Header row -->
         <div class="section-header">
           <h2>תבניות מייל</h2>
-          <button class="btn-run-check" onclick="newTemplate()" style="font-size:0.88rem;padding:8px 16px;">+ תבנית חדשה</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn-run-check" onclick="newTemplate()" style="font-size:0.88rem;padding:8px 16px;">+ תבנית חדשה</button>
+            <button class="btn-outline" onclick="seedNewsletterTemplate()" style="font-size:0.88rem;padding:8px 16px;">📰 טען ניוזלטר</button>
+          </div>
         </div>
 
         <!-- Templates table -->
@@ -577,6 +580,10 @@
           <div style="display:flex; align-items:center; gap:12px;">
             <button class="btn-run-check" id="run-automation-btn" onclick="triggerAutomation()" style="background:var(--surface); border:1px solid var(--border); color:var(--text); white-space:nowrap;">⚡ הרץ אוטומציה עכשיו</button>
             <span style="font-size:0.82rem; color:var(--text-muted);">מריץ מיילי הפעלה/תזכורת/הרחבה לפי כללי הזמנים</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <button class="btn-run-check" id="run-newsletter-btn" onclick="sendTestNewsletter()" style="background:var(--surface); border:1px solid var(--border); color:var(--text); white-space:nowrap;">📰 שלח עדכון מוצר (בדיקה)</button>
+            <span style="font-size:0.82rem; color:var(--text-muted);">שולח את ניוזלטר החידושים לכתובת הבדיקה</span>
           </div>
         </div>
         <div id="test-msg" style="margin-top:16px; font-size:0.9rem; min-height:20px;"></div>

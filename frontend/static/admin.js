@@ -968,6 +968,32 @@ async function sendTestClickEmail() {
   }
 }
 
+async function sendTestNewsletter() {
+  const btn = document.getElementById("run-newsletter-btn");
+  const msg = document.getElementById("test-msg");
+  const to = document.getElementById("test-target-email")?.value.trim();
+  btn.disabled = true; btn.textContent = "שולח...";
+  const url = to ? `/admin/send-test-newsletter?to=${encodeURIComponent(to)}` : "/admin/send-test-newsletter";
+  const res = await apiFetch(url, { method: "POST" });
+  btn.disabled = false; btn.textContent = "📰 שלח עדכון מוצר (בדיקה)";
+  if (res && res.ok) {
+    const data = await res.json().catch(() => ({}));
+    msg.textContent = `✅ ניוזלטר נשלח ל-${data.to || ""}`;
+    setTimeout(() => { msg.textContent = ""; }, 6000);
+  } else {
+    msg.textContent = "❌ שגיאה בשליחה";
+    setTimeout(() => { msg.textContent = ""; }, 4000);
+  }
+}
+
+async function seedNewsletterTemplate() {
+  const res = await apiFetch("/admin/seed-newsletter-template", { method: "POST" });
+  if (!res || !res.ok) { alert("שגיאה ביצירת התבנית"); return; }
+  const data = await res.json().catch(() => ({}));
+  await loadTemplates();
+  if (data.id) editTemplate(data.id);
+}
+
 // ── Email Templates ──────────────────────────────────────────────────────────
 
 let _editingTemplateId = null;

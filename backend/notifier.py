@@ -837,3 +837,143 @@ def send_no_click_reminder(user, product, days_free: int) -> bool:
         "List-Id": "Amazon Israel Alert <alerts.amzfreeil.com>",
     }
     return _send_via_resend(user.notify_email, subject, html_body, plain, extra_headers=extra_headers)
+
+
+# ── Product update newsletter ─────────────────────────────────────────────────
+
+_NEWSLETTER_SUBJECT = "🚀 חידושים חדשים ב-AMZ Free IL — תוסף כרום, חיפוש ועוד"
+
+_NEWSLETTER_HTML_TEMPLATE = """\
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    @media only screen and (max-width:600px){
+      .email-container{width:100% !important;}
+      .feature-title{font-size:16px !important;}
+      .hero-title{font-size:22px !important;}
+    }
+  </style>
+</head>
+<body dir="rtl" style="margin:0;padding:0;background:#f3f3f3;font-family:Arial,'Segoe UI',sans-serif;">
+  <div style="display:none;max-height:0;overflow:hidden;">3 חידושים חדשים שיעזרו לך למצוא עוד יותר משלוח חינם מאמזון לישראל 🚀</div>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f3f3;padding:24px 0;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" class="email-container"
+             style="max-width:600px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e8e8e8;">
+        <tr>
+          <td style="background:#ffffff;border-bottom:3px solid #FF9900;padding:28px 24px 20px;text-align:center;">
+            <p style="margin:0 0 6px;font-size:13px;color:#999;letter-spacing:1px;text-transform:uppercase;">עדכון מוצר</p>
+            <h1 class="hero-title" style="margin:0 0 10px;color:#e47911;font-size:26px;font-weight:bold;line-height:1.3;">🚀 חידושים חדשים ב-<bdi>AMZ Free IL</bdi></h1>
+            <p style="margin:0;color:#555;font-size:15px;line-height:1.5;">שלושה כלים חדשים שיעזרו לך להשיג עוד יותר מוצרים עם משלוח חינם לישראל</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px 28px 8px;">
+            <p style="margin:0;font-size:15px;color:#333;line-height:1.8;text-align:right;">היי 👋<br><br>עבדנו קשה בחודשים האחרונים כדי להרחיב את הכלים שיעזרו לך לחסוך בקניות באמזון. הנה מה שחדש:</p>
+          </td>
+        </tr>
+        <tr><td style="padding:16px 28px 0;"><hr style="border:none;border-top:1px solid #f0f0f0;margin:0;"></td></tr>
+        <tr>
+          <td style="padding:24px 28px;">
+            <div style="display:inline-block;background:#FFF3E0;border-radius:12px;padding:12px 16px;margin-bottom:14px;"><span style="font-size:32px;">🧩</span></div>
+            <h2 class="feature-title" style="margin:0 0 8px;font-size:18px;color:#111;font-weight:bold;">תוסף לכרום — הוסף מוצר למעקב בלחיצה אחת</h2>
+            <p style="margin:0 0 12px;font-size:14px;color:#555;line-height:1.7;">גולש באמזון ומצאת מוצר שמעניין אותך? עד היום היית צריך להעתיק את כתובת המוצר או את ה-<bdi>ASIN</bdi> ולהדביק ידנית בחשבון. עכשיו זה נגמר — התוסף <strong>שולח את המוצר ישירות לחשבון שלך</strong> בלחיצה אחת, בלי לעזוב את אמזון.</p>
+            <ul style="margin:0 0 16px;padding-right:20px;font-size:14px;color:#555;line-height:2;">
+              <li>✅ גלוש באמזון → לחץ על התוסף → המוצר נוסף אוטומטית</li>
+              <li>✅ אין צורך להעתיק <bdi>ASIN</bdi> או כתובת ידנית</li>
+              <li>✅ תקבל התראה ברגע שיהיה משלוח חינם</li>
+            </ul>
+            <table cellpadding="0" cellspacing="0" border="0"><tr><td align="center" bgcolor="#FF9900" style="border-radius:6px;">
+              <a href="https://chromewebstore.google.com/detail/amz-free-ship-alert/mbickhgdhofaefhibfbgpacejhbelddn"
+                 style="display:inline-block;background:#FF9900;color:#111111;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;text-decoration:none;padding:11px 28px;border-radius:6px;white-space:nowrap;"
+                 target="_blank">הורד את התוסף לכרום ←</a>
+            </td></tr></table>
+          </td>
+        </tr>
+        <tr><td style="padding:0 28px;"><hr style="border:none;border-top:1px solid #f0f0f0;margin:0;"></td></tr>
+        <tr>
+          <td style="padding:24px 28px;">
+            <div style="display:inline-block;background:#E8F5E9;border-radius:12px;padding:12px 16px;margin-bottom:14px;"><span style="font-size:32px;">🔍</span></div>
+            <h2 class="feature-title" style="margin:0 0 8px;font-size:18px;color:#111;font-weight:bold;">חיפוש ישיר באמזון — עם פילטר משלוח חינם לישראל</h2>
+            <p style="margin:0 0 12px;font-size:14px;color:#555;line-height:1.7;">רוצה לחפש מוצר ספציפי ולוודא שהוא נשלח חינם לישראל? הכלי החדש שלנו מאפשר לך <strong>לחפש ישירות באמזון</strong> עם פילטר משלוח חינם לישראל מוכן ומוגדר — בלי להתעסק עם הגדרות ידנית.</p>
+            <ul style="margin:0 0 16px;padding-right:20px;font-size:14px;color:#555;line-height:2;">
+              <li>✅ הכנס מונח חיפוש + טווח מחיר אופציונלי</li>
+              <li>✅ התוצאות נפתחות ישירות באמזון עם פילטר <bdi>"Free Shipping"</bdi> מופעל</li>
+              <li>✅ תראה רק מוצרים עם <bdi>"FREE delivery"</bdi> + <bdi>"Ships to Israel"</bdi></li>
+            </ul>
+            <table cellpadding="0" cellspacing="0" border="0"><tr><td align="center" bgcolor="#FF9900" style="border-radius:6px;">
+              <a href="https://www.amzfreeil.com/search.html"
+                 style="display:inline-block;background:#FF9900;color:#111111;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;text-decoration:none;padding:11px 28px;border-radius:6px;white-space:nowrap;"
+                 target="_blank">חפש מוצרים עם משלוח חינם ←</a>
+            </td></tr></table>
+          </td>
+        </tr>
+        <tr><td style="padding:0 28px;"><hr style="border:none;border-top:1px solid #f0f0f0;margin:0;"></td></tr>
+        <tr>
+          <td style="padding:24px 28px;">
+            <div style="display:inline-block;background:#E3F2FD;border-radius:12px;padding:12px 16px;margin-bottom:14px;"><span style="font-size:32px;">📦</span></div>
+            <h2 class="feature-title" style="margin:0 0 8px;font-size:18px;color:#111;font-weight:bold;">רשימת מוצרים — מה יש עכשיו במשלוח חינם?</h2>
+            <p style="margin:0 0 12px;font-size:14px;color:#555;line-height:1.7;">לא צריך לחכות להתראה — העמוד החדש מציג את <strong>כל המוצרים שכרגע נשלחים חינם לישראל</strong>, מתעדכן יומית באופן אוטומטי. פשוט נכנסים ורואים.</p>
+            <ul style="margin:0 0 16px;padding-right:20px;font-size:14px;color:#555;line-height:2;">
+              <li>✅ רשימה מתעדכנת יומית — תמיד עדכנית</li>
+              <li>✅ כל מוצר ברשימה אומת אוטומטית עם משלוח חינם לישראל</li>
+              <li>✅ לחץ על מוצר כדי לקנות ישירות באמזון</li>
+            </ul>
+            <table cellpadding="0" cellspacing="0" border="0"><tr><td align="center" bgcolor="#FF9900" style="border-radius:6px;">
+              <a href="https://www.amzfreeil.com/free-products.html"
+                 style="display:inline-block;background:#FF9900;color:#111111;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;text-decoration:none;padding:11px 28px;border-radius:6px;white-space:nowrap;"
+                 target="_blank">ראה מה חינם עכשיו ←</a>
+            </td></tr></table>
+          </td>
+        </tr>
+        <tr><td style="padding:0 28px 8px;"><hr style="border:none;border-top:2px solid #FF9900;margin:0;"></td></tr>
+        <tr>
+          <td style="padding:28px 28px 24px;text-align:center;background:#FFFBF3;">
+            <p style="margin:0 0 6px;font-size:13px;color:#999;letter-spacing:0.5px;">כל הכלים זמינים בחשבון שלך</p>
+            <p style="margin:0 0 20px;font-size:16px;color:#333;font-weight:bold;">כנס לחשבון כדי לנצל את כל החידושים 👇</p>
+            <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;"><tr><td align="center" bgcolor="#e47911" style="border-radius:8px;">
+              <a href="https://app.amzfreeil.com/dashboard"
+                 style="display:inline-block;background:#e47911;color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;text-decoration:none;padding:13px 40px;border-radius:8px;white-space:nowrap;"
+                 target="_blank">כניסה לחשבון שלי</a>
+            </td></tr></table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 24px 20px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0faf0;border-radius:8px;border:1px solid #c8e6c9;">
+              <tr><td style="padding:14px 18px;text-align:right;">
+                <p style="margin:0 0 3px;font-size:13px;font-weight:bold;color:#2e7d32;">💡 טיפ לחיסכון</p>
+                <p style="margin:0;font-size:13px;color:#388e3c;line-height:1.6;">הזמינו בין <bdi>$49</bdi> ל-<bdi>$130</bdi> כדי ליהנות ממשלוח חינם ללא מכס ישראלי. מעל <bdi>$130</bdi>? ייתכן מכס של 18% מע"מ + אגרת שחרור.</p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f8f8f8;border-radius:0 0 10px 10px;border-top:1px solid #eee;padding:16px 24px 20px;text-align:center;">
+            <p style="margin:0 0 4px;color:#888;font-size:12px;"><bdi>Amazon Free Shipping to Israel Alert</bdi> · <bdi>amzfreeil.com</bdi></p>
+            <p style="margin:0 0 8px;color:#bbb;font-size:11px;">נשלח ב-__SEND_DATE__</p>
+            <p style="margin:0;font-size:11px;">
+              <a href="{{pause_url}}" style="color:#aaa;text-decoration:underline;">הפסק לקבל עדכונים</a>
+              &nbsp;·&nbsp;
+              <a href="https://app.amzfreeil.com/dashboard" style="color:#aaa;text-decoration:underline;">ניהול העדפות</a>
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
+
+def build_newsletter_html(pause_url_val: str) -> str:
+    date_str = datetime.now().strftime("%d/%m/%Y")
+    return _NEWSLETTER_HTML_TEMPLATE.replace("{{pause_url}}", pause_url_val).replace("__SEND_DATE__", date_str)
+
+
+def send_newsletter_test(to_email: str, pause_url_val: str) -> bool:
+    html = build_newsletter_html(pause_url_val)
+    return _send_via_resend(to_email, _NEWSLETTER_SUBJECT, html, "")

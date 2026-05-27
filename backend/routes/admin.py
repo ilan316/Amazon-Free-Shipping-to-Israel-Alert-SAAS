@@ -1167,6 +1167,35 @@ async def send_test_click_email(
     return {"sent": ok, "to": dest, "tracking_url": tracking}
 
 
+@router.post("/send-test-newsletter")
+async def send_test_newsletter(
+    admin: Annotated[User, Depends(get_current_admin)],
+    to: str | None = None,
+):
+    from backend.notifier import send_newsletter_test, _pause_url
+    target = to or admin.notify_email or admin.email
+    pause = _pause_url(admin.id)
+    ok = send_newsletter_test(target, pause)
+    return {"ok": ok, "to": target}
+
+
+@router.post("/seed-newsletter-template")
+async def seed_newsletter_template(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    from backend.notifier import build_newsletter_html, _NEWSLETTER_SUBJECT
+    name = "עדכון_מוצר_מאי_2026"
+    existing = (await db.execute(select(EmailTemplate).where(EmailTemplate.name == name))).scalar_one_or_none()
+    if existing:
+        return {"id": existing.id, "message": "תבנית כבר קיימת", "already_exists": True}
+    body = build_newsletter_html("{{pause_url}}")
+    t = EmailTemplate(name=name, subject=_NEWSLETTER_SUBJECT, body=body)
+    db.add(t)
+    await db.commit()
+    await db.refresh(t)
+    return {"id": t.id, "message": "תבנית ניוזלטר נוצרה", "already_exists": False}
+
 
 @router.get("/quick-log")
 async def quick_log(
