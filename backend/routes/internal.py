@@ -38,6 +38,7 @@ class SyncProduct(BaseModel):
     found_at: str = ""
     last_price: str = ""
     image_url: str = ""
+    name_he: str = ""
 
 
 class SyncRequest(BaseModel):
@@ -73,6 +74,7 @@ async def sync_products(
             consecutive_errors=0,
             last_price=p.last_price or None,
             image_url=p.image_url or None,
+            name_he=p.name_he or None,
         )
         stmt = stmt.on_conflict_do_update(
             index_elements=["asin"],
@@ -85,6 +87,7 @@ async def sync_products(
                 "consecutive_errors": 0,
                 "last_price": stmt.excluded.last_price,
                 "image_url": stmt.excluded.image_url,
+                "name_he": stmt.excluded.name_he,
             },
         )
         result = await db.execute(stmt)

@@ -126,6 +126,11 @@ async def create_tables():
         )
         await conn.execute(
             __import__("sqlalchemy").text(
+                "ALTER TABLE products ADD COLUMN IF NOT EXISTS name_he VARCHAR(300)"
+            )
+        )
+        await conn.execute(
+            __import__("sqlalchemy").text(
                 "ALTER TABLE user_products ADD COLUMN IF NOT EXISTS no_click_reminder_sent_at TIMESTAMP WITH TIME ZONE"
             )
         )

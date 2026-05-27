@@ -263,6 +263,7 @@ async def public_free_products():
             "last_price": p.last_price,
             "found_in_aod": p.found_in_aod,
             "last_checked": p.last_checked.isoformat() if p.last_checked else None,
+            "name_he": p.name_he,
         }
         for p in products
     ]
