@@ -108,3 +108,40 @@ async def sync_products(
 
     logger.info(f"sync-products: synced={synced}, removed={removed}")
     return {"synced": synced, "removed": removed}
+
+
+@router.post("/backfill-hebrew", dependencies=[Depends(_require_secret)])
+async def backfill_hebrew(db: Annotated[AsyncSession, Depends(get_db)]):
+    """Generate name_he for every product in DB that is missing it."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY not set on server.")
+
+    import anthropic
+    client = anthropic.Anthropic(api_key=api_key)
+
+    result = await db.execute(
+        select(Product).where(
+            (Product.name_he == None) | (Product.name_he == "")
+        )
+    )
+    products = result.scalars().all()
+
+    updated = 0
+    for p in products:
+        if not p.name:
+            continue
+        try:
+            msg = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=60,
+                messages=[{"role": "user", "content": f"תרגם לעברית קצרה ומובנת (עד 7 מילים, שמור את שם המותג, ללא מרכאות): {p.name}"}],
+            )
+            p.name_he = msg.content[0].text.strip()
+            updated += 1
+        except Exception as e:
+            logger.warning(f"[{p.asin}] Hebrew name generation failed: {e}")
+
+    await db.commit()
+    logger.info(f"backfill-hebrew: updated {updated}/{len(products)} products")
+    return {"updated": updated, "total_missing": len(products)}
