@@ -43,8 +43,11 @@ def _is_bot(ua: str) -> bool:
 
 
 def _is_apple_mpp(ua: str, ip: str | None) -> bool:
-    """Return True if this open looks like an Apple MPP pre-fetch (not a real user open)."""
+    """Return True if this open looks like a machine pre-fetch (Apple MPP or Google Image Proxy)."""
     if ip and ip.startswith("17."):
+        return True
+    # Google Image Proxy range (66.249.x.x) — fires on delivery, not on real open
+    if ip and ip.startswith("66.249."):
         return True
     ua_lower = ua.lower()
     return any(frag in ua_lower for frag in _APPLE_MPP_UA_FRAGMENTS)

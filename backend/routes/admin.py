@@ -1167,6 +1167,22 @@ async def send_test_click_email(
     return {"sent": ok, "to": dest, "tracking_url": tracking}
 
 
+@router.post("/fix-google-proxy-opens")
+async def fix_google_proxy_opens(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """One-time migration: mark all Google IP opens as suspicious."""
+    from sqlalchemy import update as sa_update
+    result = await db.execute(
+        sa_update(EmailOpen)
+        .where(EmailOpen.ip.like("66.249.%"), EmailOpen.is_suspicious == False)
+        .values(is_suspicious=True)
+    )
+    await db.commit()
+    return {"updated": result.rowcount}
+
+
 @router.post("/send-test-newsletter")
 async def send_test_newsletter(
     admin: Annotated[User, Depends(get_current_admin)],
