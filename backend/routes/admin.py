@@ -1186,10 +1186,13 @@ async def seed_newsletter_template(
 ):
     from backend.notifier import build_newsletter_html, _NEWSLETTER_SUBJECT
     name = "עדכון_מוצר_מאי_2026"
+    body = build_newsletter_html("{{pause_url}}")
     existing = (await db.execute(select(EmailTemplate).where(EmailTemplate.name == name))).scalar_one_or_none()
     if existing:
-        return {"id": existing.id, "message": "תבנית כבר קיימת", "already_exists": True}
-    body = build_newsletter_html("{{pause_url}}")
+        existing.subject = _NEWSLETTER_SUBJECT
+        existing.body = body
+        await db.commit()
+        return {"id": existing.id, "message": "תבנית עודכנה", "already_exists": True}
     t = EmailTemplate(name=name, subject=_NEWSLETTER_SUBJECT, body=body)
     db.add(t)
     await db.commit()
@@ -1343,15 +1346,29 @@ async def _execute_send_job(
     sent = failed = 0
     recipients_to_save = []
 
+    from urllib.parse import quote as _quote
+
     for i, (uid, email, notify_email, pc) in enumerate(user_data):
         recipient = notify_email or email
         subj = tpl_subject.replace("{{email}}", email).replace("{{product_count}}", str(pc))
+
+        def _turl(dest: str) -> str:
+            return f"{base_url}/track/click?u={uid}&a=&url={_quote(dest, safe='')}"
+
+        open_pixel = (
+            f'<img src="{base_url}/track/email-open?uid={uid}&tn={tpl_name}"'
+            ' width="1" height="1" style="display:none;border:0;" alt="">'
+        )
         html_body = (
             tpl_body
             .replace("{{email}}", email)
             .replace("{{notify_email}}", recipient)
             .replace("{{product_count}}", str(pc))
             .replace("{{pause_url}}", _pause_url(uid))
+            .replace("{{open_pixel}}", open_pixel)
+            .replace("{{track_search}}", _turl("https://www.amzfreeil.com/search.html"))
+            .replace("{{track_free_products}}", _turl("https://www.amzfreeil.com/free-products.html"))
+            .replace("{{track_dashboard}}", _turl("https://app.amzfreeil.com/dashboard"))
         )
         ok = _send_via_resend(recipient, subj, html_body, "")
         if ok:

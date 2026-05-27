@@ -905,7 +905,7 @@ _NEWSLETTER_HTML_TEMPLATE = """\
               <li>✅ תראה רק מוצרים עם <bdi>"FREE delivery"</bdi> + <bdi>"Ships to Israel"</bdi></li>
             </ul>
             <table cellpadding="0" cellspacing="0" border="0"><tr><td align="center" bgcolor="#FF9900" style="border-radius:6px;">
-              <a href="https://www.amzfreeil.com/search.html"
+              <a href="{{track_search}}"
                  style="display:inline-block;background:#FF9900;color:#111111;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;text-decoration:none;padding:11px 28px;border-radius:6px;white-space:nowrap;"
                  target="_blank">חפש מוצרים עם משלוח חינם ←</a>
             </td></tr></table>
@@ -923,7 +923,7 @@ _NEWSLETTER_HTML_TEMPLATE = """\
               <li>✅ לחץ על מוצר כדי לקנות ישירות באמזון</li>
             </ul>
             <table cellpadding="0" cellspacing="0" border="0"><tr><td align="center" bgcolor="#FF9900" style="border-radius:6px;">
-              <a href="https://www.amzfreeil.com/free-products.html"
+              <a href="{{track_free_products}}"
                  style="display:inline-block;background:#FF9900;color:#111111;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;text-decoration:none;padding:11px 28px;border-radius:6px;white-space:nowrap;"
                  target="_blank">ראה מה חינם עכשיו ←</a>
             </td></tr></table>
@@ -935,7 +935,7 @@ _NEWSLETTER_HTML_TEMPLATE = """\
             <p style="margin:0 0 6px;font-size:13px;color:#999;letter-spacing:0.5px;">כל הכלים זמינים בחשבון שלך</p>
             <p style="margin:0 0 20px;font-size:16px;color:#333;font-weight:bold;">כנס לחשבון כדי לנצל את כל החידושים 👇</p>
             <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;"><tr><td align="center" bgcolor="#e47911" style="border-radius:8px;">
-              <a href="https://app.amzfreeil.com/dashboard"
+              <a href="{{track_dashboard}}"
                  style="display:inline-block;background:#e47911;color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;text-decoration:none;padding:13px 40px;border-radius:8px;white-space:nowrap;"
                  target="_blank">כניסה לחשבון שלי</a>
             </td></tr></table>
@@ -958,13 +958,14 @@ _NEWSLETTER_HTML_TEMPLATE = """\
             <p style="margin:0;font-size:11px;">
               <a href="{{pause_url}}" style="color:#aaa;text-decoration:underline;">הפסק לקבל עדכונים</a>
               &nbsp;·&nbsp;
-              <a href="https://app.amzfreeil.com/dashboard" style="color:#aaa;text-decoration:underline;">ניהול העדפות</a>
+              <a href="{{track_dashboard}}" style="color:#aaa;text-decoration:underline;">ניהול העדפות</a>
             </p>
           </td>
         </tr>
       </table>
     </td></tr>
   </table>
+{{open_pixel}}
 </body>
 </html>"""
 

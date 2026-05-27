@@ -53,6 +53,7 @@ _ALLOWED_PREFIXES = (
     "https://www.amazon.com/",
     "https://app.amzfreeil.com/",
     "https://amzfreeil.com/",
+    "https://www.amzfreeil.com/",
 )
 
 
