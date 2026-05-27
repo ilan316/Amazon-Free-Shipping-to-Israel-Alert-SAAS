@@ -845,6 +845,42 @@ async def change_password(
     return {"message": "הסיסמה עודכנה בהצלחה"}
 
 
+@router.post("/reclassify-all")
+async def reclassify_all_products(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Re-classify all products using stored raw_text + last_price (no Amazon fetch)."""
+    from backend.checker import _classify, ShippingStatus
+
+    result = await db.execute(select(Product).where(Product.source == "user"))
+    products = result.scalars().all()
+
+    changed = 0
+    details = []
+    for p in products:
+        old_status = p.last_status
+        raw = p.raw_text or ""
+        price = p.last_price or ""
+
+        if raw:
+            new_status = _classify(raw)
+        else:
+            new_status = ShippingStatus.PAID if price.upper().startswith("ILS") else ShippingStatus(old_status)
+
+        # Apply ILS override
+        if price.upper().startswith("ILS") and new_status not in (ShippingStatus.FREE,):
+            new_status = ShippingStatus.PAID
+
+        if new_status.value != old_status:
+            details.append({"asin": p.asin, "from": old_status, "to": new_status.value})
+            p.last_status = new_status.value
+            changed += 1
+
+    await db.commit()
+    return {"total": len(products), "changed": changed, "details": details}
+
+
 @router.post("/profile/request-email-change")
 async def request_email_change(
     body: RequestEmailChangeRequest,
