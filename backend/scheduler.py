@@ -750,3 +750,57 @@ async def check_decodo_quota():
     except Exception as e:
         logger.warning(f"Decodo quota check error: {e}")
     logger.info("=== Decodo quota check complete ===")
+
+
+async def run_hebrew_backfill():
+    """Generate name_he for user-sourced products that are missing it."""
+    import os, anthropic as _anthropic
+    from backend.database import AsyncSessionLocal
+    from backend.models import Product
+    from sqlalchemy import select
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(Product).where(
+                Product.source == "user",
+                (Product.name_he == None) | (Product.name_he == ""),
+            )
+        )
+        products = result.scalars().all()
+
+    if not products:
+        logger.info("Hebrew backfill: no user products missing name_he — skipping.")
+        return
+
+    logger.info(f"Hebrew backfill: generating name_he for {len(products)} user product(s).")
+    client = _anthropic.Anthropic(api_key=api_key)
+    updated = 0
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(Product).where(
+                Product.source == "user",
+                (Product.name_he == None) | (Product.name_he == ""),
+            )
+        )
+        products = result.scalars().all()
+        for p in products:
+            if not p.name:
+                continue
+            try:
+                msg = client.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=60,
+                    messages=[{"role": "user", "content": f"תרגם לעברית קצרה ומובנת (עד 7 מילים, שמור את שם המותג, ללא מרכאות): {p.name}"}],
+                )
+                p.name_he = msg.content[0].text.strip()
+                updated += 1
+            except Exception as e:
+                logger.warning(f"[{p.asin}] Hebrew name failed: {e}")
+        await db.commit()
+
+    logger.info(f"Hebrew backfill: updated {updated}/{len(products)} products.")
