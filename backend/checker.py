@@ -1090,7 +1090,7 @@ class BrowserManager:
         if not products:
             return []
 
-        semaphore = asyncio.Semaphore(4)
+        semaphore = asyncio.Semaphore(2)
 
         async def _check_one(idx: int, asin: str, url: str):
             async with semaphore:

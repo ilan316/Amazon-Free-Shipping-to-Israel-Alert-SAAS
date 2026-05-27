@@ -44,6 +44,23 @@ from backend.routes import internal as internal_routes
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
+def _setup_persistent_log():
+    """Add a rotating file handler that writes to the Railway volume, surviving redeploys."""
+    import os
+    from logging.handlers import RotatingFileHandler
+    log_dir = os.path.join(os.environ.get("BROWSER_PROFILE_DIR", "/app/browser_profile"), "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    fh = RotatingFileHandler(
+        os.path.join(log_dir, "app.log"),
+        maxBytes=10 * 1024 * 1024,  # 10 MB per file
+        backupCount=9,               # keep 10 files = up to 100 MB total
+        encoding="utf-8",
+    )
+    fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    logging.getLogger().addHandler(fh)
+
+_setup_persistent_log()
+
 async def _get_check_time() -> tuple:
     """Read daily check time from DB (SystemSetting key 'check_time'), fallback to 06:00."""
     try:
