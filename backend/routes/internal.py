@@ -122,7 +122,8 @@ async def backfill_hebrew(db: Annotated[AsyncSession, Depends(get_db)]):
 
     result = await db.execute(
         select(Product).where(
-            (Product.name_he == None) | (Product.name_he == "")
+            Product.source == "user",
+            (Product.name_he == None) | (Product.name_he == ""),
         )
     )
     products = result.scalars().all()
