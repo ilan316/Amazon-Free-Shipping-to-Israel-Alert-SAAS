@@ -444,13 +444,15 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
         if exports_text and exports_text != raw_text:
             raw_text = (raw_text + " " + exports_text).strip() if raw_text else exports_text
 
-    if not raw_text:
-        return CheckResult(asin, ShippingStatus.NO_SHIP, error_message="No delivery block found",
-                           product_name=product_name)
-
-    status = _classify(raw_text)
     price = _extract_price(soup)
     image_url = _extract_image_url(soup)
+    if not raw_text:
+        # ILS price means the product IS reachable from Israel — can't be NO_SHIP
+        fallback = ShippingStatus.PAID if price.upper().startswith("ILS") else ShippingStatus.NO_SHIP
+        return CheckResult(asin, fallback, error_message="No delivery block found",
+                           product_name=product_name, last_price=price, image_url=image_url)
+
+    status = _classify(raw_text)
     # ILS price = product is purchasable from Israel → only FREE or PAID, never NO_SHIP/UNKNOWN
     if price.upper().startswith("ILS") and status not in (ShippingStatus.FREE,):
         status = ShippingStatus.PAID
@@ -836,10 +838,6 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
                     status = aod_status
                     found_in_aod = (aod_status == ShippingStatus.FREE)
 
-        if not raw_text:
-            return CheckResult(asin, ShippingStatus.NO_SHIP, error_message="No delivery block found",
-                               product_name=product_name)
-
         # Extract price and image from current page HTML
         pw_price = ""
         pw_image = ""
@@ -852,6 +850,12 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
             pw_image = _extract_image_url(pw_soup)
         except Exception:
             pass
+
+        if not raw_text:
+            # ILS price means the product IS reachable from Israel — can't be NO_SHIP
+            fallback = ShippingStatus.PAID if pw_price.upper().startswith("ILS") else ShippingStatus.NO_SHIP
+            return CheckResult(asin, fallback, error_message="No delivery block found",
+                               product_name=product_name, last_price=pw_price, image_url=pw_image)
 
         # Safety scan: check full HTML for NO_SHIP phrases that may not appear in the delivery blocks.
         # Exception: ILS price means the product IS purchasable from Israel — phrase may be in hidden/JS element.
