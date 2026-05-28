@@ -33,8 +33,17 @@ _BROWSER_UA = (
     "Chrome/120.0.0.0 Safari/537.36"
 )
 
-# Resource types to block in Playwright pages (speed optimisation)
+# Resource types to block in Playwright pages (speed + bandwidth optimisation)
 _BLOCK_RESOURCE_TYPES = {"image", "media", "font", "stylesheet"}
+
+# Third-party script domains to block — analytics/ads that Amazon loads but we don't need.
+# Amazon's own JS (amazon.com, ssl-images-amazon.com, media-amazon.com) is kept.
+_BLOCK_SCRIPT_DOMAINS = {
+    "google-analytics.com", "googletagmanager.com", "doubleclick.net",
+    "amazon-adsystem.com", "adsystem.com", "advertising.com",
+    "scorecardresearch.com", "omtrdc.net", "demdex.net",
+    "adobedtm.com", "2mdn.net", "criteo.com", "criteo.net",
+}
 
 logger = logging.getLogger(__name__)
 
@@ -925,9 +934,14 @@ class BrowserManager:
             "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
         )
 
-        # Block images, media, fonts and stylesheets — we only need HTML text
+        # Block images, media, fonts, stylesheets, and third-party scripts.
+        # Amazon's own scripts are kept — they render prices and delivery blocks.
         async def _block_resources(route, request):
             if request.resource_type in _BLOCK_RESOURCE_TYPES:
+                await route.abort()
+            elif request.resource_type == "script" and any(
+                d in request.url for d in _BLOCK_SCRIPT_DOMAINS
+            ):
                 await route.abort()
             else:
                 await route.continue_()
