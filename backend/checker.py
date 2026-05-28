@@ -493,6 +493,7 @@ async def _check_product_httpx(asin: str, url: str, cookies: list) -> CheckResul
                                    error_message=f"Redirected away from amazon.com: {resp.url}")
             return _parse_html_delivery(resp.text, asin)
     except Exception as e:
+        logger.warning(f"[{asin}] curl_cffi exception: {type(e).__name__}: {e}")
         return CheckResult(asin, ShippingStatus.ERROR, error_message=f"httpx error: {e}")
 
 
