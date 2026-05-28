@@ -84,11 +84,14 @@ async def _retry_check_cycle_after(minutes: int):
 
 async def run_global_check_cycle():
     """Check all tracked products and update DB. No emails sent here."""
+    cycle_start = datetime.now(timezone.utc)
     logger.info("=== Check cycle started ===")
     from backend.checker import browser_manager
-    if browser_manager._session_cookies:
-        logger.info("Location refresh skipped — using existing session cookies")
+    cookies_count = len(browser_manager._session_cookies)
+    if cookies_count:
+        logger.info(f"Location refresh skipped — {cookies_count} session cookies already available")
     else:
+        logger.warning("No session cookies — attempting location refresh via curl_cffi")
         loc_ok = await browser_manager.refresh_location()
         if not loc_ok:
             logger.warning("Location refresh failed — checks may show USD prices instead of ILS")
@@ -152,7 +155,9 @@ async def run_global_check_cycle():
             check_results = await browser_manager.check_many(
                 [(p.asin, p.url) for p in to_check]
             )
+            status_counts: dict = {}
             for i, (product, check_result) in enumerate(zip(to_check, check_results)):
+                status_counts[check_result.status.value] = status_counts.get(check_result.status.value, 0) + 1
                 try:
                     is_first_error = await _update_product(db, product, check_result)
                     if is_first_error:
@@ -172,6 +177,9 @@ async def run_global_check_cycle():
                     except Exception:
                         await db.rollback()
 
+    if to_check:
+        logger.info(f"=== Cycle result breakdown: {status_counts} | skipped={len(products)-len(to_check)} ===")
+
     if newly_failed:
         await _notify_admin_of_errors(newly_failed)
     if newly_blocked:
@@ -188,7 +196,8 @@ async def run_global_check_cycle():
             db.add(SystemSetting(key="last_check_at", value=now_str))
         await db.commit()
 
-    logger.info("=== Check cycle complete ===")
+    duration = (datetime.now(timezone.utc) - cycle_start).total_seconds()
+    logger.info(f"=== Check cycle complete in {duration/60:.1f} min ===")
 
 
 async def run_daily_summary():

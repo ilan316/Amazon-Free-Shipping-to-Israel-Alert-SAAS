@@ -416,7 +416,7 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
     if title_el:
         product_name = title_el.get_text(strip=True)
     if not product_name:
-        logger.warning(f"[{asin}] httpx: productTitle not found — continuing without name.")
+        logger.warning(f"[{asin}] httpx: productTitle not found (page_title={title_text!r}) — possible CAPTCHA/redirect/wrong page")
 
     # Safety scan: check the raw HTML for definitive NO_SHIP phrases before any DOM parsing.
     # Covers cases where the message lives in #availability or other elements not in the selector list.
@@ -448,13 +448,16 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
         "buyBoxInner",
     ]
     raw_text = ""
+    matched_delivery_id = None
     for el_id in delivery_ids:
         el = soup.find(id=el_id)
         if el:
             text = el.get_text(separator=" ", strip=True)
             if text:
                 raw_text = text
+                matched_delivery_id = el_id
                 break
+    logger.debug(f"[{asin}] httpx: delivery selector matched={matched_delivery_id!r} raw_text[:80]={raw_text[:80]!r}")
 
     # Always also check exports_feature_div — books and some products put
     # "No Import Charges & $X.XX Shipping to Israel" there, not in the main delivery block.
@@ -469,7 +472,7 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
 
     # Rule 1: No ILS price → doesn't ship to Israel
     if not price.upper().startswith("ILS"):
-        logger.info(f"[{asin}] httpx: NO_SHIP (no ILS price) | price={price!r}")
+        logger.info(f"[{asin}] httpx: NO_SHIP (no ILS price) | price={price!r} | delivery_el={matched_delivery_id!r} | delivery_text={raw_text[:100]!r}")
         return CheckResult(asin, ShippingStatus.NO_SHIP, raw_text=raw_text or "",
                            product_name=product_name, last_price=price, image_url=image_url)
 
@@ -508,9 +511,16 @@ async def _check_product_httpx(asin: str, url: str, cookies: list) -> CheckResul
                 allow_redirects=True,
                 timeout=20,
             )
-            if "amazon.com" not in str(resp.url):
+            final_url = str(resp.url)
+            resp_size = len(resp.content)
+            cookies_sent = len(cookie_dict)
+            logger.info(
+                f"[{asin}] curl_cffi: status={resp.status_code} size={resp_size}B "
+                f"cookies_sent={cookies_sent} final_url={final_url[:120]!r}"
+            )
+            if "amazon.com" not in final_url:
                 return CheckResult(asin, ShippingStatus.ERROR,
-                                   error_message=f"Redirected away from amazon.com: {resp.url}")
+                                   error_message=f"Redirected away from amazon.com: {final_url}")
             return _parse_html_delivery(resp.text, asin)
     except Exception as e:
         logger.warning(f"[{asin}] curl_cffi exception: {type(e).__name__}: {e}")
@@ -1117,8 +1127,13 @@ class BrowserManager:
             return []
 
         semaphore = asyncio.Semaphore(2)
+        httpx_ok = 0
+        pw_fallback = 0
+        pw_ok = 0
+        lock = asyncio.Lock()
 
         async def _check_one(idx: int, asin: str, url: str):
+            nonlocal httpx_ok, pw_fallback, pw_ok
             async with semaphore:
                 # Small random stagger to avoid request bursts
                 await asyncio.sleep(random.uniform(0.0, 2.0))
@@ -1131,9 +1146,13 @@ class BrowserManager:
                 if result.status in (ShippingStatus.ERROR, ShippingStatus.UNKNOWN) or (
                     result.status == ShippingStatus.NO_SHIP and not result.last_price
                 ):
+                    fallback_reason = result.error_message or result.raw_text or result.status.value
                     logger.warning(
-                        f"[{asin}] httpx returned {result.status.value} (price={result.last_price!r}) — falling back to Playwright"
+                        f"[{asin}] httpx→Playwright fallback | status={result.status.value} "
+                        f"price={result.last_price!r} reason={fallback_reason[:100]!r}"
                     )
+                    async with lock:
+                        pw_fallback += 1
                     result = await self.check(asin, url)
                     if result.status == ShippingStatus.NOT_FOUND:
                         return idx, result
@@ -1142,13 +1161,25 @@ class BrowserManager:
                         await asyncio.sleep(random.uniform(8, 12))
                         logger.info(f"[{asin}] Final retry via curl_cffi...")
                         result = await _check_product_httpx(asin, url, self._session_cookies)
+                    else:
+                        async with lock:
+                            pw_ok += 1
+                else:
+                    async with lock:
+                        httpx_ok += 1
 
                 return idx, result
 
         tasks = [_check_one(i, asin, url) for i, (asin, url) in enumerate(products)]
         indexed = await asyncio.gather(*tasks)
         indexed.sort(key=lambda x: x[0])
-        return [r for _, r in indexed]
+        results = [r for _, r in indexed]
+        logger.info(
+            f"check_many complete: {len(products)} total | "
+            f"httpx_ok={httpx_ok} | pw_fallback={pw_fallback} | pw_ok={pw_ok} | "
+            f"cookies_available={len(self._session_cookies)}"
+        )
+        return results
 
 
 browser_manager = BrowserManager()
