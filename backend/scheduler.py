@@ -85,7 +85,10 @@ async def _retry_check_cycle_after(minutes: int):
 async def run_global_check_cycle():
     """Check all tracked products and update DB. No emails sent here."""
     logger.info("=== Check cycle started ===")
-    # Israeli residential proxy provides location automatically — no cookie setup needed
+    from backend.checker import browser_manager
+    loc_ok = await browser_manager.refresh_location()
+    if not loc_ok:
+        logger.warning("Location refresh failed — checks may show USD prices instead of ILS")
     async with AsyncSessionLocal() as db:
         now = datetime.now(timezone.utc)
         result = await db.execute(

@@ -341,8 +341,19 @@ async def _try_set_location_httpx(proxy_url: str = "") -> tuple:
                 body_preview = r.text[:200].replace("\n", " ")
                 logger.info(f"curl_cffi location: variant {i+1} → {r.status_code} | {body_preview!r}")
                 if r.status_code in (200, 302):
-                    api_resp = r
-                    break
+                    # Check if Amazon accepted the location change (successful:1 in JSON body)
+                    try:
+                        import json as _json
+                        resp_json = _json.loads(r.text)
+                        if resp_json.get("successful") == 1 or resp_json.get("isAddressUpdated") == 1:
+                            api_resp = r
+                            break
+                        else:
+                            logger.warning(f"curl_cffi location: variant {i+1} returned HTTP 200 but successful=0 — trying next variant")
+                    except Exception:
+                        # Non-JSON response — accept it and proceed to verification step
+                        api_resp = r
+                        break
 
             if not api_resp:
                 return False, []
