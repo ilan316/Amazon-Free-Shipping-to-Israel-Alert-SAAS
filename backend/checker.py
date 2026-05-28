@@ -39,10 +39,16 @@ _BLOCK_RESOURCE_TYPES = {"image", "media", "font", "stylesheet"}
 # Third-party script domains to block — analytics/ads that Amazon loads but we don't need.
 # Amazon's own JS (amazon.com, ssl-images-amazon.com, media-amazon.com) is kept.
 _BLOCK_SCRIPT_DOMAINS = {
+    # Third-party trackers / ads
     "google-analytics.com", "googletagmanager.com", "doubleclick.net",
     "amazon-adsystem.com", "adsystem.com", "advertising.com",
     "scorecardresearch.com", "omtrdc.net", "demdex.net",
     "adobedtm.com", "2mdn.net", "criteo.com", "criteo.net",
+    # Amazon-owned tracking/analytics (safe to block — not used for price/delivery rendering)
+    "fls-na.amazon.com", "fls-eu.amazon.com", "fls.amazon.com",
+    "ir-na.amazon-adsystem.com",
+    # Non-essential Amazon CDN JS (video player, enhanced images, recommendations)
+    "m.media-amazon.com",
 }
 
 logger = logging.getLogger(__name__)
@@ -875,7 +881,15 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
                     status = aod_status
                     found_in_aod = (aod_status == ShippingStatus.FREE)
 
-        # Extract price and image from current page HTML
+        # Stop all pending network downloads — delivery text + AOD are already read,
+        # no more resources needed. Prevents the browser from completing large Amazon
+        # JS bundle downloads (8-10 MB/page) that aren't required for parsing.
+        try:
+            await page.evaluate("window.stop()")
+        except Exception:
+            pass
+
+        # Extract price and image from current page HTML (reads DOM — no network needed)
         pw_price = ""
         pw_image = ""
         pw_html = ""
