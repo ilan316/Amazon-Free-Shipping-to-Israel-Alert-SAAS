@@ -86,9 +86,12 @@ async def run_global_check_cycle():
     """Check all tracked products and update DB. No emails sent here."""
     logger.info("=== Check cycle started ===")
     from backend.checker import browser_manager
-    loc_ok = await browser_manager.refresh_location()
-    if not loc_ok:
-        logger.warning("Location refresh failed — checks may show USD prices instead of ILS")
+    if browser_manager._session_cookies:
+        logger.info("Location refresh skipped — using existing session cookies")
+    else:
+        loc_ok = await browser_manager.refresh_location()
+        if not loc_ok:
+            logger.warning("Location refresh failed — checks may show USD prices instead of ILS")
     async with AsyncSessionLocal() as db:
         now = datetime.now(timezone.utc)
         result = await db.execute(
