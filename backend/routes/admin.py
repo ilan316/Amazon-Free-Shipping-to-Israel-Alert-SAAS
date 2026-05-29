@@ -1972,3 +1972,30 @@ async def export_excel(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="amzfree-report-{file_date}.xlsx"'},
     )
+
+
+@router.get("/logs")
+async def get_persistent_logs(
+    admin: Annotated[User, Depends(get_current_admin)],
+    lines: int = 500,
+    grep: str = "",
+):
+    """Return last N lines from the persistent log file on the Railway volume.
+    Optional ?grep= filter (case-insensitive substring match).
+    """
+    import os, collections
+    log_path = os.path.join(
+        os.environ.get("BROWSER_PROFILE_DIR", "/app/browser_profile"), "logs", "app.log"
+    )
+    if not os.path.exists(log_path):
+        return {"lines": [], "log_path": log_path, "error": "Log file not found"}
+
+    grep_lower = grep.lower()
+    buf = collections.deque(maxlen=lines)
+    with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            line = line.rstrip("\n")
+            if not grep_lower or grep_lower in line.lower():
+                buf.append(line)
+
+    return {"lines": list(buf), "total_matched": len(buf), "log_path": log_path}
