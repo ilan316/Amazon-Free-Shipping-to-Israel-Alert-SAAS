@@ -2,7 +2,7 @@ import io
 from datetime import datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from jose import JWTError, jwt
 from openpyxl import Workbook
@@ -1976,14 +1976,39 @@ async def export_excel(
 
 @router.get("/logs")
 async def get_persistent_logs(
-    admin: Annotated[User, Depends(get_current_admin)],
+    request: Request,
     lines: int = 500,
     grep: str = "",
 ):
     """Return last N lines from the persistent log file on the Railway volume.
+    Auth: X-Admin-Token: ADMIN_SECRET_TOKEN  (for CLI/scripts)
+       OR standard Bearer JWT admin session  (for admin panel).
     Optional ?grep= filter (case-insensitive substring match).
     """
     import os, collections
+    secret = os.environ.get("ADMIN_SECRET_TOKEN", "")
+    token_header = request.headers.get("x-admin-token", "")
+    if not (secret and token_header == secret):
+        # Fall back to JWT admin check via jose
+        from jose import JWTError, jwt as jose_jwt
+        from backend.auth import SECRET_KEY, ALGORITHM
+        from backend.models import User as UserModel
+        from backend.database import AsyncSessionLocal
+        auth_header = request.headers.get("authorization", "")
+        if not auth_header.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        try:
+            payload = jose_jwt.decode(auth_header[7:], SECRET_KEY, algorithms=[ALGORITHM])
+            user_id = int(payload.get("sub", 0))
+        except (JWTError, ValueError):
+            raise HTTPException(status_code=401, detail="Invalid token")
+        async with AsyncSessionLocal() as db:
+            user = (await db.execute(
+                select(UserModel).where(UserModel.id == user_id, UserModel.is_active == True)
+            )).scalar_one_or_none()
+        if not user or not user.is_admin:
+            raise HTTPException(status_code=403, detail="Admin access required")
+
     log_path = os.path.join(
         os.environ.get("BROWSER_PROFILE_DIR", "/app/browser_profile"), "logs", "app.log"
     )
