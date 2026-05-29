@@ -2024,3 +2024,50 @@ async def get_persistent_logs(
                 buf.append(line)
 
     return {"lines": list(buf), "total_matched": len(buf), "log_path": log_path}
+
+
+@router.get("/query/notifications")
+async def query_notifications(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    asin: str = "",
+    email: str = "",
+    limit: int = 200,
+):
+    """Query notification_log by ASIN and/or email. Auth: X-Admin-Token header."""
+    import os
+    secret = os.environ.get("ADMIN_SECRET_TOKEN", "")
+    token_header = request.headers.get("x-admin-token", "")
+    if not (secret and token_header == secret):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    stmt = (
+        select(NotificationLog, User.email.label("user_email"), Product.asin.label("product_asin"), Product.name.label("product_name"))
+        .join(User, NotificationLog.user_id == User.id)
+        .join(Product, NotificationLog.product_id == Product.id)
+        .order_by(NotificationLog.sent_at.desc())
+        .limit(limit)
+    )
+    if asin:
+        stmt = stmt.where(Product.asin == asin)
+    if email:
+        stmt = stmt.where(User.email == email)
+
+    rows = (await db.execute(stmt)).all()
+    return {
+        "total": len(rows),
+        "rows": [
+            {
+                "id": log.id,
+                "sent_at": log.sent_at.isoformat(),
+                "user_email": user_email,
+                "email_to": log.email_to,
+                "asin": product_asin,
+                "product_name": product_name,
+                "status": log.status,
+                "success": log.success,
+                "error_msg": log.error_msg,
+            }
+            for log, user_email, product_asin, product_name in rows
+        ],
+    }
