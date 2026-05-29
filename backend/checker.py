@@ -1045,6 +1045,29 @@ class BrowserManager:
             logger.error("Playwright location timed out after 90s.")
             return False
 
+    async def _save_cookies_to_db(self):
+        """Persist current session cookies to DB so they survive restarts."""
+        if not self._session_cookies:
+            return
+        try:
+            import json
+            from backend.database import AsyncSessionLocal
+            from backend.models import SystemSetting
+            from sqlalchemy import select as sa_select
+            async with AsyncSessionLocal() as _db:
+                row = (await _db.execute(
+                    sa_select(SystemSetting).where(SystemSetting.key == "amazon_session_cookies")
+                )).scalar_one_or_none()
+                value = json.dumps(self._session_cookies)
+                if row:
+                    row.value = value
+                else:
+                    _db.add(SystemSetting(key="amazon_session_cookies", value=value))
+                await _db.commit()
+            logger.info(f"Cookies saved to DB ({len(self._session_cookies)} cookies)")
+        except Exception as e:
+            logger.warning(f"Failed to save cookies to DB: {e}")
+
     async def _refresh_location_playwright(self) -> bool:
         """Playwright-based location setter. Called only as fallback from refresh_location."""
         page = await self._context.new_page()
@@ -1060,6 +1083,7 @@ class BrowserManager:
                 if await _verify_location(page):
                     self._session_cookies = await self._context.cookies()
                     logger.info("Location already Israel ✓ (Playwright)")
+                    await self._save_cookies_to_db()
                     return True
                 set_ok = await _set_location_js(page)
                 if set_ok:
@@ -1068,6 +1092,7 @@ class BrowserManager:
                     if await _verify_location(page):
                         self._session_cookies = await self._context.cookies()
                         logger.info("Location set to Israel via Playwright JS ✓")
+                        await self._save_cookies_to_db()
                         return True
                 set_ok = await _set_location_on_page(page, "IL")
                 if set_ok:
@@ -1076,6 +1101,7 @@ class BrowserManager:
                     if await _verify_location(page):
                         self._session_cookies = await self._context.cookies()
                         logger.info("Location set to Israel via Playwright UI ✓")
+                        await self._save_cookies_to_db()
                         return True
                 logger.warning(f"Location set failed (attempt {attempt + 1}/3)")
                 await _pause(2.0, 3.0)
