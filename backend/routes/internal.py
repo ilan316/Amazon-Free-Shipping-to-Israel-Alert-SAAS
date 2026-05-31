@@ -110,6 +110,26 @@ async def sync_products(
     return {"synced": synced, "removed": removed}
 
 
+@router.post("/seed-telegram-invite", dependencies=[Depends(_require_secret)])
+async def seed_telegram_invite(db: Annotated[AsyncSession, Depends(get_db)]):
+    """Create/update the Telegram invite email template in DB."""
+    from backend.models import EmailTemplate
+    from backend.notifier import build_telegram_invite_html, _TELEGRAM_INVITE_SUBJECT
+    name = "הזמנה_טלגרם_יוני_2026"
+    body = build_telegram_invite_html("{{pause_url}}")
+    existing = (await db.execute(select(EmailTemplate).where(EmailTemplate.name == name))).scalar_one_or_none()
+    if existing:
+        existing.subject = _TELEGRAM_INVITE_SUBJECT
+        existing.body = body
+        await db.commit()
+        return {"id": existing.id, "message": "תבנית עודכנה", "already_exists": True}
+    t = EmailTemplate(name=name, subject=_TELEGRAM_INVITE_SUBJECT, body=body)
+    db.add(t)
+    await db.commit()
+    await db.refresh(t)
+    return {"id": t.id, "message": "תבנית נוצרה", "already_exists": False}
+
+
 @router.post("/backfill-hebrew", dependencies=[Depends(_require_secret)])
 async def backfill_hebrew(db: Annotated[AsyncSession, Depends(get_db)]):
     """Generate name_he for every product in DB that is missing it."""
