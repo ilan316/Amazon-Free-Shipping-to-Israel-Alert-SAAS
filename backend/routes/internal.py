@@ -110,6 +110,17 @@ async def sync_products(
     return {"synced": synced, "removed": removed}
 
 
+@router.post("/send-telegram-invite-test", dependencies=[Depends(_require_secret)])
+async def send_telegram_invite_test_endpoint(
+    to: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Send a test Telegram invite email to a given address."""
+    from backend.notifier import send_telegram_invite_test
+    ok = send_telegram_invite_test(to, "")
+    return {"ok": ok, "to": to}
+
+
 @router.post("/seed-telegram-invite", dependencies=[Depends(_require_secret)])
 async def seed_telegram_invite(db: Annotated[AsyncSession, Depends(get_db)]):
     """Create/update the Telegram invite email template in DB."""
