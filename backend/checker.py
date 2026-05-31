@@ -100,6 +100,7 @@ class CheckResult:
     found_in_aod: bool = False
     last_price: str = ""
     image_url: str = ""
+    amazon_category: str = ""
 
 
 # ── Selectors ─────────────────────────────────────────────────────────────────
@@ -224,6 +225,16 @@ def _extract_price(soup) -> str:
             if txt and any(c.isdigit() for c in txt):
                 # Normalize: ILS42.81 → ILS 42.81 (currency code stuck to digits)
                 return _re.sub(r"([A-Z]{2,})(\d)", r"\1 \2", txt)
+    return ""
+
+
+def _extract_amazon_category(soup) -> str:
+    """Extract top-level Amazon category from product page breadcrumb."""
+    breadcrumb = soup.find(id="wayfinding-breadcrumbs_feature_div")
+    if breadcrumb:
+        first_link = breadcrumb.find("a")
+        if first_link:
+            return first_link.get_text(strip=True)
     return ""
 
 
@@ -475,24 +486,28 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
 
     price = _extract_price(soup)
     image_url = _extract_image_url(soup)
+    amazon_category = _extract_amazon_category(soup)
 
     # Rule 1: No ILS price → doesn't ship to Israel
     if not price.upper().startswith("ILS"):
         logger.info(f"[{asin}] httpx: NO_SHIP (no ILS price) | price={price!r} | delivery_el={matched_delivery_id!r} | delivery_text={raw_text[:100]!r}")
         return CheckResult(asin, ShippingStatus.NO_SHIP, raw_text=raw_text or "",
-                           product_name=product_name, last_price=price, image_url=image_url)
+                           product_name=product_name, last_price=price, image_url=image_url,
+                           amazon_category=amazon_category)
 
     # Rule 2: Has ILS price → ships to Israel. Check FREE or PAID.
     if not raw_text:
         logger.info(f"[{asin}] httpx: PAID (ILS price, no delivery block) | price={price!r}")
         return CheckResult(asin, ShippingStatus.PAID, error_message="No delivery block found",
-                           product_name=product_name, last_price=price, image_url=image_url)
+                           product_name=product_name, last_price=price, image_url=image_url,
+                           amazon_category=amazon_category)
 
     status = _classify(raw_text)
     if status != ShippingStatus.FREE:
         status = ShippingStatus.PAID
     logger.info(f"[{asin}] httpx: {status.value} | price={price!r} | {raw_text[:120]!r}")
-    return CheckResult(asin, status, raw_text=raw_text, product_name=product_name, last_price=price, image_url=image_url)
+    return CheckResult(asin, status, raw_text=raw_text, product_name=product_name, last_price=price,
+                       image_url=image_url, amazon_category=amazon_category)
 
 
 async def _check_product_httpx(asin: str, url: str, cookies: list) -> CheckResult:
@@ -892,6 +907,7 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
         # Extract price and image from current page HTML (reads DOM — no network needed)
         pw_price = ""
         pw_image = ""
+        pw_category = ""
         pw_html = ""
         try:
             from bs4 import BeautifulSoup as _BS
@@ -899,6 +915,7 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
             pw_soup = _BS(pw_html, "html.parser")
             pw_price = _extract_price(pw_soup)
             pw_image = _extract_image_url(pw_soup)
+            pw_category = _extract_amazon_category(pw_soup)
         except Exception:
             pass
 
@@ -906,19 +923,22 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
         if not pw_price.upper().startswith("ILS"):
             logger.info(f"[{asin}] Playwright: NO_SHIP (no ILS price) | price={pw_price!r}")
             return CheckResult(asin, ShippingStatus.NO_SHIP, raw_text=raw_text or "",
-                               product_name=product_name, last_price=pw_price, image_url=pw_image)
+                               product_name=product_name, last_price=pw_price, image_url=pw_image,
+                               amazon_category=pw_category)
 
         # Rule 2: Has ILS price → ships to Israel. Check FREE or PAID.
         if not raw_text:
             logger.info(f"[{asin}] Playwright: PAID (ILS price, no delivery block) | price={pw_price!r}")
             return CheckResult(asin, ShippingStatus.PAID, error_message="No delivery block found",
-                               product_name=product_name, last_price=pw_price, image_url=pw_image)
+                               product_name=product_name, last_price=pw_price, image_url=pw_image,
+                               amazon_category=pw_category)
 
         if status != ShippingStatus.FREE:
             status = ShippingStatus.PAID
         logger.info(f"[{asin}] Playwright: {status.value} | price={pw_price!r} | {raw_text[:120]!r}")
         return CheckResult(asin, status, raw_text=raw_text, product_name=product_name,
-                           found_in_aod=found_in_aod, last_price=pw_price, image_url=pw_image)
+                           found_in_aod=found_in_aod, last_price=pw_price, image_url=pw_image,
+                           amazon_category=pw_category)
 
     except PWTimeout as e:
         return CheckResult(asin, ShippingStatus.ERROR, error_message=f"Timeout: {e}")

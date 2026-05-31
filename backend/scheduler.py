@@ -54,6 +54,8 @@ async def _update_product(db: AsyncSession, product: Product, result: CheckResul
         product.last_price = result.last_price  # '' clears stale buybox price
         if result.image_url:
             product.image_url = result.image_url
+        if result.amazon_category and not product.amazon_category:
+            product.amazon_category = result.amazon_category
         await db.commit()
         return False
     elif result.status == ShippingStatus.UNKNOWN:
