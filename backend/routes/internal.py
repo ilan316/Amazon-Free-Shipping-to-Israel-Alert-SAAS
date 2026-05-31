@@ -35,6 +35,7 @@ class SyncProduct(BaseModel):
     name: str = ""
     url: str = ""
     category: str = ""
+    amazon_category: str = ""
     found_at: str = ""
     last_price: str = ""
     image_url: str = ""
@@ -75,6 +76,7 @@ async def sync_products(
             last_price=p.last_price or None,
             image_url=p.image_url or None,
             name_he=p.name_he or None,
+            amazon_category=p.amazon_category or None,
         )
         stmt = stmt.on_conflict_do_update(
             index_elements=["asin"],
@@ -88,6 +90,7 @@ async def sync_products(
                 "last_price": stmt.excluded.last_price,
                 "image_url": stmt.excluded.image_url,
                 "name_he": stmt.excluded.name_he,
+                "amazon_category": stmt.excluded.amazon_category,
             },
         )
         result = await db.execute(stmt)
