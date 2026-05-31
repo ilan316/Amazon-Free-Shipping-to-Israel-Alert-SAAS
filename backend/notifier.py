@@ -978,3 +978,142 @@ def build_newsletter_html(pause_url_val: str) -> str:
 def send_newsletter_test(to_email: str, pause_url_val: str) -> bool:
     html = build_newsletter_html(pause_url_val)
     return _send_via_resend(to_email, _NEWSLETTER_SUBJECT, html, "")
+
+
+# ── Telegram invite ───────────────────────────────────────────────────────────
+
+_TELEGRAM_INVITE_SUBJECT = "📣 הצטרפו לערוץ הטלגרם שלנו — מוצרים חינם ישירות לנייד"
+
+_TELEGRAM_INVITE_HTML = """\
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    @media only screen and (max-width:600px){
+      .email-container{width:100% !important;}
+      .hero-title{font-size:22px !important;}
+    }
+  </style>
+</head>
+<body dir="rtl" style="margin:0;padding:0;background:#f3f3f3;font-family:Arial,'Segoe UI',sans-serif;">
+  <div style="display:none;max-height:0;overflow:hidden;">המוצרים החינמיים הכי טובים — עכשיו גם בטלגרם, ישירות לנייד שלך 📱</div>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f3f3;padding:24px 0;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" class="email-container"
+             style="max-width:600px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e8e8e8;">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:#ffffff;border-bottom:3px solid #FF9900;padding:28px 24px 20px;text-align:center;">
+            <p style="margin:0 0 6px;font-size:13px;color:#999;letter-spacing:1px;">חדש מ-AMZ Free IL</p>
+            <h1 class="hero-title" style="margin:0 0 10px;color:#e47911;font-size:26px;font-weight:bold;line-height:1.3;">📱 ערוץ טלגרם חדש — <bdi>@amzfreeil</bdi></h1>
+            <p style="margin:0;color:#555;font-size:15px;line-height:1.5;">מוצרים עם משלוח חינם לישראל — ישירות לנייד שלך, בלי לפתוח אתר</p>
+          </td>
+        </tr>
+
+        <!-- Intro -->
+        <tr>
+          <td style="padding:24px 28px 8px;">
+            <p style="margin:0;font-size:15px;color:#333;line-height:1.8;text-align:right;">היי 👋<br><br>
+            פתחנו ערוץ טלגרם רשמי — <strong><bdi>AMZ Free Ship 🇮🇱</bdi></strong>.<br>
+            כל יום אנחנו מפרסמים שם מוצרים נבחרים עם משלוח חינם לישראל — עם תמונה, תיאור ומחיר, ישירות בפיד שלך.</p>
+          </td>
+        </tr>
+        <tr><td style="padding:0 28px;"><hr style="border:none;border-top:1px solid #f0f0f0;margin:16px 0;"></td></tr>
+
+        <!-- Benefits -->
+        <tr>
+          <td style="padding:0 28px 8px;">
+            <h2 style="margin:0 0 14px;font-size:17px;color:#111;font-weight:bold;">מה תקבלו בערוץ?</h2>
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:10px 0;border-bottom:1px solid #f5f5f5;font-size:14px;color:#333;line-height:1.6;">
+                  <span style="font-size:20px;margin-left:10px;">🛍️</span>
+                  <strong>מוצרים נבחרים יומית</strong> — לא הכל, רק הכי טובים
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:10px 0;border-bottom:1px solid #f5f5f5;font-size:14px;color:#333;line-height:1.6;">
+                  <span style="font-size:20px;margin-left:10px;">📸</span>
+                  <strong>תמונה + תיאור + מחיר</strong> — כל המידע במקום אחד
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:10px 0;border-bottom:1px solid #f5f5f5;font-size:14px;color:#333;line-height:1.6;">
+                  <span style="font-size:20px;margin-left:10px;">✈️</span>
+                  <strong>משלוח חינם לישראל בלבד</strong> — כל מוצר אומת
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:10px 0;font-size:14px;color:#333;line-height:1.6;">
+                  <span style="font-size:20px;margin-left:10px;">🔔</span>
+                  <strong>הודעות ישירות לנייד</strong> — לא צריך להיכנס לאתר
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr><td style="padding:0 28px;"><hr style="border:none;border-top:1px solid #f0f0f0;margin:16px 0;"></td></tr>
+
+        <!-- CTA -->
+        <tr>
+          <td style="padding:8px 28px 28px;text-align:center;">
+            <p style="margin:0 0 20px;font-size:16px;color:#333;font-weight:bold;">הצטרפו עכשיו — בחינם, ניתן לעזוב בכל עת 👇</p>
+            <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
+              <tr>
+                <td align="center" bgcolor="#0088cc" style="border-radius:8px;">
+                  <a href="https://t.me/amzfreeil"
+                     style="display:inline-block;background:#0088cc;color:#ffffff;font-family:Arial,sans-serif;
+                            font-size:16px;font-weight:bold;text-decoration:none;padding:13px 40px;
+                            border-radius:8px;white-space:nowrap;"
+                     target="_blank">📱 הצטרפו לערוץ הטלגרם ←</a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:16px 0 0;font-size:13px;color:#888;">@amzfreeil · בחינם לחלוטין</p>
+          </td>
+        </tr>
+
+        <!-- Tip -->
+        <tr>
+          <td style="padding:0 24px 20px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0faf0;border-radius:8px;border:1px solid #c8e6c9;">
+              <tr><td style="padding:14px 18px;text-align:right;">
+                <p style="margin:0 0 3px;font-size:13px;font-weight:bold;color:#2e7d32;">💡 טיפ לחיסכון</p>
+                <p style="margin:0;font-size:13px;color:#388e3c;line-height:1.6;">הזמינו בין <bdi>$49</bdi> ל-<bdi>$130</bdi> כדי ליהנות ממשלוח חינם ללא מכס ישראלי.</p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#f8f8f8;border-radius:0 0 10px 10px;border-top:1px solid #eee;padding:16px 24px 20px;text-align:center;">
+            <p style="margin:0 0 4px;color:#888;font-size:12px;"><bdi>Amazon Free Shipping to Israel Alert</bdi> · <bdi>amzfreeil.com</bdi></p>
+            <p style="margin:0 0 8px;color:#bbb;font-size:11px;">נשלח ב-__SEND_DATE__</p>
+            <p style="margin:0;font-size:11px;">
+              <a href="{{pause_url}}" style="color:#aaa;text-decoration:underline;">הפסק לקבל עדכונים</a>
+              &nbsp;·&nbsp;
+              <a href="https://app.amzfreeil.com/dashboard" style="color:#aaa;text-decoration:underline;">ניהול העדפות</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+{{open_pixel}}
+</body>
+</html>"""
+
+
+def build_telegram_invite_html(pause_url_val: str) -> str:
+    date_str = datetime.now().strftime("%d/%m/%Y")
+    return _TELEGRAM_INVITE_HTML.replace("{{pause_url}}", pause_url_val).replace("__SEND_DATE__", date_str)
+
+
+def send_telegram_invite_test(to_email: str, pause_url_val: str) -> bool:
+    html = build_telegram_invite_html(pause_url_val)
+    return _send_via_resend(to_email, _TELEGRAM_INVITE_SUBJECT, html, "")

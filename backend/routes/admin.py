@@ -1216,6 +1216,39 @@ async def seed_newsletter_template(
     return {"id": t.id, "message": "תבנית ניוזלטר נוצרה", "already_exists": False}
 
 
+@router.post("/send-test-telegram-invite")
+async def send_test_telegram_invite(
+    admin: Annotated[User, Depends(get_current_admin)],
+    to: str | None = None,
+):
+    from backend.notifier import send_telegram_invite_test, _pause_url
+    target = to or admin.notify_email or admin.email
+    pause = _pause_url(admin.id)
+    ok = send_telegram_invite_test(target, pause)
+    return {"ok": ok, "to": target}
+
+
+@router.post("/seed-telegram-invite-template")
+async def seed_telegram_invite_template(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    from backend.notifier import build_telegram_invite_html, _TELEGRAM_INVITE_SUBJECT
+    name = "הזמנה_טלגרם_יוני_2026"
+    body = build_telegram_invite_html("{{pause_url}}")
+    existing = (await db.execute(select(EmailTemplate).where(EmailTemplate.name == name))).scalar_one_or_none()
+    if existing:
+        existing.subject = _TELEGRAM_INVITE_SUBJECT
+        existing.body = body
+        await db.commit()
+        return {"id": existing.id, "message": "תבנית עודכנה", "already_exists": True}
+    t = EmailTemplate(name=name, subject=_TELEGRAM_INVITE_SUBJECT, body=body)
+    db.add(t)
+    await db.commit()
+    await db.refresh(t)
+    return {"id": t.id, "message": "תבנית הזמנת טלגרם נוצרה", "already_exists": False}
+
+
 @router.get("/quick-log")
 async def quick_log(
     admin: Annotated[User, Depends(get_current_admin)],
