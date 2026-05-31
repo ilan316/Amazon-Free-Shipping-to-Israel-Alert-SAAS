@@ -110,6 +110,31 @@ async def sync_products(
     return {"synced": synced, "removed": removed}
 
 
+@router.get("/last-send-log", dependencies=[Depends(_require_secret)])
+async def last_send_log(db: Annotated[AsyncSession, Depends(get_db)], limit: int = 1):
+    """Return the last N email send logs with per-recipient success/fail counts."""
+    from backend.models import EmailSendLog, EmailSendRecipient
+    logs = (await db.execute(
+        select(EmailSendLog).order_by(EmailSendLog.sent_at.desc()).limit(limit)
+    )).scalars().all()
+    result = []
+    for log in logs:
+        recipients = (await db.execute(
+            select(EmailSendRecipient).where(EmailSendRecipient.send_log_id == log.id)
+        )).scalars().all()
+        failed = [r.email for r in recipients if not r.success]
+        result.append({
+            "id": log.id,
+            "template_name": log.template_name,
+            "sent_at": log.sent_at.isoformat() if log.sent_at else None,
+            "audience": log.audience,
+            "sent_count": log.sent_count,
+            "failed_count": log.failed_count,
+            "failed_emails": failed,
+        })
+    return result
+
+
 @router.post("/send-telegram-invite-test", dependencies=[Depends(_require_secret)])
 async def send_telegram_invite_test_endpoint(
     to: str,
