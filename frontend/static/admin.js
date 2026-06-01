@@ -121,6 +121,8 @@ async function loadCookieStatus() {
   const dateStr = d.updated_at
     ? new Date(d.updated_at).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" })
     : "";
+  badge.style.direction = "ltr";
+  badge.style.display = "inline-block";
   if (d.loaded) {
     badge.textContent = `✅ פעיל · ${d.count} cookies` + (dateStr ? ` · ${dateStr}` : "");
     badge.style.background = "#e8f5e9"; badge.style.color = "#2e7d32";
