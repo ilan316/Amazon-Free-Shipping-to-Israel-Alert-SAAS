@@ -732,10 +732,10 @@ def _telegram_caption(product: Product) -> str:
 
 
 async def _send_telegram_product_message(product: Product) -> bool:
-    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
+    token = os.environ.get("TELEGRAM_PRODUCT_BOT_TOKEN", "")
+    chat_id = os.environ.get("TELEGRAM_PRODUCT_CHAT_ID", "")
     if not token or not chat_id:
-        logger.warning("TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set — skipping product send")
+        logger.warning("TELEGRAM_PRODUCT_BOT_TOKEN or TELEGRAM_PRODUCT_CHAT_ID not set — skipping product send")
         return False
     caption = _telegram_caption(product)
     try:
