@@ -152,3 +152,11 @@ class EmailSendRecipient(Base):
     user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     email: Mapped[str] = mapped_column(String(255), nullable=False)
     success: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class TelegramSent(Base):
+    __tablename__ = "telegram_sent"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    asin: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)

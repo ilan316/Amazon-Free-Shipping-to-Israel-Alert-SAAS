@@ -690,6 +690,122 @@ async def run_telegram_report():
         logger.error(f"Telegram report error: {e}")
 
 
+_CATEGORY_MAP = {
+    "Electronics": ("🔌", "אלקטרוניקה"), "Computers": ("💻", "מחשבים"),
+    "Camera": ("📷", "מצלמות"), "Home": ("🏠", "בית"), "Kitchen": ("🍳", "מטבח"),
+    "Sports": ("⚽", "ספורט"), "Toys": ("🧸", "צעצועים"), "Beauty": ("💄", "יופי"),
+    "Health": ("💊", "בריאות"), "Clothing": ("👕", "ביגוד"), "Books": ("📚", "ספרים"),
+    "Automotive": ("🚗", "רכב"), "Garden": ("🌿", "גינה"), "Pet": ("🐾", "חיות מחמד"),
+    "Office": ("🖊️", "משרד"), "Tools": ("🔧", "כלים"),
+}
+_TELEGRAM_RESEND_DAYS = 7
+_RTL = "‏"
+
+
+def _telegram_caption(product: Product) -> str:
+    tag = os.environ.get("AMAZON_AFFILIATE_TAG", "").strip()
+    url = f"https://www.amazon.com/dp/{product.asin}?tag={tag}" if tag else f"https://www.amazon.com/dp/{product.asin}"
+    name_he = product.name_he or product.name or product.asin
+    price = (product.last_price or "").strip()
+    category = product.amazon_category or ""
+    cat_emoji, cat_he = next(
+        (v for k, v in _CATEGORY_MAP.items() if k.lower() in category.lower()),
+        ("📦", category or "כללי"),
+    )
+    today = datetime.now().strftime("%d/%m/%Y")
+    lines = [
+        f"{_RTL}✈️ משלוח חינם לישראל | {cat_emoji} {cat_he}",
+        "",
+        f"{_RTL}*{name_he}*",
+        "",
+        f"{_RTL}--",
+        "",
+        f"{_RTL}💰 מחיר: *{price}*" if price else f"{_RTL}💰 משלוח חינם",
+        f"{_RTL}🚚 משלוח חינם לישראל 🇮🇱",
+        f"{_RTL}📅 {today}",
+        "",
+        f"[👉 לרכישה באמזון]({url})",
+        "",
+        f"{_RTL}📢 @amzfreeil",
+    ]
+    return "\n".join(lines)
+
+
+async def _send_telegram_product_message(product: Product) -> bool:
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
+    if not token or not chat_id:
+        logger.warning("TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set — skipping product send")
+        return False
+    caption = _telegram_caption(product)
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            if product.image_url:
+                resp = await client.post(
+                    f"https://api.telegram.org/bot{token}/sendPhoto",
+                    data={"chat_id": chat_id, "photo": product.image_url,
+                          "caption": caption, "parse_mode": "Markdown"},
+                )
+            else:
+                resp = await client.post(
+                    f"https://api.telegram.org/bot{token}/sendMessage",
+                    json={"chat_id": chat_id, "text": caption, "parse_mode": "Markdown"},
+                )
+        if resp.status_code == 200:
+            return True
+        logger.warning(f"[telegram_product] send failed for {product.asin}: {resp.text[:200]}")
+        return False
+    except Exception as e:
+        logger.warning(f"[telegram_product] send error for {product.asin}: {e}")
+        return False
+
+
+async def run_send_telegram_product():
+    """Send one free product to the Telegram channel. Skips ASINs sent in the last 7 days."""
+    from backend.models import TelegramSent
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    logger.info("=== Telegram product send started ===")
+    async with AsyncSessionLocal() as db:
+        now = datetime.now(timezone.utc)
+        resend_cutoff = now - timedelta(days=_TELEGRAM_RESEND_DAYS)
+
+        # Products eligible: FREE + scanner source + not sent recently
+        sent_recently = (
+            select(TelegramSent.asin)
+            .where(TelegramSent.sent_at > resend_cutoff)
+            .scalar_subquery()
+        )
+        result = await db.execute(
+            select(Product)
+            .where(
+                Product.last_status == "FREE",
+                Product.source == "scanner",
+                Product.asin.not_in(sent_recently),
+            )
+            .order_by(func.random())
+            .limit(1)
+        )
+        product = result.scalar_one_or_none()
+
+        if not product:
+            logger.info("=== Telegram product send: no eligible products ===")
+            return
+
+        ok = await _send_telegram_product_message(product)
+        if ok:
+            stmt = pg_insert(TelegramSent).values(asin=product.asin, sent_at=now)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["asin"],
+                set_={"sent_at": now},
+            )
+            await db.execute(stmt)
+            await db.commit()
+            logger.info(f"=== Telegram product sent: {product.asin} — {product.name_he or product.name} ===")
+        else:
+            logger.warning(f"=== Telegram product send failed: {product.asin} ===")
+
+
 async def check_single_product(asin: str, url: str):
     """Check a single product immediately (used after a user adds it or manual re-check)."""
     logger.info(f"[{asin}] Immediate check triggered")

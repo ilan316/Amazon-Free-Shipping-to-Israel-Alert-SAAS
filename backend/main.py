@@ -102,10 +102,16 @@ def _upsert_job(func, job_id: str, kwargs: dict):
     when the job is genuinely new.
     """
     if scheduler.get_job(job_id):
-        from apscheduler.triggers.cron import CronTrigger
-        trigger_kwargs = {k: v for k, v in kwargs.items()
-                         if k in ("hour", "minute", "second", "timezone")}
-        scheduler.reschedule_job(job_id, trigger=CronTrigger(**trigger_kwargs))
+        trigger_type = kwargs.get("trigger", "cron")
+        if trigger_type == "interval":
+            from apscheduler.triggers.interval import IntervalTrigger
+            trigger_kwargs = {k: v for k, v in kwargs.items() if k in ("minutes", "seconds", "hours")}
+            scheduler.reschedule_job(job_id, trigger=IntervalTrigger(**trigger_kwargs))
+        else:
+            from apscheduler.triggers.cron import CronTrigger
+            trigger_kwargs = {k: v for k, v in kwargs.items()
+                             if k in ("hour", "minute", "second", "timezone")}
+            scheduler.reschedule_job(job_id, trigger=CronTrigger(**trigger_kwargs))
         logger.debug(f"Rescheduled existing job: {job_id}")
     else:
         scheduler.add_job(func, **kwargs, id=job_id)
@@ -150,7 +156,7 @@ async def lifespan(app: FastAPI):
 
     scheduler.start()
 
-    from backend.scheduler import run_inactivity_check, run_automation_emails, check_decodo_quota, run_telegram_report, run_hebrew_backfill
+    from backend.scheduler import run_inactivity_check, run_automation_emails, check_decodo_quota, run_telegram_report, run_hebrew_backfill, run_send_telegram_product
 
     telegram_hour = int(os.environ.get("TELEGRAM_REPORT_HOUR", "8"))
     telegram_minute = int(os.environ.get("TELEGRAM_REPORT_MINUTE", "0"))
@@ -172,6 +178,9 @@ async def lifespan(app: FastAPI):
     ))
     _upsert_job(run_hebrew_backfill, "hebrew_backfill", dict(
         trigger="cron", hour=8, minute=10, timezone="Asia/Jerusalem", misfire_grace_time=600
+    ))
+    _upsert_job(run_send_telegram_product, "telegram_product", dict(
+        trigger="interval", minutes=60, misfire_grace_time=300
     ))
 
     # Read daily check time from DB (cron trigger — no timer reset on deploy)

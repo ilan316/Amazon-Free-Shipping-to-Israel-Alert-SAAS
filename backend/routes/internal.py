@@ -169,6 +169,14 @@ async def seed_telegram_invite(db: Annotated[AsyncSession, Depends(get_db)]):
     return {"id": t.id, "message": "תבנית נוצרה", "already_exists": False}
 
 
+@router.post("/trigger-telegram-product", dependencies=[Depends(_require_secret)])
+async def trigger_telegram_product(db: Annotated[AsyncSession, Depends(get_db)]):
+    """Manually trigger sending one product to the Telegram channel (for testing)."""
+    from backend.scheduler import run_send_telegram_product
+    await run_send_telegram_product()
+    return {"ok": True}
+
+
 @router.post("/backfill-hebrew", dependencies=[Depends(_require_secret)])
 async def backfill_hebrew(db: Annotated[AsyncSession, Depends(get_db)]):
     """Generate name_he for every product in DB that is missing it."""
