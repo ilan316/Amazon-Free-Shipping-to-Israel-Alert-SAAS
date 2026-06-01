@@ -771,6 +771,10 @@ async def _send_telegram_product_message(product: Product) -> bool:
 
 async def run_send_telegram_product():
     """Send one free product to the Telegram channel. Skips ASINs sent in the last 7 days."""
+    if os.environ.get("TELEGRAM_PRODUCT_ENABLED", "true").lower() == "false":
+        logger.info("[telegram_product] disabled via TELEGRAM_PRODUCT_ENABLED=false — skipping")
+        return
+
     from backend.models import TelegramSent
     from sqlalchemy.dialects.postgresql import insert as pg_insert
 
