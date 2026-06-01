@@ -775,6 +775,13 @@ async def run_send_telegram_product():
         logger.info("[telegram_product] disabled via TELEGRAM_PRODUCT_ENABLED=false — skipping")
         return
 
+    import pytz
+    _il_tz = pytz.timezone("Asia/Jerusalem")
+    _il_hour = datetime.now(_il_tz).hour
+    if not (6 <= _il_hour < 22):
+        logger.info(f"[telegram_product] outside active hours (hour={_il_hour}) — skipping")
+        return
+
     from backend.models import TelegramSent
     from sqlalchemy.dialects.postgresql import insert as pg_insert
 

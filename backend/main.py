@@ -180,7 +180,7 @@ async def lifespan(app: FastAPI):
         trigger="cron", hour=8, minute=10, timezone="Asia/Jerusalem", misfire_grace_time=600
     ))
     _upsert_job(run_send_telegram_product, "telegram_product", dict(
-        trigger="interval", minutes=60, misfire_grace_time=300
+        trigger="interval", minutes=45, misfire_grace_time=300
     ))
 
     # Read daily check time from DB (cron trigger — no timer reset on deploy)
