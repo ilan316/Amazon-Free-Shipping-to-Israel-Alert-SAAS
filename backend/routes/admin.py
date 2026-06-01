@@ -692,13 +692,18 @@ async def clear_cookies(
 @router.get("/cookie-status")
 async def cookie_status(
     admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Return current session cookie state loaded in the running checker."""
     from backend.checker import browser_manager
     count = len(browser_manager._session_cookies)
+    ts_row = (await db.execute(
+        select(SystemSetting).where(SystemSetting.key == "amazon_session_cookies_updated_at")
+    )).scalar_one_or_none()
     return {
         "loaded": count > 0,
         "count": count,
+        "updated_at": ts_row.value if ts_row else None,
     }
 
 
@@ -728,12 +733,21 @@ async def inject_cookies(
     else:
         raise HTTPException(status_code=400, detail="Invalid cookies format")
 
-    # Persist cookies to DB so they survive restarts
+    # Persist cookies + injection timestamp to DB so they survive restarts
+    from datetime import datetime, timezone
+    now_iso = datetime.now(timezone.utc).isoformat()
+
     row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "amazon_session_cookies"))).scalar_one_or_none()
     if row:
         row.value = json.dumps(cookie_list)
     else:
         db.add(SystemSetting(key="amazon_session_cookies", value=json.dumps(cookie_list)))
+
+    ts_row = (await db.execute(select(SystemSetting).where(SystemSetting.key == "amazon_session_cookies_updated_at"))).scalar_one_or_none()
+    if ts_row:
+        ts_row.value = now_iso
+    else:
+        db.add(SystemSetting(key="amazon_session_cookies_updated_at", value=now_iso))
     await db.commit()
 
     browser_manager._session_cookies = cookie_list

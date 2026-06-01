@@ -118,8 +118,11 @@ async function loadCookieStatus() {
   const res = await apiFetch("/admin/cookie-status");
   if (!res || !res.ok) { badge.textContent = "לא ידוע"; return; }
   const d = await res.json();
+  const dateStr = d.updated_at
+    ? new Date(d.updated_at).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" })
+    : "";
   if (d.loaded) {
-    badge.textContent = `✅ פעיל · ${d.count} cookies`;
+    badge.textContent = `✅ פעיל · ${d.count} cookies` + (dateStr ? ` · ${dateStr}` : "");
     badge.style.background = "#e8f5e9"; badge.style.color = "#2e7d32";
   } else {
     badge.textContent = "❌ אין cookies — הזרק כדי להפעיל בדיקות";
