@@ -252,6 +252,11 @@ async def create_tables():
                 "ALTER TABLE products ADD COLUMN IF NOT EXISTS amazon_category VARCHAR(100)"
             )
         )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT"
+            )
+        )
         # Mark admin accounts as having received automation emails so they're never emailed as regular users
         await conn.execute(
             __import__("sqlalchemy").text("""

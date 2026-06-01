@@ -48,6 +48,7 @@ class Product(Base):
     image_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     name_he: Mapped[str | None] = mapped_column(String(300), nullable=True)
     amazon_category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     free_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
