@@ -118,16 +118,22 @@ async function loadCookieStatus() {
   const res = await apiFetch("/admin/cookie-status");
   if (!res || !res.ok) { badge.textContent = "לא ידוע"; return; }
   const d = await res.json();
-  const dateStr = d.updated_at
-    ? new Date(d.updated_at).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" })
-    : "";
-  badge.style.direction = "ltr";
+  let dateStr = "";
+  if (d.updated_at) {
+    const dt = new Date(d.updated_at);
+    const day   = String(dt.getDate()).padStart(2, "0");
+    const month = String(dt.getMonth() + 1).padStart(2, "0");
+    const year  = dt.getFullYear();
+    const time  = dt.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+    dateStr = `${day}.${month}.${year} · ${time}`;
+  }
+  badge.style.direction = "rtl";
   badge.style.display = "inline-block";
   if (d.loaded) {
-    badge.textContent = `✅ פעיל · ${d.count} cookies` + (dateStr ? ` · ${dateStr}` : "");
+    badge.textContent = `✅ פעיל · ${d.count} קוקיז` + (dateStr ? ` · ${dateStr}` : "");
     badge.style.background = "#e8f5e9"; badge.style.color = "#2e7d32";
   } else {
-    badge.textContent = "❌ אין cookies — הזרק כדי להפעיל בדיקות";
+    badge.textContent = "❌ אין קוקיז — הזרק כדי להפעיל בדיקות";
     badge.style.background = "#fdecea"; badge.style.color = "var(--error)";
   }
 }
