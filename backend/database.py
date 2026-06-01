@@ -285,10 +285,12 @@ async def create_tables():
             ('B082KZ8ZGM','2026-06-01 13:57:34+00'),('B0DHX8NSZ8','2026-06-01 13:57:39+00'),
             ('B0DHGP8TZ2','2026-06-01 13:57:43+00'),('B0DQ183H9D','2026-06-01 13:57:48+00'),
         ]
+        from datetime import datetime, timezone as _tz
         for _asin, _ts in _sent_asins:
+            _dt = datetime.fromisoformat(_ts.replace('+00', '+00:00')).replace(tzinfo=_tz.utc)
             await conn.execute(__import__("sqlalchemy").text(
                 "INSERT INTO telegram_sent (asin, sent_at) VALUES (:a, :t) ON CONFLICT (asin) DO NOTHING"
-            ), {"a": _asin, "t": _ts})
+            ), {"a": _asin, "t": _dt})
 
         # Mark admin accounts as having received automation emails so they're never emailed as regular users
         await conn.execute(
