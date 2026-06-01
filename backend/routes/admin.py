@@ -2104,3 +2104,30 @@ async def query_notifications(
             for log, user_email, product_asin, product_name in rows
         ],
     }
+
+
+@router.post("/check-asin")
+async def check_asin_now(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    asin: str = "",
+):
+    """Force-check a product by ASIN. Auth: X-Admin-Token header."""
+    import os
+    secret = os.environ.get("ADMIN_SECRET_TOKEN", "")
+    token_header = request.headers.get("x-admin-token", "")
+    if not (secret and token_header == secret):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    if not asin:
+        raise HTTPException(status_code=400, detail="asin query param required")
+
+    result = await db.execute(select(Product).where(Product.asin == asin))
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail=f"ASIN {asin} not found in DB")
+
+    from backend.scheduler import check_single_product
+    import asyncio
+    asyncio.create_task(check_single_product(product.asin, product.url))
+    return {"message": f"Check triggered for {asin}", "product_id": product.id}
