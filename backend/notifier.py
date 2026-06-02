@@ -79,8 +79,8 @@ _STRINGS = {
 
 _DAILY_TIPS: dict[str, list[str]] = {
     "he": [
-        "הזמינו בין $49 ל-$130 כדי ליהנות ממשלוח חינם ללא מכס ישראלי.",
-        "מעל $130? ייתכן מכס של 18% מע\"מ + אגרת שחרור — חשבו פעמיים לפני הקנייה.",
+        "הזמינו בין $49 ל-$75 כדי ליהנות ממשלוח חינם ללא מכס ישראלי.",
+        "מעל $75? ייתכן מכס של 18% מע\"מ + אגרת שחרור — חשבו פעמיים לפני הקנייה.",
         "כמה פריטים קטנים? שווה לאחד להזמנה אחת מעל $49 ולחסוך בדמי משלוח.",
         "פריטים מתחת ל-$49 גובים דמי משלוח — בדקו אם הוספת פריט נוסף חוסכת כסף.",
         "מחיר נמוך מדי? בדקו שהמוכר הוא <bdi>Amazon</bdi> ולא <bdi>Third-party</bdi> עם מדיניות החזרה שונה.",
@@ -94,8 +94,8 @@ _DAILY_TIPS: dict[str, list[str]] = {
         '<bdi>Size Guide</bdi> של <bdi>Amazon</bdi> לרוב מדויק — השתמשו בו לפני הזמנת ביגוד ונעליים.',
     ],
     "en": [
-        "Order between $49–$130 to enjoy free shipping without Israeli customs fees.",
-        "Over $130? Expect 18% VAT + customs clearance fee — think twice before buying.",
+        "Order between $49–$75 to enjoy free shipping without Israeli customs fees.",
+        "Over $75? Expect 18% VAT + customs clearance fee — think twice before buying.",
         "Multiple small items? Combine into one order over $49 to save on shipping.",
         "Items under $49 charge shipping — check if adding another item saves money overall.",
         "Price too low? Verify the seller is Amazon, not a Third-party with different return policies.",
@@ -946,7 +946,7 @@ _NEWSLETTER_HTML_TEMPLATE = """\
             <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0faf0;border-radius:8px;border:1px solid #c8e6c9;">
               <tr><td style="padding:14px 18px;text-align:right;">
                 <p style="margin:0 0 3px;font-size:13px;font-weight:bold;color:#2e7d32;">💡 טיפ לחיסכון</p>
-                <p style="margin:0;font-size:13px;color:#388e3c;line-height:1.6;">הזמינו בין <bdi>$49</bdi> ל-<bdi>$130</bdi> כדי ליהנות ממשלוח חינם ללא מכס ישראלי. מעל <bdi>$130</bdi>? ייתכן מכס של 18% מע"מ + אגרת שחרור.</p>
+                <p style="margin:0;font-size:13px;color:#388e3c;line-height:1.6;">הזמינו בין <bdi>$49</bdi> ל-<bdi>$75</bdi> כדי ליהנות ממשלוח חינם ללא מכס ישראלי. מעל <bdi>$75</bdi>? ייתכן מכס של 18% מע"מ + אגרת שחרור.</p>
               </td></tr>
             </table>
           </td>
@@ -1082,7 +1082,7 @@ _TELEGRAM_INVITE_HTML = """\
             <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0faf0;border-radius:8px;border:1px solid #c8e6c9;">
               <tr><td style="padding:14px 18px;text-align:right;">
                 <p style="margin:0 0 3px;font-size:13px;font-weight:bold;color:#2e7d32;">💡 טיפ לחיסכון</p>
-                <p style="margin:0;font-size:13px;color:#388e3c;line-height:1.6;">הזמינו בין <bdi>$49</bdi> ל-<bdi>$130</bdi> כדי ליהנות ממשלוח חינם ללא מכס ישראלי.</p>
+                <p style="margin:0;font-size:13px;color:#388e3c;line-height:1.6;">הזמינו בין <bdi>$49</bdi> ל-<bdi>$75</bdi> כדי ליהנות ממשלוח חינם ללא מכס ישראלי.</p>
               </td></tr>
             </table>
           </td>
