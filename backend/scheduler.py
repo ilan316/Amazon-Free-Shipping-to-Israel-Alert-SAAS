@@ -730,6 +730,7 @@ def _telegram_caption(product: Product) -> str:
         f"{_RTL}--",
         "",
         f"{_RTL}💰 מחיר: *{price}*",
+        f"{_RTL}ℹ️ משלוח חינם מותנה בהזמנה מינימלית של $49 — ניתן לצרף מוצרים נוספים",
         f"{_RTL}🚚 משלוח חינם לישראל 🇮🇱",
         f"{_RTL}📅 {today}",
         "",
