@@ -674,7 +674,7 @@ function renderAdminProducts() {
     if (lblMap[f]) btn.textContent = lblMap[f];
   });
 
-  const fullyPaused = p => p.paused_watchers > 0 && p.paused_watchers === p.watchers;
+  const fullyPaused = p => p.watchers === 0 || (p.paused_watchers > 0 && p.paused_watchers === p.watchers);
   const filtered = _adminFilter === 'ALL'
     ? _allAdminProducts
     : _adminFilter === 'PAUSED'
