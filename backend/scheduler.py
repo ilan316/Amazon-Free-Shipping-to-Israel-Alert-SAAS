@@ -754,19 +754,9 @@ def _telegram_caption(product: Product) -> str:
     )
     today = datetime.now().strftime("%d/%m/%Y")
     description = product.description or ""
-    bullet_lines = [f"{_RTL}• {b}" for b in description.splitlines() if b.strip()][:5]
+    all_bullets = [f"{_RTL}• {b}" for b in description.splitlines() if b.strip()]
 
-    lines = [
-        f"{_RTL}✈️ משלוח חינם לישראל | {cat_emoji} {cat_he}",
-        "",
-        f"{_RTL}*{name_he}*",
-        "",
-    ]
-    if bullet_lines:
-        lines += bullet_lines
-        lines.append("")
-
-    lines += [
+    footer_lines = [
         f"{_RTL}--",
         "",
         f"{_RTL}💰 מחיר: *{price}*",
@@ -778,6 +768,27 @@ def _telegram_caption(product: Product) -> str:
         "",
         f"{_RTL}📢 @amzfreeil",
     ]
+    header_lines = [
+        f"{_RTL}✈️ משלוח חינם לישראל | {cat_emoji} {cat_he}",
+        "",
+        f"{_RTL}*{name_he}*",
+        "",
+    ]
+
+    base = "\n".join(header_lines) + "\n".join(footer_lines)
+    kept = []
+    for bullet in all_bullets[:5]:
+        candidate = "\n".join(header_lines) + "\n".join(kept + [bullet, ""]) + "\n".join(footer_lines)
+        if len(candidate) <= 1024:
+            kept.append(bullet)
+        else:
+            break
+
+    lines = header_lines[:]
+    if kept:
+        lines += kept
+        lines.append("")
+    lines += footer_lines
     return "\n".join(lines)
 
 
