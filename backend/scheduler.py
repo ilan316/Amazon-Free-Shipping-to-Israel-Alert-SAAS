@@ -790,14 +790,26 @@ async def _send_telegram_product_message(product: Product) -> bool:
     caption = _telegram_caption(product)
     try:
         async with httpx.AsyncClient(timeout=15) as client:
-            if product.image_url and len(caption) <= 1024:
-                resp = await client.post(
-                    f"https://api.telegram.org/bot{token}/sendPhoto",
-                    data={"chat_id": chat_id, "photo": product.image_url,
-                          "caption": caption, "parse_mode": "Markdown"},
-                )
+            if product.image_url:
+                if len(caption) <= 1024:
+                    # Photo with full caption
+                    resp = await client.post(
+                        f"https://api.telegram.org/bot{token}/sendPhoto",
+                        data={"chat_id": chat_id, "photo": product.image_url,
+                              "caption": caption, "parse_mode": "Markdown"},
+                    )
+                else:
+                    # Caption too long — send photo without caption, then full text as follow-up
+                    resp = await client.post(
+                        f"https://api.telegram.org/bot{token}/sendPhoto",
+                        data={"chat_id": chat_id, "photo": product.image_url},
+                    )
+                    if resp.status_code == 200:
+                        await client.post(
+                            f"https://api.telegram.org/bot{token}/sendMessage",
+                            json={"chat_id": chat_id, "text": caption, "parse_mode": "Markdown"},
+                        )
             else:
-                # Caption too long for photo (>1024) or no image — send as text message (limit 4096)
                 resp = await client.post(
                     f"https://api.telegram.org/bot{token}/sendMessage",
                     json={"chat_id": chat_id, "text": caption, "parse_mode": "Markdown"},
