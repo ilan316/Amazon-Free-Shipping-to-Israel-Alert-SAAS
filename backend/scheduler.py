@@ -656,7 +656,8 @@ async def run_telegram_report():
 
             keywords = ["error", "fatal", "crash", "exception", "unhandled", "timeout"]
             errors_found = [l.get("message", "")[:120] for l in all_logs
-                            if any(k in l.get("message", "").lower() for k in keywords)]
+                            if any(k in l.get("message", "").lower() for k in keywords)
+                            and "NO_SHIP" not in l.get("message", "")]
 
         if not failed and not errors_found:
             message = (
