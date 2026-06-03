@@ -200,6 +200,10 @@ def _extract_price(soup) -> str:
     sponsored sections, or other unrelated parts of the page.
     Returns a normalized string like 'ILS 42.81' or '$29.99', or '' if not found.
     Note: price does NOT include shipping, taxes, or customs fees.
+
+    When multiple prices are found (e.g. main seller ILS + secondary seller USD),
+    ILS/₪ prices are preferred over USD — because the ILS price is the Israel-facing
+    buybox price, while USD belongs to a non-localised seller offer on the same page.
     """
     import re as _re
     # Ordered from most-specific (buybox) to less-specific — all scoped to buybox area
@@ -218,14 +222,20 @@ def _extract_price(soup) -> str:
         "#price_inside_buybox",
         "#kindle-price",
     ]
+    first_found = ""
     for sel in buybox_selectors:
         el = soup.select_one(sel)
         if el:
             txt = el.get_text().replace("\xa0", " ").strip()
             if txt and any(c.isdigit() for c in txt):
                 # Normalize: ILS42.81 → ILS 42.81 (currency code stuck to digits)
-                return _re.sub(r"([A-Z]{2,})(\d)", r"\1 \2", txt)
-    return ""
+                normalized = _re.sub(r"([A-Z]{2,})(\d)", r"\1 \2", txt)
+                # Prefer ILS/₪ over USD — some pages show both (Israel seller + USD seller)
+                if normalized.upper().startswith("ILS") or normalized.startswith("₪"):
+                    return normalized
+                if not first_found:
+                    first_found = normalized
+    return first_found
 
 
 def _extract_amazon_category(soup) -> str:
@@ -488,14 +498,19 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
     image_url = _extract_image_url(soup)
     amazon_category = _extract_amazon_category(soup)
 
-    # Rule 1: No ILS price → doesn't ship to Israel
+    # Rule 1: No ILS price — check delivery text before concluding NO_SHIP.
+    # Some sellers price in USD even for Israeli delivery; delivery text is the authoritative signal.
     if not price.upper().startswith("ILS"):
-        logger.info(f"[{asin}] httpx: NO_SHIP (no ILS price) | price={price!r} | delivery_el={matched_delivery_id!r} | delivery_text={raw_text[:100]!r}")
-        return CheckResult(asin, ShippingStatus.NO_SHIP, raw_text=raw_text or "",
-                           product_name=product_name, last_price=price, image_url=image_url,
-                           amazon_category=amazon_category)
+        if raw_text and "israel" in raw_text.lower():
+            logger.info(f"[{asin}] httpx: no ILS price but Israel in delivery text — classifying via text | price={price!r}")
+            # Fall through to classification below
+        else:
+            logger.info(f"[{asin}] httpx: NO_SHIP (no ILS price, no Israel in delivery) | price={price!r} | delivery_el={matched_delivery_id!r} | delivery_text={raw_text[:100]!r}")
+            return CheckResult(asin, ShippingStatus.NO_SHIP, raw_text=raw_text or "",
+                               product_name=product_name, last_price=price, image_url=image_url,
+                               amazon_category=amazon_category)
 
-    # Rule 2: Has ILS price → ships to Israel. Check FREE or PAID.
+    # Rule 2: Has ILS price (or Israel in delivery text) → ships to Israel. Check FREE or PAID.
     if not raw_text:
         logger.info(f"[{asin}] httpx: PAID (ILS price, no delivery block) | price={price!r}")
         return CheckResult(asin, ShippingStatus.PAID, error_message="No delivery block found",
@@ -919,14 +934,19 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
         except Exception:
             pass
 
-        # Rule 1: No ILS price → doesn't ship to Israel
+        # Rule 1: No ILS price — check delivery text before concluding NO_SHIP.
+        # Some sellers price in USD even for Israeli delivery; delivery text is the authoritative signal.
         if not pw_price.upper().startswith("ILS"):
-            logger.info(f"[{asin}] Playwright: NO_SHIP (no ILS price) | price={pw_price!r}")
-            return CheckResult(asin, ShippingStatus.NO_SHIP, raw_text=raw_text or "",
-                               product_name=product_name, last_price=pw_price, image_url=pw_image,
-                               amazon_category=pw_category)
+            if raw_text and "israel" in raw_text.lower():
+                logger.info(f"[{asin}] Playwright: no ILS price but Israel in delivery text — classifying via text | price={pw_price!r}")
+                # Fall through to classification below
+            else:
+                logger.info(f"[{asin}] Playwright: NO_SHIP (no ILS price, no Israel in delivery) | price={pw_price!r}")
+                return CheckResult(asin, ShippingStatus.NO_SHIP, raw_text=raw_text or "",
+                                   product_name=product_name, last_price=pw_price, image_url=pw_image,
+                                   amazon_category=pw_category)
 
-        # Rule 2: Has ILS price → ships to Israel. Check FREE or PAID.
+        # Rule 2: Has ILS price (or Israel in delivery text) → ships to Israel. Check FREE or PAID.
         if not raw_text:
             logger.info(f"[{asin}] Playwright: PAID (ILS price, no delivery block) | price={pw_price!r}")
             return CheckResult(asin, ShippingStatus.PAID, error_message="No delivery block found",
