@@ -756,17 +756,7 @@ def _telegram_caption(product: Product) -> str:
     description = product.description or ""
     bullet_lines = [f"{_RTL}• {b}" for b in description.splitlines() if b.strip()]
 
-    lines = [
-        f"{_RTL}✈️ משלוח חינם לישראל | {cat_emoji} {cat_he}",
-        "",
-        f"{_RTL}*{name_he}*",
-        "",
-    ]
-    if bullet_lines:
-        lines += bullet_lines
-        lines.append("")
-
-    lines += [
+    footer = "\n".join([
         f"{_RTL}--",
         "",
         f"{_RTL}💰 מחיר: *{price}*",
@@ -777,8 +767,30 @@ def _telegram_caption(product: Product) -> str:
         f"[👉 לרכישה באמזון]({url})",
         "",
         f"{_RTL}📢 @amzfreeil",
-    ]
-    return "\n".join(lines)
+    ])
+
+    header = "\n".join([
+        f"{_RTL}✈️ משלוח חינם לישראל | {cat_emoji} {cat_he}",
+        "",
+        f"{_RTL}*{name_he}*",
+        "",
+    ])
+
+    # Telegram caption limit is 1024 chars — trim bullets to fit
+    MAX_CAPTION = 1024
+    base = header + footer
+    if bullet_lines:
+        kept = []
+        for line in bullet_lines:
+            candidate = header + "\n".join(kept + [line]) + "\n\n" + footer
+            if len(candidate) <= MAX_CAPTION:
+                kept.append(line)
+            else:
+                break
+        if kept:
+            return header + "\n".join(kept) + "\n\n" + footer
+        return base[:MAX_CAPTION]
+    return base
 
 
 async def _send_telegram_product_message(product: Product) -> bool:
