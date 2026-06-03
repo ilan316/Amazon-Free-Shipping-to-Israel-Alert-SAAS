@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800&family=Rubik:wght@500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=16">
+  <link rel="stylesheet" href="/static/styles.css?v=17">
 
 </head>
 <body>
@@ -148,7 +148,7 @@
     <div id="products-list" class="products-list"></div>
 
     <!-- FAQ accordion -->
-    <div class="faq-section">
+    <div class="faq-section" style="display:none;">
       <button class="faq-toggle" onclick="toggleFaq(this)">
         <span>❓ שאלות נפוצות על הבדיקות</span>
         <span class="faq-arrow">▼</span>
@@ -245,22 +245,27 @@
     function acceptCookies() { localStorage.setItem('cookie_consent','1'); document.getElementById('cookie-banner').style.display = 'none'; }
   </script>
 
-  <button class="faq-sticky-tab" onclick="scrollToFaq()" aria-label="שאלות נפוצות">
-    <span>❓ שאלות נפוצות</span>
-  </button>
-  <script>
-    function scrollToFaq() {
-      const section = document.querySelector('.faq-section');
-      if (!section) return;
-      const body = section.querySelector('.faq-body');
-      const arrow = section.querySelector('.faq-arrow');
-      if (body && body.style.display === 'none') {
-        body.style.display = 'block';
-        if (arrow) arrow.style.transform = 'rotate(180deg)';
-      }
-      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  </script>
+  <aside class="faq-panel">
+    <div class="faq-panel-header">❓ שאלות נפוצות</div>
+    <div class="faq-panel-body">
+      <div class="faq-panel-item">
+        <strong>כמה פעמים נבדק מוצר?</strong>
+        <p>מוצרים עם משלוח בתשלום (💳) נבדקים כל ~14 יום. מוצרים שלא נשלחים לארץ (🚫) נבדקים כל ~21 יום. מוצרים עם משלוח חינם נבדקים בתדירות גבוהה יותר.</p>
+      </div>
+      <div class="faq-panel-item">
+        <strong>מה זה "הושהה אוטומטית"?</strong>
+        <p>כשמוצר מראה משלוח חינם ולא לחצת על הקישור שלו במשך 5 ימים — המערכת מניחה שאתה לא מעוניין כרגע ומשהה את המעקב.</p>
+      </div>
+      <div class="faq-panel-item">
+        <strong>מתי אקבל מייל?</strong>
+        <p>מייל נשלח ברגע שמוצר עובר למשלוח חינם. לא נשלחים מיילים כפולים — רק שינוי סטטוס מפעיל התראה.</p>
+      </div>
+      <div class="faq-panel-item">
+        <strong>מה ההבדל בין 💳 ל-🚫?</strong>
+        <p>💳 משלוח בתשלום — אמזון שולח לישראל אך גובה דמי משלוח. 🚫 לא נשלח לארץ — אמזון לא מציע משלוח ישיר כלל.</p>
+      </div>
+    </div>
+  </aside>
 </body>
 </html>
 
