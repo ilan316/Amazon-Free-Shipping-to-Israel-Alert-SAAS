@@ -123,6 +123,16 @@ a:hover { text-decoration: underline; }
   color: var(--text-muted);
   padding: 4px;
 }
+.feature-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.feature-grid .ext-banner { margin-bottom: 0; }
+@media (max-width: 600px) {
+  .feature-grid { grid-template-columns: 1fr; }
+}
 
 
 /* ── Page wrapper ─────────────────────────────────────────────────────────── */
