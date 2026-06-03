@@ -605,6 +605,29 @@ a:hover { text-decoration: underline; }
 .faq-item:last-child { border-bottom: none; }
 .faq-item strong { font-size: 0.9rem; display: block; margin-bottom: 6px; }
 .faq-item p { font-size: 0.85rem; color: var(--text-muted); margin: 0; line-height: 1.6; }
+.faq-sticky-tab {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  background: #fff8e6;
+  border: 1px solid #ffc107;
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  padding: 14px 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
+  z-index: 100;
+  box-shadow: -2px 2px 8px rgba(0,0,0,0.08);
+  transition: background 0.15s;
+  font-family: inherit;
+  direction: rtl;
+}
+.faq-sticky-tab:hover { background: #ffeeba; }
 
 /* ── Empty state ──────────────────────────────────────────────────────────── */
 .empty-state {

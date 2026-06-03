@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800&family=Rubik:wght@500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=15">
+  <link rel="stylesheet" href="/static/styles.css?v=16">
 
 </head>
 <body>
@@ -243,6 +243,23 @@
   <script>
     if (!localStorage.getItem('cookie_consent')) document.getElementById('cookie-banner').style.display = 'flex';
     function acceptCookies() { localStorage.setItem('cookie_consent','1'); document.getElementById('cookie-banner').style.display = 'none'; }
+  </script>
+
+  <button class="faq-sticky-tab" onclick="scrollToFaq()" aria-label="שאלות נפוצות">
+    <span>❓ שאלות נפוצות</span>
+  </button>
+  <script>
+    function scrollToFaq() {
+      const section = document.querySelector('.faq-section');
+      if (!section) return;
+      const body = section.querySelector('.faq-body');
+      const arrow = section.querySelector('.faq-arrow');
+      if (body && body.style.display === 'none') {
+        body.style.display = 'block';
+        if (arrow) arrow.style.transform = 'rotate(180deg)';
+      }
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   </script>
 </body>
 </html>
