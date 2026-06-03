@@ -100,19 +100,30 @@ def _upsert_job(func, job_id: str, kwargs: dict):
     This helper uses reschedule_job (UPDATE) when the job already exists in
     memory (loaded from DB by scheduler.start()), and add_job (INSERT) only
     when the job is genuinely new.
+
+    For interval jobs: only reschedules if the interval actually changed —
+    preserves the existing next_run_time so restarts don't reset the countdown.
     """
-    if scheduler.get_job(job_id):
+    existing = scheduler.get_job(job_id)
+    if existing:
         trigger_type = kwargs.get("trigger", "cron")
         if trigger_type == "interval":
             from apscheduler.triggers.interval import IntervalTrigger
+            from datetime import timedelta
             trigger_kwargs = {k: v for k, v in kwargs.items() if k in ("minutes", "seconds", "hours")}
-            scheduler.reschedule_job(job_id, trigger=IntervalTrigger(**trigger_kwargs))
+            desired_interval = timedelta(**trigger_kwargs)
+            current_interval = getattr(existing.trigger, "interval", None)
+            if current_interval != desired_interval:
+                scheduler.reschedule_job(job_id, trigger=IntervalTrigger(**trigger_kwargs))
+                logger.debug(f"Rescheduled interval job (interval changed): {job_id}")
+            else:
+                logger.debug(f"Kept existing interval job schedule (unchanged): {job_id}")
         else:
             from apscheduler.triggers.cron import CronTrigger
             trigger_kwargs = {k: v for k, v in kwargs.items()
                              if k in ("hour", "minute", "second", "timezone")}
             scheduler.reschedule_job(job_id, trigger=CronTrigger(**trigger_kwargs))
-        logger.debug(f"Rescheduled existing job: {job_id}")
+            logger.debug(f"Rescheduled existing job: {job_id}")
     else:
         scheduler.add_job(func, **kwargs, id=job_id)
         logger.debug(f"Added new job: {job_id}")
