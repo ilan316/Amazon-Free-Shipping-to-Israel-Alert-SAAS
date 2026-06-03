@@ -659,31 +659,70 @@ async def run_telegram_report():
                             if any(k in l.get("message", "").lower() for k in keywords)
                             and "NO_SHIP" not in l.get("message", "")]
 
-        if not failed and not errors_found:
+        # DB health checks
+        db_issues = []
+        try:
+            async with AsyncSessionLocal() as db:
+                # Check for USD prices (location/cookie issue)
+                usd_rows = (await db.execute(
+                    select(Product.asin, Product.last_price)
+                    .where(Product.last_price != "", ~Product.last_price.startswith("₪"))
+                    .limit(5)
+                )).all()
+                if usd_rows:
+                    items = ", ".join(f"{r.asin}={r.last_price}" for r in usd_rows)
+                    db_issues.append(f"⚠️ מחירי USD (בעיית cookies): {items}")
+                else:
+                    db_issues.append("✅ כל המחירים בשקלים")
+
+                # Check for products with consecutive errors
+                err_rows = (await db.execute(
+                    select(Product.asin, Product.consecutive_errors)
+                    .where(Product.consecutive_errors > 0)
+                    .order_by(Product.consecutive_errors.desc())
+                    .limit(5)
+                )).all()
+                if err_rows:
+                    items = ", ".join(f"{r.asin}({r.consecutive_errors}x)" for r in err_rows)
+                    db_issues.append(f"⚠️ שגיאות רצופות: {items}")
+                else:
+                    db_issues.append("✅ אין שגיאות רצופות")
+        except Exception as db_err:
+            db_issues.append(f"⚠️ DB check failed: {db_err}")
+
+        has_db_issues = any(line.startswith("⚠️") for line in db_issues)
+        db_section = "DB Health:\n" + "\n".join(db_issues)
+
+        has_warning = bool(failed or errors_found or has_db_issues)
+        status = "WARNING" if has_warning else "OK"
+
+        if not has_warning:
             message = (
                 f"Railway Monitor - aware-wisdom\n\n"
-                f"Status: OK\n"
+                f"Status: {status}\n"
                 f"Period: Last 24 hours\n"
                 f"Total logs checked: {len(all_logs)}\n"
                 f"Deployments: {len(recent)} total, 0 failed\n"
                 f"Errors in logs: None\n"
+                f"{db_section}\n"
                 f"Time: {current_time}"
             )
         else:
             top_errors = "\n".join(errors_found[:5]) if errors_found else "None"
             message = (
                 f"Railway Monitor - aware-wisdom\n\n"
-                f"Status: WARNING\n"
+                f"Status: {status}\n"
                 f"Period: Last 24 hours\n"
                 f"Total logs checked: {len(all_logs)}\n"
                 f"Deployments: {len(recent)} total, {len(failed)} failed\n"
                 f"Errors in logs: {len(errors_found)}\n"
                 f"Top issues:\n{top_errors}\n"
+                f"{db_section}\n"
                 f"Time: {current_time}"
             )
 
         await send_telegram(message)
-        logger.info(f"=== Telegram report sent — {len(all_logs)} logs checked, {len(errors_found)} errors ===")
+        logger.info(f"=== Telegram report sent — {len(all_logs)} logs checked, {len(errors_found)} errors, db_issues={has_db_issues} ===")
 
     except Exception as e:
         msg = f"Railway Monitor - aware-wisdom\n\nStatus: ERROR\nFailed: {str(e)}\nTime: {current_time}"
