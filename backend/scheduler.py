@@ -756,7 +756,17 @@ def _telegram_caption(product: Product) -> str:
     description = product.description or ""
     bullet_lines = [f"{_RTL}• {b}" for b in description.splitlines() if b.strip()]
 
-    footer = "\n".join([
+    lines = [
+        f"{_RTL}✈️ משלוח חינם לישראל | {cat_emoji} {cat_he}",
+        "",
+        f"{_RTL}*{name_he}*",
+        "",
+    ]
+    if bullet_lines:
+        lines += bullet_lines
+        lines.append("")
+
+    lines += [
         f"{_RTL}--",
         "",
         f"{_RTL}💰 מחיר: *{price}*",
@@ -767,30 +777,8 @@ def _telegram_caption(product: Product) -> str:
         f"[👉 לרכישה באמזון]({url})",
         "",
         f"{_RTL}📢 @amzfreeil",
-    ])
-
-    header = "\n".join([
-        f"{_RTL}✈️ משלוח חינם לישראל | {cat_emoji} {cat_he}",
-        "",
-        f"{_RTL}*{name_he}*",
-        "",
-    ])
-
-    # Telegram caption limit is 1024 chars — trim bullets to fit
-    MAX_CAPTION = 1024
-    base = header + footer
-    if bullet_lines:
-        kept = []
-        for line in bullet_lines:
-            candidate = header + "\n".join(kept + [line]) + "\n\n" + footer
-            if len(candidate) <= MAX_CAPTION:
-                kept.append(line)
-            else:
-                break
-        if kept:
-            return header + "\n".join(kept) + "\n\n" + footer
-        return base[:MAX_CAPTION]
-    return base
+    ]
+    return "\n".join(lines)
 
 
 async def _send_telegram_product_message(product: Product) -> bool:
@@ -802,13 +790,14 @@ async def _send_telegram_product_message(product: Product) -> bool:
     caption = _telegram_caption(product)
     try:
         async with httpx.AsyncClient(timeout=15) as client:
-            if product.image_url:
+            if product.image_url and len(caption) <= 1024:
                 resp = await client.post(
                     f"https://api.telegram.org/bot{token}/sendPhoto",
                     data={"chat_id": chat_id, "photo": product.image_url,
                           "caption": caption, "parse_mode": "Markdown"},
                 )
             else:
+                # Caption too long for photo (>1024) or no image — send as text message (limit 4096)
                 resp = await client.post(
                     f"https://api.telegram.org/bot{token}/sendMessage",
                     json={"chat_id": chat_id, "text": caption, "parse_mode": "Markdown"},
