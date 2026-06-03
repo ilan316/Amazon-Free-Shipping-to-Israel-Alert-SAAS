@@ -754,7 +754,7 @@ def _telegram_caption(product: Product) -> str:
     )
     today = datetime.now().strftime("%d/%m/%Y")
     description = product.description or ""
-    bullet_lines = [f"{_RTL}• {b}" for b in description.splitlines() if b.strip()]
+    bullet_lines = [f"{_RTL}• {b}" for b in description.splitlines() if b.strip()][:5]
 
     lines = [
         f"{_RTL}✈️ משלוח חינם לישראל | {cat_emoji} {cat_he}",
