@@ -1224,17 +1224,11 @@ class BrowserManager:
                     logger.warning(f"[{asin}] Product not found on Amazon (404)")
                     return idx, result
 
-                # With valid Israel cookies: NO_SHIP + no buybox price = product genuinely
-                # doesn't ship to Israel. Trust the result — no Playwright needed.
-                # Without cookies: no-price could be a location issue, so still fall back.
-                has_cookies = len(self._session_cookies) > 0
-                if result.status in (ShippingStatus.ERROR, ShippingStatus.UNKNOWN) or (
-                    result.status == ShippingStatus.NO_SHIP and not result.last_price and not has_cookies
-                ):
+                if result.status in (ShippingStatus.ERROR, ShippingStatus.UNKNOWN):
                     fallback_reason = result.error_message or result.raw_text or result.status.value
                     logger.warning(
                         f"[{asin}] httpx→Playwright fallback | status={result.status.value} "
-                        f"price={result.last_price!r} cookies={has_cookies} reason={fallback_reason[:100]!r}"
+                        f"price={result.last_price!r} reason={fallback_reason[:100]!r}"
                     )
                     async with lock:
                         pw_fallback += 1
