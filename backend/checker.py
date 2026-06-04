@@ -498,19 +498,14 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
     image_url = _extract_image_url(soup)
     amazon_category = _extract_amazon_category(soup)
 
-    # Rule 1: No ILS price — check delivery text before concluding NO_SHIP.
-    # Some sellers price in USD even for Israeli delivery; delivery text is the authoritative signal.
+    # Rule 1: ILS buybox price is the definitive signal — no ILS price = NO_SHIP.
     if not price.upper().startswith("ILS"):
-        if raw_text and "israel" in raw_text.lower():
-            logger.info(f"[{asin}] httpx: no ILS price but Israel in delivery text — classifying via text | price={price!r}")
-            # Fall through to classification below
-        else:
-            logger.info(f"[{asin}] httpx: NO_SHIP (no ILS price, no Israel in delivery) | price={price!r} | delivery_el={matched_delivery_id!r} | delivery_text={raw_text[:100]!r}")
-            return CheckResult(asin, ShippingStatus.NO_SHIP, raw_text=raw_text or "",
-                               product_name=product_name, last_price=price, image_url=image_url,
-                               amazon_category=amazon_category)
+        logger.info(f"[{asin}] httpx: NO_SHIP (no ILS buybox price) | price={price!r} | delivery_el={matched_delivery_id!r} | delivery_text={raw_text[:100]!r}")
+        return CheckResult(asin, ShippingStatus.NO_SHIP, raw_text=raw_text or "",
+                           product_name=product_name, last_price=price, image_url=image_url,
+                           amazon_category=amazon_category)
 
-    # Rule 2: Has ILS price (or Israel in delivery text) → ships to Israel. Check FREE or PAID.
+    # Rule 2: ILS price confirmed → ships to Israel. Check FREE or PAID.
     if not raw_text:
         logger.info(f"[{asin}] httpx: PAID (ILS price, no delivery block) | price={price!r}")
         return CheckResult(asin, ShippingStatus.PAID, error_message="No delivery block found",
@@ -756,10 +751,6 @@ def _classify(text: str) -> ShippingStatus:
     text = re.sub(r'([A-Z]{2,})(\d)', r'\1 \2', text)
     t = text.lower()
 
-    # "See Similar Items" = no offer ships to this delivery address — takes priority over AOD
-    if "see similar items" in t:
-        return ShippingStatus.NO_SHIP
-
     # "No featured offers available" = no seller listing for this delivery address
     if "no featured offers available" in t:
         return ShippingStatus.NO_SHIP
@@ -938,19 +929,14 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
         except Exception:
             pass
 
-        # Rule 1: No ILS price — check delivery text before concluding NO_SHIP.
-        # Some sellers price in USD even for Israeli delivery; delivery text is the authoritative signal.
+        # Rule 1: ILS buybox price is the definitive signal — no ILS price = NO_SHIP.
         if not pw_price.upper().startswith("ILS"):
-            if raw_text and "israel" in raw_text.lower():
-                logger.info(f"[{asin}] Playwright: no ILS price but Israel in delivery text — classifying via text | price={pw_price!r}")
-                # Fall through to classification below
-            else:
-                logger.info(f"[{asin}] Playwright: NO_SHIP (no ILS price, no Israel in delivery) | price={pw_price!r}")
-                return CheckResult(asin, ShippingStatus.NO_SHIP, raw_text=raw_text or "",
-                                   product_name=product_name, last_price=pw_price, image_url=pw_image,
-                                   amazon_category=pw_category)
+            logger.info(f"[{asin}] Playwright: NO_SHIP (no ILS buybox price) | price={pw_price!r}")
+            return CheckResult(asin, ShippingStatus.NO_SHIP, raw_text=raw_text or "",
+                               product_name=product_name, last_price=pw_price, image_url=pw_image,
+                               amazon_category=pw_category)
 
-        # Rule 2: Has ILS price (or Israel in delivery text) → ships to Israel. Check FREE or PAID.
+        # Rule 2: ILS price confirmed → ships to Israel. Check FREE or PAID.
         if not raw_text:
             logger.info(f"[{asin}] Playwright: PAID (ILS price, no delivery block) | price={pw_price!r}")
             return CheckResult(asin, ShippingStatus.PAID, error_message="No delivery block found",
