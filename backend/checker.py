@@ -756,11 +756,18 @@ def _classify(text: str) -> ShippingStatus:
     text = re.sub(r'([A-Z]{2,})(\d)', r'\1 \2', text)
     t = text.lower()
 
+    # "See Similar Items" = no offer ships to this delivery address — takes priority over AOD
+    if "see similar items" in t:
+        return ShippingStatus.NO_SHIP
+
+    # "No featured offers available" = no seller listing for this delivery address
+    if "no featured offers available" in t:
+        return ShippingStatus.NO_SHIP
+
     if "see all buying options" in t:
         return ShippingStatus.PAID
 
-    # NO_SHIP before "see similar items" — the cannot-be-shipped message and See Similar Items
-    # button appear together on the same page; NO_SHIP must win.
+    # NO_SHIP phrases — must be checked before other signals
     no_ship = [
         "doesn't ship to israel",
         "does not ship to israel",
@@ -774,9 +781,6 @@ def _classify(text: str) -> ShippingStatus:
     ]
     if any(p in t for p in no_ship):
         return ShippingStatus.NO_SHIP
-
-    if "see similar items" in t:
-        return ShippingStatus.UNKNOWN
 
     # FREE shipping to Israel — two Amazon phrasings, both valid:
     #   ≥$49 products: "FREE delivery [date] to Israel"
