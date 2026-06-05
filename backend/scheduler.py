@@ -747,11 +747,18 @@ _TELEGRAM_RESEND_DAYS = 7
 _RTL = "‏"
 
 
+def _format_price(raw: str | None) -> str:
+    """Normalize Amazon price string to 'X.XX ש"ח' format."""
+    p = (raw or "").strip()
+    p = p.replace("ILS", "").replace("₪", "").strip()
+    return f'{p} ש"ח' if p else ""
+
+
 def _telegram_caption(product: Product) -> str:
     tag = os.environ.get("AMAZON_AFFILIATE_TAG", "").strip()
     url = f"https://www.amazon.com/dp/{product.asin}?tag={tag}" if tag else f"https://www.amazon.com/dp/{product.asin}"
     name_he = product.name_he or product.name or product.asin
-    price = (product.last_price or "").strip()
+    price = _format_price(product.last_price)
     category = product.amazon_category or ""
     cat_emoji, cat_he = next(
         (v for k, v in _CATEGORY_MAP.items() if k.lower() in category.lower()),
@@ -890,35 +897,40 @@ def _facebook_caption(product: Product) -> str:
     tag = os.environ.get("AMAZON_AFFILIATE_TAG", "").strip()
     url = f"https://www.amazon.com/dp/{product.asin}?tag={tag}" if tag else f"https://www.amazon.com/dp/{product.asin}"
     name_he = product.name_he or product.name or product.asin
-    # Truncate long names to ~40 chars for cleaner Facebook posts
-    if len(name_he) > 40:
-        cut = name_he[:38].rsplit(" ", 1)[0]
-        name_he = cut + "..."
-    price = (product.last_price or "").strip().replace("ILS", "₪").replace("₪ ", "").replace("₪", "")
-    price_display = f"{price} ₪" if price else ""
+    price = _format_price(product.last_price)
     category = product.amazon_category or ""
     cat_emoji, cat_he = next(
         (v for k, v in _CATEGORY_MAP.items() if k.lower() in category.lower()),
         ("📦", category or "כללי"),
     )
     today = datetime.now().strftime("%d/%m/%Y")
-    lines = [
-        f"✈️ משלוח חינם לישראל | {cat_emoji} {cat_he}",
+    description = product.description or ""
+    all_bullets = [f"{_RTL}• {b}" for b in description.splitlines() if b.strip()]
+
+    header_lines = [
+        f"{_RTL}✈️ משלוח חינם לישראל | {cat_emoji} {cat_he}",
         "",
-        f"🛒 {name_he}",
+        f"{_RTL}{name_he}",
         "",
     ]
-    if price_display:
-        lines.append(f"💰 מחיר: {price_display}")
-    lines += [
-        "✅ משלוח חינם לישראל בהזמנות מעל $49",
-        "ℹ️ ניתן לצרף מוצרים נוספים להזמנה",
-        f"📅 {today}",
+    footer_lines = [
+        f"{_RTL}--",
         "",
-        f"👉 לרכישה: {url}",
+        f"{_RTL}💰 מחיר: {price}",
+        f"{_RTL}ℹ️ משלוח חינם מותנה בהזמנה מינימלית של $49 — ניתן לצרף מוצרים נוספים",
+        f"{_RTL}🚚 משלוח חינם לישראל 🇮🇱",
+        f"{_RTL}📅 {today}",
         "",
-        "📢 עמוד: AMZ Free Ship Alert",
+        f"{_RTL}👉 לרכישה באמזון: {url}",
+        "",
+        f"{_RTL}📢 AMZ Free Ship Alert",
     ]
+
+    lines = header_lines[:]
+    if all_bullets:
+        lines += all_bullets
+        lines.append("")
+    lines += footer_lines
     return "\n".join(lines)
 
 
