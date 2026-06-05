@@ -894,8 +894,7 @@ _FACEBOOK_RESEND_DAYS = 7
 
 
 def _facebook_caption(product: Product) -> str:
-    tag = os.environ.get("AMAZON_AFFILIATE_TAG", "").strip()
-    url = f"https://www.amazon.com/dp/{product.asin}?tag={tag}" if tag else f"https://www.amazon.com/dp/{product.asin}"
+    url = f"https://app.amzfreeil.com/go/{product.asin}"
     name_he = product.name_he or product.name or product.asin
     price = _format_price(product.last_price)
     category = product.amazon_category or ""

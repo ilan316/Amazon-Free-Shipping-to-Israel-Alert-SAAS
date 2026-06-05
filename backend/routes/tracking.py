@@ -60,6 +60,18 @@ _ALLOWED_PREFIXES = (
 )
 
 
+@router.get("/go/{asin}", include_in_schema=False)
+async def go_asin(asin: str):
+    """Short redirect for Facebook/social posts: /go/ASIN → Amazon affiliate URL."""
+    import os, re
+    if not re.fullmatch(r"[A-Z0-9]{10}", asin.upper()):
+        return RedirectResponse("https://www.amazon.com/", status_code=302)
+    tag = os.environ.get("AMAZON_AFFILIATE_TAG", "").strip()
+    asin = asin.upper()
+    dest = f"https://www.amazon.com/dp/{asin}?tag={tag}" if tag else f"https://www.amazon.com/dp/{asin}"
+    return RedirectResponse(dest, status_code=302)
+
+
 @router.get("/track/click", include_in_schema=False)
 async def track_click(
     request: Request,
