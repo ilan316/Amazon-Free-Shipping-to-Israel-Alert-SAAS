@@ -918,18 +918,25 @@ def _facebook_caption(product: Product) -> str:
 
 
 async def _get_facebook_page_token(user_token: str, page_id: str) -> str | None:
-    """Exchange System User Token for a Page Access Token."""
+    """Get Page Access Token from System User Token via /me/accounts."""
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.get(
-                f"https://graph.facebook.com/v19.0/{page_id}",
-                params={"fields": "access_token", "access_token": user_token},
+                "https://graph.facebook.com/v19.0/me/accounts",
+                params={"access_token": user_token},
             )
         data = resp.json()
-        if "access_token" in data:
-            return data["access_token"]
-        logger.warning(f"[facebook] failed to get page token: {data}")
-        return None
+        pages = data.get("data", [])
+        if not pages:
+            logger.warning(f"[facebook] /me/accounts returned no pages: {data}")
+            return None
+        # Find matching page or use first
+        for page in pages:
+            if str(page.get("id")) == str(page_id):
+                return page.get("access_token")
+        # fallback: use first page token
+        logger.warning(f"[facebook] page_id {page_id} not found in accounts, using first: {pages[0].get('id')}")
+        return pages[0].get("access_token")
     except Exception as e:
         logger.warning(f"[facebook] page token exchange error: {e}")
         return None
