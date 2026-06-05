@@ -664,9 +664,14 @@ async def run_telegram_report():
         try:
             async with AsyncSessionLocal() as db:
                 # Check for USD prices (location/cookie issue)
+                # Valid ILS prices start with either ₪ or "ILS" — flag anything else
                 usd_rows = (await db.execute(
                     select(Product.asin, Product.last_price)
-                    .where(Product.last_price != "", ~Product.last_price.startswith("₪"))
+                    .where(
+                        Product.last_price != "",
+                        ~Product.last_price.startswith("₪"),
+                        ~Product.last_price.startswith("ILS"),
+                    )
                     .limit(5)
                 )).all()
                 if usd_rows:
