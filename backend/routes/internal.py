@@ -180,6 +180,14 @@ async def trigger_telegram_product(db: Annotated[AsyncSession, Depends(get_db)])
     return {"ok": True}
 
 
+@router.post("/trigger-facebook-product", dependencies=[Depends(_require_secret)])
+async def trigger_facebook_product(db: Annotated[AsyncSession, Depends(get_db)]):
+    """Manually trigger sending one product to the Facebook page (for testing)."""
+    from backend.scheduler import run_send_facebook_product
+    await run_send_facebook_product()
+    return {"ok": True}
+
+
 @router.post("/backfill-hebrew", dependencies=[Depends(_require_secret)])
 async def backfill_hebrew(db: Annotated[AsyncSession, Depends(get_db)]):
     """Generate name_he for every product in DB that is missing it."""
