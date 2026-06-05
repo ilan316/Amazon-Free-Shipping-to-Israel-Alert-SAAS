@@ -917,12 +917,36 @@ def _facebook_caption(product: Product) -> str:
     return "\n".join(lines)
 
 
+async def _get_facebook_page_token(user_token: str, page_id: str) -> str | None:
+    """Exchange System User Token for a Page Access Token."""
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(
+                f"https://graph.facebook.com/v19.0/{page_id}",
+                params={"fields": "access_token", "access_token": user_token},
+            )
+        data = resp.json()
+        if "access_token" in data:
+            return data["access_token"]
+        logger.warning(f"[facebook] failed to get page token: {data}")
+        return None
+    except Exception as e:
+        logger.warning(f"[facebook] page token exchange error: {e}")
+        return None
+
+
 async def _send_facebook_product_message(product: Product) -> bool:
-    token = os.environ.get("FACEBOOK_PAGE_TOKEN", "")
+    user_token = os.environ.get("FACEBOOK_PAGE_TOKEN", "")
     page_id = os.environ.get("FACEBOOK_PAGE_ID", "")
-    if not token or not page_id:
+    if not user_token or not page_id:
         logger.warning("FACEBOOK_PAGE_TOKEN or FACEBOOK_PAGE_ID not set — skipping Facebook send")
         return False
+
+    page_token = await _get_facebook_page_token(user_token, page_id)
+    if not page_token:
+        logger.warning("[facebook] could not obtain page access token — skipping")
+        return False
+
     caption = _facebook_caption(product)
     try:
         async with httpx.AsyncClient(timeout=20) as client:
@@ -932,7 +956,7 @@ async def _send_facebook_product_message(product: Product) -> bool:
                     data={
                         "url": product.image_url,
                         "caption": caption,
-                        "access_token": token,
+                        "access_token": page_token,
                     },
                 )
             else:
@@ -940,7 +964,7 @@ async def _send_facebook_product_message(product: Product) -> bool:
                     f"https://graph.facebook.com/v19.0/{page_id}/feed",
                     data={
                         "message": caption,
-                        "access_token": token,
+                        "access_token": page_token,
                     },
                 )
         if resp.status_code == 200:
