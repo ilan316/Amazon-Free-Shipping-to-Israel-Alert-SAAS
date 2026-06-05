@@ -161,3 +161,11 @@ class TelegramSent(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     asin: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class FacebookSent(Base):
+    __tablename__ = "facebook_sent"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    asin: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)

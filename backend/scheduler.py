@@ -883,6 +883,125 @@ async def run_send_telegram_product():
             logger.warning(f"=== Telegram product send failed: {product.asin} ===")
 
 
+_FACEBOOK_RESEND_DAYS = 7
+
+
+def _facebook_caption(product: Product) -> str:
+    tag = os.environ.get("AMAZON_AFFILIATE_TAG", "").strip()
+    url = f"https://www.amazon.com/dp/{product.asin}?tag={tag}" if tag else f"https://www.amazon.com/dp/{product.asin}"
+    name_he = product.name_he or product.name or product.asin
+    price = (product.last_price or "").strip()
+    category = product.amazon_category or ""
+    cat_emoji, cat_he = next(
+        (v for k, v in _CATEGORY_MAP.items() if k.lower() in category.lower()),
+        ("📦", category or "כללי"),
+    )
+    today = datetime.now().strftime("%d/%m/%Y")
+    lines = [
+        f"✈️ משלוח חינם לישראל | {cat_emoji} {cat_he}",
+        "",
+        f"🛒 {name_he}",
+        "",
+    ]
+    if price:
+        lines.append(f"💰 מחיר: {price}")
+    lines += [
+        "✅ משלוח חינם לישראל בהזמנות מעל $49",
+        "ℹ️ ניתן לצרף מוצרים נוספים להזמנה",
+        f"📅 {today}",
+        "",
+        f"👉 לרכישה: {url}",
+        "",
+        "📢 עמוד: AMZ Free Ship Alert",
+    ]
+    return "\n".join(lines)
+
+
+async def _send_facebook_product_message(product: Product) -> bool:
+    token = os.environ.get("FACEBOOK_PAGE_TOKEN", "")
+    page_id = os.environ.get("FACEBOOK_PAGE_ID", "")
+    if not token or not page_id:
+        logger.warning("FACEBOOK_PAGE_TOKEN or FACEBOOK_PAGE_ID not set — skipping Facebook send")
+        return False
+    caption = _facebook_caption(product)
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            if product.image_url:
+                resp = await client.post(
+                    f"https://graph.facebook.com/v19.0/{page_id}/photos",
+                    data={
+                        "url": product.image_url,
+                        "caption": caption,
+                        "access_token": token,
+                    },
+                )
+            else:
+                resp = await client.post(
+                    f"https://graph.facebook.com/v19.0/{page_id}/feed",
+                    data={
+                        "message": caption,
+                        "access_token": token,
+                    },
+                )
+        if resp.status_code == 200:
+            return True
+        logger.warning(f"[facebook] send failed for {product.asin}: {resp.text[:300]}")
+        return False
+    except Exception as e:
+        logger.warning(f"[facebook] send error for {product.asin}: {e}")
+        return False
+
+
+async def run_send_facebook_product():
+    """Send one free product to the Facebook Page. Runs twice daily (08:00 and 13:00 IL).
+    Skips ASINs sent in the last 7 days."""
+    if os.environ.get("FACEBOOK_PRODUCT_ENABLED", "true").lower() == "false":
+        logger.info("[facebook] disabled via FACEBOOK_PRODUCT_ENABLED=false — skipping")
+        return
+
+    from backend.models import FacebookSent
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    logger.info("=== Facebook product send started ===")
+    async with AsyncSessionLocal() as db:
+        now = datetime.now(timezone.utc)
+        resend_cutoff = now - timedelta(days=_FACEBOOK_RESEND_DAYS)
+
+        sent_recently = (
+            select(FacebookSent.asin)
+            .where(FacebookSent.sent_at > resend_cutoff)
+            .scalar_subquery()
+        )
+        result = await db.execute(
+            select(Product)
+            .where(
+                Product.last_status == "FREE",
+                Product.source == "scanner",
+                Product.asin.not_in(sent_recently),
+            )
+            .order_by(func.random())
+            .limit(1)
+        )
+        product = result.scalar_one_or_none()
+
+        if not product:
+            logger.info("=== Facebook product send: no eligible products ===")
+            return
+
+        ok = await _send_facebook_product_message(product)
+        if ok:
+            stmt = pg_insert(FacebookSent).values(asin=product.asin, sent_at=now)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["asin"],
+                set_={"sent_at": now},
+            )
+            await db.execute(stmt)
+            await db.commit()
+            logger.info(f"=== Facebook product sent: {product.asin} — {product.name_he or product.name} ===")
+        else:
+            logger.warning(f"=== Facebook product send failed: {product.asin} ===")
+
+
 async def check_single_product(asin: str, url: str):
     """Check a single product immediately (used after a user adds it or manual re-check)."""
     logger.info(f"[{asin}] Immediate check triggered")
