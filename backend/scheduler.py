@@ -747,6 +747,19 @@ _TELEGRAM_RESEND_DAYS = 7
 _RTL = "‏"
 
 
+def _get_image_urls(product: Product) -> list[str]:
+    """Return up to 4 image URLs for a product. Falls back to single image_url."""
+    import json as _json
+    if product.image_urls:
+        try:
+            urls = _json.loads(product.image_urls)
+            if isinstance(urls, list) and urls:
+                return urls[:4]
+        except Exception:
+            pass
+    return [product.image_url] if product.image_url else []
+
+
 def _format_price(raw: str | None) -> str:
     """Normalize Amazon price string to 'X.XX ש"ח' format."""
     p = (raw or "").strip()
@@ -811,12 +824,22 @@ async def _send_telegram_product_message(product: Product) -> bool:
         logger.warning("TELEGRAM_PRODUCT_BOT_TOKEN or TELEGRAM_PRODUCT_CHAT_ID not set — skipping product send")
         return False
     caption = _telegram_caption(product)
+    image_urls = _get_image_urls(product)
     try:
         async with httpx.AsyncClient(timeout=15) as client:
-            if product.image_url:
+            if len(image_urls) > 1:
+                media = [
+                    {"type": "photo", "media": image_urls[0], "caption": caption, "parse_mode": "Markdown"},
+                    *[{"type": "photo", "media": u} for u in image_urls[1:]],
+                ]
+                resp = await client.post(
+                    f"https://api.telegram.org/bot{token}/sendMediaGroup",
+                    json={"chat_id": chat_id, "media": media},
+                )
+            elif image_urls:
                 resp = await client.post(
                     f"https://api.telegram.org/bot{token}/sendPhoto",
-                    data={"chat_id": chat_id, "photo": product.image_url,
+                    data={"chat_id": chat_id, "photo": image_urls[0],
                           "caption": caption, "parse_mode": "Markdown"},
                 )
             else:
@@ -971,24 +994,38 @@ async def _send_facebook_product_message(product: Product) -> bool:
         return False
 
     caption = _facebook_caption(product)
+    image_urls = _get_image_urls(product)
     try:
-        async with httpx.AsyncClient(timeout=20) as client:
-            if product.image_url:
+        async with httpx.AsyncClient(timeout=30) as client:
+            if len(image_urls) > 1:
+                # Upload each photo unpublished, collect IDs, then post as multi-image feed
+                photo_ids = []
+                for img_url in image_urls:
+                    upload_resp = await client.post(
+                        f"https://graph.facebook.com/v19.0/{page_id}/photos",
+                        data={"url": img_url, "published": "false", "access_token": page_token},
+                    )
+                    if upload_resp.status_code == 200:
+                        pid = upload_resp.json().get("id")
+                        if pid:
+                            photo_ids.append(pid)
+                if not photo_ids:
+                    logger.warning(f"[facebook] no photos uploaded for {product.asin}")
+                    return False
+                attached = [{"media_fbid": pid} for pid in photo_ids]
+                resp = await client.post(
+                    f"https://graph.facebook.com/v19.0/{page_id}/feed",
+                    json={"message": caption, "attached_media": attached, "access_token": page_token},
+                )
+            elif image_urls:
                 resp = await client.post(
                     f"https://graph.facebook.com/v19.0/{page_id}/photos",
-                    data={
-                        "url": product.image_url,
-                        "caption": caption,
-                        "access_token": page_token,
-                    },
+                    data={"url": image_urls[0], "caption": caption, "access_token": page_token},
                 )
             else:
                 resp = await client.post(
                     f"https://graph.facebook.com/v19.0/{page_id}/feed",
-                    data={
-                        "message": caption,
-                        "access_token": page_token,
-                    },
+                    data={"message": caption, "access_token": page_token},
                 )
         if resp.status_code == 200:
             return True

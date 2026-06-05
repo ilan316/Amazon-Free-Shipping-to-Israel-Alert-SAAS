@@ -46,6 +46,7 @@ class Product(Base):
     consecutive_errors: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_price: Mapped[str | None] = mapped_column(String(50), nullable=True)
     image_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    image_urls: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list of up to 4 URLs
     name_he: Mapped[str | None] = mapped_column(String(300), nullable=True)
     amazon_category: Mapped[str | None] = mapped_column(String(100), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)

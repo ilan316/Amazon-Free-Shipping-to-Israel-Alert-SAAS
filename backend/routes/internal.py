@@ -4,6 +4,7 @@ Authentication: X-Sync-Secret header must match INTERNAL_SYNC_SECRET env var.
 """
 
 import os
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Annotated
@@ -39,6 +40,7 @@ class SyncProduct(BaseModel):
     found_at: str = ""
     last_price: str = ""
     image_url: str = ""
+    image_urls: list[str] = []
     name_he: str = ""
     description: str = ""
 
@@ -76,6 +78,7 @@ async def sync_products(
             consecutive_errors=0,
             last_price=p.last_price or None,
             image_url=p.image_url or None,
+            image_urls=json.dumps(p.image_urls) if p.image_urls else None,
             name_he=p.name_he or None,
             amazon_category=p.amazon_category or None,
             description=p.description or None,
@@ -91,6 +94,7 @@ async def sync_products(
                 "consecutive_errors": 0,
                 "last_price": stmt.excluded.last_price,
                 "image_url": stmt.excluded.image_url,
+                "image_urls": stmt.excluded.image_urls,
                 "name_he": stmt.excluded.name_he,
                 "amazon_category": stmt.excluded.amazon_category,
                 "description": stmt.excluded.description,

@@ -257,6 +257,11 @@ async def create_tables():
                 "ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT"
             )
         )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE products ADD COLUMN IF NOT EXISTS image_urls TEXT"
+            )
+        )
         # Seed telegram_sent with ASINs already sent via local scanner (to avoid duplicates)
         _sent_asins = [
             ('B0GY8HCFHG','2026-05-31 17:38:46+00'),('B0FCG39JQ6','2026-05-31 17:38:51+00'),
