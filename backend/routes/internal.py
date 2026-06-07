@@ -120,6 +120,19 @@ async def sync_products(
     return {"synced": synced, "removed": removed}
 
 
+@router.get("/image-stats", dependencies=[Depends(_require_secret)])
+async def image_stats(db: Annotated[AsyncSession, Depends(get_db)]):
+    """Return image_urls coverage stats across all products."""
+    from sqlalchemy import func, case
+    rows = (await db.execute(select(Product.image_urls))).scalars().all()
+    total = len(rows)
+    counts = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
+    for r in rows:
+        n = len(json.loads(r)) if r else 0
+        counts[min(n, 4)] = counts.get(min(n, 4), 0) + 1
+    return {"total": total, "by_image_count": counts}
+
+
 @router.get("/last-send-log", dependencies=[Depends(_require_secret)])
 async def last_send_log(db: Annotated[AsyncSession, Depends(get_db)], limit: int = 1):
     """Return the last N email send logs with per-recipient success/fail counts."""
