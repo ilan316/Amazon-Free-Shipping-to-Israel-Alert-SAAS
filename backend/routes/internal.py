@@ -124,29 +124,17 @@ async def sync_products(
 async def product_stats(db: Annotated[AsyncSession, Depends(get_db)]):
     """Return image_urls, name_he and description coverage stats."""
     rows = (await db.execute(select(Product.image_urls, Product.name_he, Product.description, Product.source))).all()
-    total = len(rows)
-    img_counts = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
-    no_name_he = 0
-    no_description = 0
-    eng_description = 0
-    by_source = {}
+    result = {}
     for image_urls, name_he, description, source in rows:
+        s = result.setdefault(source, {"total": 0, "images": {0:0,1:0,2:0,3:0,4:0}, "no_name_he": 0, "no_description_he": 0})
+        s["total"] += 1
         n = len(json.loads(image_urls)) if image_urls else 0
-        img_counts[min(n, 4)] = img_counts.get(min(n, 4), 0) + 1
+        s["images"][min(n, 4)] += 1
         if not name_he:
-            no_name_he += 1
-        if not description:
-            no_description += 1
-        elif all(ord(c) < 1488 for c in description if c.isalpha()):
-            eng_description += 1
-        by_source[source] = by_source.get(source, 0) + 1
-    return {
-        "total": total,
-        "by_source": by_source,
-        "images": img_counts,
-        "no_name_he": no_name_he,
-        "no_description_he": no_description + eng_description,
-    }
+            s["no_name_he"] += 1
+        if not description or all(ord(c) < 1488 for c in description if c.isalpha()):
+            s["no_description_he"] += 1
+    return {"total": sum(s["total"] for s in result.values()), "by_source": result}
 
 
 @router.get("/last-send-log", dependencies=[Depends(_require_secret)])
