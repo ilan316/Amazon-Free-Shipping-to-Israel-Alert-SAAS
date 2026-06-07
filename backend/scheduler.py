@@ -824,22 +824,13 @@ async def _send_telegram_product_message(product: Product) -> bool:
         logger.warning("TELEGRAM_PRODUCT_BOT_TOKEN or TELEGRAM_PRODUCT_CHAT_ID not set — skipping product send")
         return False
     caption = _telegram_caption(product)
-    image_urls = _get_image_urls(product)
+    image_url = product.image_url
     try:
         async with httpx.AsyncClient(timeout=15) as client:
-            if len(image_urls) > 1:
-                media = [
-                    {"type": "photo", "media": image_urls[0], "caption": caption, "parse_mode": "Markdown"},
-                    *[{"type": "photo", "media": u} for u in image_urls[1:]],
-                ]
-                resp = await client.post(
-                    f"https://api.telegram.org/bot{token}/sendMediaGroup",
-                    json={"chat_id": chat_id, "media": media},
-                )
-            elif image_urls:
+            if image_url:
                 resp = await client.post(
                     f"https://api.telegram.org/bot{token}/sendPhoto",
-                    data={"chat_id": chat_id, "photo": image_urls[0],
+                    data={"chat_id": chat_id, "photo": image_url,
                           "caption": caption, "parse_mode": "Markdown"},
                 )
             else:
