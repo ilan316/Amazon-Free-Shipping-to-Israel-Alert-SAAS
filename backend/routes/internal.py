@@ -120,17 +120,33 @@ async def sync_products(
     return {"synced": synced, "removed": removed}
 
 
-@router.get("/image-stats", dependencies=[Depends(_require_secret)])
-async def image_stats(db: Annotated[AsyncSession, Depends(get_db)]):
-    """Return image_urls coverage stats across all products."""
-    from sqlalchemy import func, case
-    rows = (await db.execute(select(Product.image_urls))).scalars().all()
+@router.get("/product-stats", dependencies=[Depends(_require_secret)])
+async def product_stats(db: Annotated[AsyncSession, Depends(get_db)]):
+    """Return image_urls, name_he and description coverage stats."""
+    rows = (await db.execute(select(Product.image_urls, Product.name_he, Product.description, Product.source))).all()
     total = len(rows)
-    counts = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
-    for r in rows:
-        n = len(json.loads(r)) if r else 0
-        counts[min(n, 4)] = counts.get(min(n, 4), 0) + 1
-    return {"total": total, "by_image_count": counts}
+    img_counts = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
+    no_name_he = 0
+    no_description = 0
+    eng_description = 0
+    by_source = {}
+    for image_urls, name_he, description, source in rows:
+        n = len(json.loads(image_urls)) if image_urls else 0
+        img_counts[min(n, 4)] = img_counts.get(min(n, 4), 0) + 1
+        if not name_he:
+            no_name_he += 1
+        if not description:
+            no_description += 1
+        elif all(ord(c) < 1488 for c in description if c.isalpha()):
+            eng_description += 1
+        by_source[source] = by_source.get(source, 0) + 1
+    return {
+        "total": total,
+        "by_source": by_source,
+        "images": img_counts,
+        "no_name_he": no_name_he,
+        "no_description_he": no_description + eng_description,
+    }
 
 
 @router.get("/last-send-log", dependencies=[Depends(_require_secret)])
