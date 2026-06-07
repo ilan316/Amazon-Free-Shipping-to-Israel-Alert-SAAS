@@ -985,7 +985,16 @@ async def _send_facebook_product_message(product: Product) -> bool:
         return False
 
     caption = _facebook_caption(product)
-    image_urls = _get_image_urls(product)
+    import json as _json
+    secondary = []
+    if product.image_urls:
+        try:
+            parsed = _json.loads(product.image_urls)
+            if isinstance(parsed, list):
+                secondary = parsed
+        except Exception:
+            pass
+    image_urls = ([product.image_url] if product.image_url else []) + secondary
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             if len(image_urls) > 1:
