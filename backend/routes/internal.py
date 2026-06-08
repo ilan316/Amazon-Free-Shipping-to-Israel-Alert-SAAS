@@ -123,13 +123,25 @@ async def sync_products(
 @router.get("/product-stats", dependencies=[Depends(_require_secret)])
 async def product_stats(db: Annotated[AsyncSession, Depends(get_db)]):
     """Return image_urls, name_he and description coverage stats."""
-    rows = (await db.execute(select(Product.image_urls, Product.name_he, Product.description, Product.source))).all()
+    rows = (await db.execute(select(Product.image_url, Product.image_urls, Product.name_he, Product.description, Product.source))).all()
     result = {}
-    for image_urls, name_he, description, source in rows:
-        s = result.setdefault(source, {"total": 0, "images": {0:0,1:0,2:0,3:0,4:0}, "no_name_he": 0, "no_description_he": 0})
+    for image_url, image_urls, name_he, description, source in rows:
+        s = result.setdefault(source, {
+            "total": 0,
+            "images": {0:0,1:0,2:0,3:0,4:0,5:0},
+            "no_image_url": 0,
+            "no_images_at_all": 0,
+            "no_name_he": 0,
+            "no_description_he": 0,
+        })
         s["total"] += 1
-        n = len(json.loads(image_urls)) if image_urls else 0
-        s["images"][min(n, 4)] += 1
+        arr_count = len(json.loads(image_urls)) if image_urls else 0
+        total_imgs = (1 if image_url else 0) + arr_count
+        s["images"][min(total_imgs, 5)] += 1
+        if not image_url:
+            s["no_image_url"] += 1
+        if not image_url and arr_count == 0:
+            s["no_images_at_all"] += 1
         if not name_he:
             s["no_name_he"] += 1
         if not description or all(ord(c) < 1488 for c in description if c.isalpha()):
