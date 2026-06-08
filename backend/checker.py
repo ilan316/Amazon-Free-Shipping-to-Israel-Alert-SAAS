@@ -1223,6 +1223,7 @@ class BrowserManager:
                     result.status == ShippingStatus.NO_SHIP
                     and has_cookies
                     and result.last_price.startswith("$")
+                    and "to israel" in (result.raw_text or "").lower()
                 )
                 if result.status in (ShippingStatus.ERROR, ShippingStatus.UNKNOWN) or (
                     result.status == ShippingStatus.NO_SHIP and not result.last_price and not has_cookies
