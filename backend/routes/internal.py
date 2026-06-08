@@ -149,6 +149,33 @@ async def product_stats(db: Annotated[AsyncSession, Depends(get_db)]):
     return {"total": sum(s["total"] for s in result.values()), "by_source": result}
 
 
+@router.get("/scanner-incomplete", dependencies=[Depends(_require_secret)])
+async def scanner_incomplete(db: Annotated[AsyncSession, Depends(get_db)]):
+    """Return scanner products missing images or Hebrew description."""
+    from sqlalchemy import or_
+    rows = (await db.execute(
+        select(Product.asin, Product.name, Product.name_he, Product.description, Product.image_url, Product.image_urls)
+        .where(
+            Product.source == "scanner",
+            or_(
+                (Product.image_url == None) & ((Product.image_urls == None) | (Product.image_urls == "[]")),
+                (Product.description == None) | (Product.description == ""),
+            )
+        )
+    )).all()
+    return [
+        {
+            "asin": r.asin,
+            "name": r.name,
+            "name_he": r.name_he,
+            "has_description": bool(r.description),
+            "has_image_url": bool(r.image_url),
+            "image_urls_count": len(json.loads(r.image_urls)) if r.image_urls else 0,
+        }
+        for r in rows
+    ]
+
+
 @router.get("/last-send-log", dependencies=[Depends(_require_secret)])
 async def last_send_log(db: Annotated[AsyncSession, Depends(get_db)], limit: int = 1):
     """Return the last N email send logs with per-recipient success/fail counts."""
