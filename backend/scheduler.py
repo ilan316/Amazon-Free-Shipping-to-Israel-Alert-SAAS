@@ -791,6 +791,8 @@ def _telegram_caption(product: Product) -> str:
         "",
         f"[👉 לרכישה באמזון]({url})",
         "",
+        f"{_RTL}📘 הצטרף לדף הפייסבוק → https://www.facebook.com/AmzFreeIL",
+        "",
         f"{_RTL}📢 @amzfreeil",
     ]
     header_lines = [
