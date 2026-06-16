@@ -936,6 +936,8 @@ def _facebook_caption(product: Product) -> str:
         "",
         f"{_RTL}👉 לרכישה באמזון: {url}",
         "",
+        f"{_RTL}📱 רוצה לקבל עוד מוצרים כאלה? הצטרף לערוץ הטלגרם שלנו → t.me/amzfreeil",
+        "",
         f"{_RTL}📢 AMZ Free Ship Alert",
     ]
 
