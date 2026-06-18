@@ -713,13 +713,11 @@ async def inject_cookies(
     admin: Annotated[User, Depends(get_current_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Inject Amazon session cookies into the running checker and trigger a check cycle.
+    """Inject Amazon session cookies into the running checker.
     Accepts: {"cookies": [{"name": "...", "value": "..."}]} (JSON array from browser export)
     """
-    import asyncio
     import json
     from backend.checker import browser_manager
-    from backend.scheduler import run_global_check_cycle
 
     raw = body.get("cookies", [])
     if not raw:
@@ -751,8 +749,7 @@ async def inject_cookies(
     await db.commit()
 
     browser_manager._session_cookies = cookie_list
-    asyncio.create_task(run_global_check_cycle())
-    return {"injected": len(cookie_list), "message": f"הוזרקו {len(cookie_list)} cookies — נשמרו ב-DB — בדיקה מתחילה"}
+    return {"injected": len(cookie_list), "message": f"הוזרקו {len(cookie_list)} cookies — נשמרו ב-DB"}
 
 
 @router.post("/products/{product_id}/reset-errors")
