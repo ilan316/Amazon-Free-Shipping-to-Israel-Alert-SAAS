@@ -626,7 +626,7 @@ async def run_telegram_report():
                 f'{{ deployments(input: {{ projectId: "{project_id}", serviceId: "{service_id}" }}) '
                 f'{{ edges {{ node {{ id status createdAt }} }} }} }}'
             })
-            deployments = (dep_resp.json() or {}).get("data", {}).get("deployments", {}).get("edges", [])
+            deployments = ((dep_resp.json() or {}).get("data") or {}).get("deployments", {}).get("edges", [])
             recent = [d["node"] for d in deployments
                       if datetime.fromisoformat(d["node"]["createdAt"].replace("Z", "+00:00")) >= since]
             failed = [d for d in recent if d["status"] in ("FAILED", "CRASHED")]
@@ -639,7 +639,7 @@ async def run_telegram_report():
                     f'{{ environmentLogs(environmentId: "{env_id}", afterDate: "{after_date}", beforeLimit: 500) '
                     f'{{ message severity timestamp }} }}'
                 })
-                page = (log_resp.json() or {}).get("data", {}).get("environmentLogs", [])
+                page = ((log_resp.json() or {}).get("data") or {}).get("environmentLogs", [])
                 if not page:
                     break
                 all_logs.extend(page)
