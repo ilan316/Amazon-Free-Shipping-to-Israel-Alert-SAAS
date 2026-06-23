@@ -309,9 +309,9 @@ async def public_system_message():
 
 
 class ContactRequest(BaseModel):
-    name: str = Field(..., max_length=100)
-    email: str = Field(..., max_length=254)
-    message: str = Field(..., max_length=5000)
+    name: str = Field(..., max_length=30)
+    email: str = Field(..., max_length=50)
+    message: str = Field(..., max_length=3000)
 
 
 @app.post("/api/contact")
