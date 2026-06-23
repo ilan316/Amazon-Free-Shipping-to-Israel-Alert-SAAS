@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
@@ -309,9 +309,9 @@ async def public_system_message():
 
 
 class ContactRequest(BaseModel):
-    name: str
-    email: str
-    message: str
+    name: str = Field(..., max_length=100)
+    email: str = Field(..., max_length=254)
+    message: str = Field(..., max_length=5000)
 
 
 @app.post("/api/contact")
@@ -321,10 +321,14 @@ async def contact_form(request: Request, body: ContactRequest):
     from backend.models import User
     from backend.notifier import send_simple_email
     from sqlalchemy import select
+    import html as html_lib
+    safe_name = html_lib.escape(body.name)
+    safe_email = html_lib.escape(body.email)
+    safe_message = html_lib.escape(body.message).replace("\n", "<br>")
     html = (
-        f"<p><strong>שם:</strong> {body.name}</p>"
-        f"<p><strong>אימייל:</strong> {body.email}</p>"
-        f"<p><strong>הודעה:</strong><br>{body.message.replace(chr(10), '<br>')}</p>"
+        f"<p><strong>שם:</strong> {safe_name}</p>"
+        f"<p><strong>אימייל:</strong> {safe_email}</p>"
+        f"<p><strong>הודעה:</strong><br>{safe_message}</p>"
     )
     async with AsyncSessionLocal() as db:
         admins = (await db.execute(
