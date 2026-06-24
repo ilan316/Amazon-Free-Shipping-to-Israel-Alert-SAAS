@@ -349,7 +349,7 @@ async def list_products(
     # Count notifications since last click per product (resets on click)
     notif_rows = await db.execute(text("""
         SELECT nl.product_id, COUNT(*) AS cnt
-        FROM notification_logs nl
+        FROM notification_log nl
         JOIN products p ON p.id = nl.product_id
         WHERE nl.success = TRUE
           AND nl.sent_at > COALESCE(
