@@ -702,6 +702,11 @@ function renderAdminProducts() {
         ${p.consecutive_errors >= 5 ? `<span title="${p.consecutive_errors} שגיאות ברצף — המוצר חסום" style="margin-right:4px;cursor:help;">🚫</span>` : ''}
         ${nextCheckLabel(p) ? `<br><span style="font-size:0.75rem;color:#e67e00;">${nextCheckLabel(p)}</span>` : ''}
       </td>
+      <td style="text-align:center;font-size:0.85rem;" title="מיילי התראה שנשלחו בהצלחה">
+        ${p.notification_count > 0
+          ? `<span style="font-weight:bold;color:${p.notification_count >= 5 ? '#e67e00' : 'var(--text)'};">${p.notification_count}</span>`
+          : '<span style="color:var(--text-muted);">—</span>'}
+      </td>
       <td class="truncate ltr" style="max-width:200px;font-size:0.78rem;color:var(--text-muted);"
           title="${p.raw_text ? p.raw_text.replace(/"/g,'&quot;') : ''}">
         ${p.raw_text ? p.raw_text.substring(0, 60) + (p.raw_text.length > 60 ? '…' : '') : '—'}

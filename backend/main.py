@@ -167,7 +167,7 @@ async def lifespan(app: FastAPI):
 
     scheduler.start()
 
-    from backend.scheduler import run_inactivity_check, run_automation_emails, check_decodo_quota, run_telegram_report, run_hebrew_backfill, run_send_telegram_product, run_send_facebook_product
+    from backend.scheduler import run_inactivity_check, run_automation_emails, check_decodo_quota, run_telegram_report, run_hebrew_backfill, run_send_telegram_product, run_send_facebook_product, run_cleanup_orphans
 
     telegram_hour = int(os.environ.get("TELEGRAM_REPORT_HOUR", "8"))
     telegram_minute = int(os.environ.get("TELEGRAM_REPORT_MINUTE", "0"))
@@ -177,6 +177,9 @@ async def lifespan(app: FastAPI):
     ))
     _upsert_job(run_inactivity_check, "inactivity_check", dict(
         trigger="cron", hour=3, minute=0, timezone="Asia/Jerusalem", misfire_grace_time=600
+    ))
+    _upsert_job(run_cleanup_orphans, "cleanup_orphans", dict(
+        trigger="cron", hour=2, minute=0, timezone="Asia/Jerusalem", misfire_grace_time=600
     ))
     _upsert_job(run_automation_emails, "automation_emails", dict(
         trigger="cron", hour=9, minute=0, timezone="Asia/Jerusalem", misfire_grace_time=600

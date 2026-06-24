@@ -20,7 +20,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from backend.models import SystemSetting
 
-from sqlalchemy import select, func, or_, update, text
+from sqlalchemy import select, func, or_, update, text, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import AsyncSessionLocal
@@ -1088,6 +1088,27 @@ async def run_send_facebook_product():
             logger.info(f"=== Facebook product sent: {product.asin} — {product.name_he or product.name} ===")
         else:
             logger.warning(f"=== Facebook product send failed: {product.asin} ===")
+
+
+async def run_cleanup_orphans():
+    """Delete user-source products with no watchers. Runs once daily at 02:00 IL."""
+    logger.info("=== Orphan cleanup started ===")
+    async with AsyncSessionLocal() as db:
+        watched_ids = select(UserProduct.product_id).distinct()
+        orphans = (await db.execute(
+            select(Product.id, Product.asin).where(
+                Product.source == "user",
+                Product.id.not_in(watched_ids),
+            )
+        )).all()
+        if not orphans:
+            logger.info("=== Orphan cleanup: no orphans found ===")
+            return
+        orphan_ids = [row.id for row in orphans]
+        await db.execute(delete(NotificationLog).where(NotificationLog.product_id.in_(orphan_ids)))
+        await db.execute(delete(Product).where(Product.id.in_(orphan_ids)))
+        await db.commit()
+    logger.info(f"=== Orphan cleanup: deleted {len(orphans)} product(s): {[r.asin for r in orphans]} ===")
 
 
 async def check_single_product(asin: str, url: str):

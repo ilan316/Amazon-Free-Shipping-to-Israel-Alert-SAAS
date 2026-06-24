@@ -346,6 +346,14 @@ async def list_products(
     )
     paused_map = {row.product_id: row.cnt for row in paused_rows}
 
+    # Batch-fetch notification counts per product
+    notif_rows = await db.execute(
+        select(NotificationLog.product_id, func.count().label("cnt"))
+        .where(NotificationLog.success == True)
+        .group_by(NotificationLog.product_id)
+    )
+    notif_map = {row.product_id: row.cnt for row in notif_rows}
+
     return [
         {
             "id": p.id,
@@ -361,6 +369,7 @@ async def list_products(
             "last_price": p.last_price or "",
             "image_url": p.image_url or f"https://images-na.ssl-images-amazon.com/images/P/{p.asin}.01._SL100_.jpg",
             "status_since": p.status_since.isoformat() if p.status_since else None,
+            "notification_count": notif_map.get(p.id, 0),
         }
         for p in products
     ]
