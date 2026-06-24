@@ -702,9 +702,9 @@ function renderAdminProducts() {
         ${p.consecutive_errors >= 5 ? `<span title="${p.consecutive_errors} שגיאות ברצף — המוצר חסום" style="margin-right:4px;cursor:help;">🚫</span>` : ''}
         ${nextCheckLabel(p) ? `<br><span style="font-size:0.75rem;color:#e67e00;">${nextCheckLabel(p)}</span>` : ''}
       </td>
-      <td style="text-align:center;font-size:0.85rem;" title="מיילי התראה שנשלחו בהצלחה">
-        ${p.notification_count > 0
-          ? `<span style="font-weight:bold;color:${p.notification_count >= 5 ? '#e67e00' : 'var(--text)'};">${p.notification_count}</span>`
+      <td style="text-align:center;font-size:0.85rem;" title="מיילים במחזור הנוכחי / סה״כ מאז תחילת המעקב">
+        ${p.notification_count_total > 0
+          ? `<span style="font-weight:bold;color:${p.notification_count >= 5 ? '#e67e00' : 'var(--text)'};">${p.notification_count}</span><span style="color:var(--text-muted);font-size:0.78rem;"> / ${p.notification_count_total}</span>`
           : '<span style="color:var(--text-muted);">—</span>'}
       </td>
       <td class="truncate ltr" style="font-size:0.78rem;color:var(--text-muted);"
