@@ -18,7 +18,12 @@ function nextCheckLabel(p) {
   const daysUntil = cycle - dayInCycle;
   const next = new Date();
   next.setDate(next.getDate() + daysUntil);
-  return `⏸ ${next.toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' })} (יום ${dayInCycle}/${cycle})`;
+  const dd = String(next.getDate()).padStart(2, '0');
+  const mm = String(next.getMonth() + 1).padStart(2, '0');
+  const dateStr = `${dd}/${mm}`;
+  const checkDays = 7;
+  const tooltip = `מוצר במשלוח בתשלום — נבדק ${checkDays} ימים מתוך כל ${cycle}. הבדיקה הבאה ב-${dateStr}`;
+  return { text: `בדיקה הבאה ${dateStr}`, tooltip };
 }
 
 function switchTab(name, btn) {
@@ -700,7 +705,7 @@ function renderAdminProducts() {
       <td class="ltr">
         ${p.last_checked ? formatDate(p.last_checked) : "—"}
         ${p.consecutive_errors >= 5 ? `<span title="${p.consecutive_errors} שגיאות ברצף — המוצר חסום" style="margin-right:4px;cursor:help;">🚫</span>` : ''}
-        ${nextCheckLabel(p) ? `<br><span style="font-size:0.75rem;color:#e67e00;">${nextCheckLabel(p)}</span>` : ''}
+        ${(() => { const nc = nextCheckLabel(p); return nc ? `<br><span style="font-size:0.75rem;color:#e67e00;cursor:help;" title="${nc.tooltip}">${nc.text}</span>` : ''; })()}
       </td>
       <td style="text-align:center;font-size:0.85rem;white-space:nowrap;" title="מיילים מאז קליק אחרון / סה״כ">
         ${p.notification_count_total > 0
