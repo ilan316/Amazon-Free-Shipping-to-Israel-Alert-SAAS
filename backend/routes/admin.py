@@ -346,12 +346,19 @@ async def list_products(
     )
     paused_map = {row.product_id: row.cnt for row in paused_rows}
 
-    # Batch-fetch notification counts per product
-    notif_rows = await db.execute(
-        select(NotificationLog.product_id, func.count().label("cnt"))
-        .where(NotificationLog.success == True)
-        .group_by(NotificationLog.product_id)
-    )
+    # Count notifications since last click per product (resets on click, like the auto-pause countdown)
+    notif_rows = await db.execute(text("""
+        SELECT nl.product_id, COUNT(*) AS cnt
+        FROM notification_logs nl
+        JOIN products p ON p.id = nl.product_id
+        WHERE nl.success = TRUE
+          AND nl.sent_at > COALESCE(
+              (SELECT MAX(ec.clicked_at) FROM email_clicks ec
+               WHERE ec.user_id = nl.user_id AND ec.asin = p.asin),
+              '1970-01-01T00:00:00+00:00'::timestamptz
+          )
+        GROUP BY nl.product_id
+    """))
     notif_map = {row.product_id: row.cnt for row in notif_rows}
 
     return [
