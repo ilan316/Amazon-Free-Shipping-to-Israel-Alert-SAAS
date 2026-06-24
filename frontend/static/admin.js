@@ -682,7 +682,7 @@ function renderAdminProducts() {
       : _allAdminProducts.filter(p => p.last_status === _adminFilter && !fullyPaused(p));
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:24px;">אין מוצרים</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:24px;">אין מוצרים</td></tr>';
     return;
   }
   tbody.innerHTML = filtered.map(p => `
@@ -702,7 +702,7 @@ function renderAdminProducts() {
         ${p.consecutive_errors >= 5 ? `<span title="${p.consecutive_errors} שגיאות ברצף — המוצר חסום" style="margin-right:4px;cursor:help;">🚫</span>` : ''}
         ${nextCheckLabel(p) ? `<br><span style="font-size:0.75rem;color:#e67e00;">${nextCheckLabel(p)}</span>` : ''}
       </td>
-      <td style="text-align:center;font-size:0.85rem;" title="מיילים במחזור הנוכחי / סה״כ מאז תחילת המעקב">
+      <td style="text-align:center;font-size:0.85rem;white-space:nowrap;" title="מיילים מאז קליק אחרון / סה״כ">
         ${p.notification_count_total > 0
           ? `<span style="font-weight:bold;color:${p.notification_count >= 5 ? '#e67e00' : 'var(--text)'};">${p.notification_count}</span><span style="color:var(--text-muted);font-size:0.78rem;"> / ${p.notification_count_total}</span>`
           : '<span style="color:var(--text-muted);">—</span>'}
