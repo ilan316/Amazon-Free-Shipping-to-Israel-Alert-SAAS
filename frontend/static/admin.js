@@ -682,7 +682,7 @@ function renderAdminProducts() {
       : _allAdminProducts.filter(p => p.last_status === _adminFilter && !fullyPaused(p));
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:24px;">אין מוצרים</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:24px;">אין מוצרים</td></tr>';
     return;
   }
   tbody.innerHTML = filtered.map(p => `
@@ -707,9 +707,9 @@ function renderAdminProducts() {
           ? `<span style="font-weight:bold;color:${p.notification_count >= 5 ? '#e67e00' : 'var(--text)'};">${p.notification_count}</span>`
           : '<span style="color:var(--text-muted);">—</span>'}
       </td>
-      <td class="truncate ltr" style="max-width:200px;font-size:0.78rem;color:var(--text-muted);"
+      <td class="truncate ltr" style="font-size:0.78rem;color:var(--text-muted);"
           title="${p.raw_text ? p.raw_text.replace(/"/g,'&quot;') : ''}">
-        ${p.raw_text ? p.raw_text.substring(0, 60) + (p.raw_text.length > 60 ? '…' : '') : '—'}
+        ${p.raw_text ? p.raw_text.substring(0, 40) + (p.raw_text.length > 40 ? '…' : '') : '—'}
       </td>
       <td style="text-align:center;">
         <button id="chk-${p.id}" class="btn-outline" style="padding:3px 8px;font-size:0.78rem;" title="הרץ בדיקה" onclick="checkSingleProduct(${p.id})">▶</button>

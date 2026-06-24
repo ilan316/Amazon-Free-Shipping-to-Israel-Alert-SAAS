@@ -205,8 +205,8 @@ async def run_global_check_cycle():
 async def run_daily_summary():
     """Send one daily summary email per user listing all their FREE products.
 
-    Pre-step: auto-pause products free for 5+ days with no click from the user.
-    Warning badges (days 3-4 free, no click) are passed to send_daily_summary().
+    Pre-step: auto-pause products free for 5+ days since last click (or free_since if never clicked).
+    A click resets the 5-day countdown. Warning badges shown at days 3-4.
     """
     logger.info("=== Daily summary started ===")
     async with AsyncSessionLocal() as db:
@@ -214,7 +214,7 @@ async def run_daily_summary():
         cutoff_pause = now - timedelta(days=5)
         cutoff_warn  = now - timedelta(days=3)
 
-        # Auto-pause products free 5+ days with no click from tracking user
+        # Auto-pause: countdown = max(free_since, last_click_at). A click resets the 5-day window.
         auto_pause_rows = (await db.execute(text("""
             SELECT up.id, up.user_id, p.asin
             FROM user_products up
@@ -223,13 +223,13 @@ async def run_daily_summary():
             WHERE up.is_paused = FALSE
               AND p.last_status = 'FREE'
               AND p.free_since IS NOT NULL
-              AND p.free_since <= :cutoff_pause
               AND u.is_active = TRUE
               AND u.is_admin = FALSE
-              AND NOT EXISTS (
-                  SELECT 1 FROM email_clicks ec
-                  WHERE ec.user_id = up.user_id AND ec.asin = p.asin
-              )
+              AND GREATEST(p.free_since, COALESCE(
+                  (SELECT MAX(ec.clicked_at) FROM email_clicks ec
+                   WHERE ec.user_id = up.user_id AND ec.asin = p.asin),
+                  p.free_since
+              )) <= :cutoff_pause
         """), {"cutoff_pause": cutoff_pause})).fetchall()
 
         auto_paused = 0
@@ -258,10 +258,13 @@ async def run_daily_summary():
         sent = 0
 
         for user in users:
-            # Clicked ASINs for this user (any time)
-            clicked_asins = {r.asin for r in (await db.execute(
-                select(EmailClick.asin).where(EmailClick.user_id == user.id).distinct()
-            )).all()}
+            # Last click time per ASIN for this user (used to reset the 5-day countdown)
+            click_rows = (await db.execute(
+                select(EmailClick.asin, func.max(EmailClick.clicked_at).label("last_click"))
+                .where(EmailClick.user_id == user.id)
+                .group_by(EmailClick.asin)
+            )).all()
+            last_click_map = {r.asin: r.last_click for r in click_rows}
 
             free_products_result = await db.execute(
                 select(Product, UserProduct.custom_name)
@@ -280,12 +283,16 @@ async def run_daily_summary():
             if not free_products:
                 continue
 
-            # Build pause warnings for products free 3-4 days with no click
+            # Build pause warnings: countdown starts from max(free_since, last_click)
             pause_warnings = {}
             for product, _ in free_products:
-                if product.free_since and product.free_since <= cutoff_warn and product.asin not in clicked_asins:
-                    days_free = (now - product.free_since).days
-                    days_until_pause = max(1, 5 - days_free)
+                if not product.free_since:
+                    continue
+                last_click = last_click_map.get(product.asin)
+                countdown_start = max(product.free_since, last_click) if last_click else product.free_since
+                if countdown_start <= cutoff_warn:
+                    days_elapsed = (now - countdown_start).days
+                    days_until_pause = max(1, 5 - days_elapsed)
                     pause_warnings[product.asin] = days_until_pause
 
             success = send_daily_summary(user, free_products, pause_warnings=pause_warnings)
