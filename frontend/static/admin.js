@@ -14,16 +14,18 @@ function nextCheckLabel(p) {
   const cycle = p.last_status === 'PAID' ? 14 : 21;
   const daysSince = Math.floor((Date.now() - new Date(p.status_since)) / 86400000);
   const dayInCycle = daysSince % cycle;
-  if (dayInCycle < 7) return null;
+  const fmt = d => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+  if (dayInCycle < 7) {
+    const until = new Date();
+    until.setDate(until.getDate() + (6 - dayInCycle));
+    const dateStr = fmt(until);
+    return { text: `בדיקה פעילה עד ${dateStr}`, tooltip: `מוצר במשלוח בתשלום — בשלב בדיקה פעילה עד ${dateStr}, לאחר מכן יושהה ${cycle - 7} ימים` };
+  }
   const daysUntil = cycle - dayInCycle;
   const next = new Date();
   next.setDate(next.getDate() + daysUntil);
-  const dd = String(next.getDate()).padStart(2, '0');
-  const mm = String(next.getMonth() + 1).padStart(2, '0');
-  const dateStr = `${dd}/${mm}`;
-  const checkDays = 7;
-  const tooltip = `מוצר במשלוח בתשלום — נבדק ${checkDays} ימים מתוך כל ${cycle}. הבדיקה הבאה ב-${dateStr}`;
-  return { text: `בדיקה הבאה ${dateStr}`, tooltip };
+  const dateStr = fmt(next);
+  return { text: `בדיקה הבאה ${dateStr}`, tooltip: `מוצר במשלוח בתשלום — נבדק 7 ימים מתוך כל ${cycle}. הבדיקה הבאה ב-${dateStr}` };
 }
 
 function switchTab(name, btn) {
