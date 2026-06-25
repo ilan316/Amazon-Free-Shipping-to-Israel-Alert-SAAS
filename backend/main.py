@@ -261,6 +261,43 @@ async def public_config():
     return {"google_client_id": os.environ.get("GOOGLE_CLIENT_ID", "")}
 
 
+async def _get_category_he(db, english_name: str) -> str:
+    """Return Hebrew translation for an Amazon category, auto-translating via Claude if unknown."""
+    from backend.models import CategoryTranslation
+    from sqlalchemy import select
+    row = (await db.execute(
+        select(CategoryTranslation).where(CategoryTranslation.english_name == english_name)
+    )).scalar_one_or_none()
+    if row:
+        return row.hebrew_name
+
+    # New category — translate via Claude API
+    hebrew_name = english_name  # fallback
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
+        msg = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=50,
+            messages=[{
+                "role": "user",
+                "content": f'תרגם את שם קטגוריית המוצר הזו מאמזון לעברית קצרה ומדויקת. ענה רק עם התרגום, ללא הסברים: "{english_name}"'
+            }]
+        )
+        hebrew_name = msg.content[0].text.strip().strip('"')
+    except Exception as e:
+        logging.warning(f"Category translation failed for '{english_name}': {e}")
+
+    # Save to DB for next time
+    try:
+        db.add(CategoryTranslation(english_name=english_name, hebrew_name=hebrew_name))
+        await db.commit()
+    except Exception:
+        await db.rollback()
+
+    return hebrew_name
+
+
 @app.get("/api/public/free-products")
 async def public_free_products():
     """Public endpoint — returns all products currently with FREE shipping to Israel.
@@ -285,6 +322,13 @@ async def public_free_products():
             .order_by(Product.last_checked.desc())
         )
         products = result.scalars().all()
+
+        # Build category translation map for all unique categories in one pass
+        unique_cats = {p.amazon_category for p in products if p.amazon_category}
+        cat_map: dict[str, str] = {}
+        for cat in unique_cats:
+            cat_map[cat] = await _get_category_he(db, cat)
+
     return [
         {
             "asin": p.asin,
@@ -296,6 +340,7 @@ async def public_free_products():
             "last_checked": p.last_checked.isoformat() if p.last_checked else None,
             "name_he": p.name_he,
             "amazon_category": p.amazon_category,
+            "category_he": cat_map.get(p.amazon_category, p.amazon_category) if p.amazon_category else "",
         }
         for p in products
     ]

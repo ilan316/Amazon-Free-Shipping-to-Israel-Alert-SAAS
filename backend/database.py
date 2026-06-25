@@ -262,6 +262,52 @@ async def create_tables():
                 "ALTER TABLE products ADD COLUMN IF NOT EXISTS image_urls TEXT"
             )
         )
+        await conn.execute(
+            __import__("sqlalchemy").text("""
+                CREATE TABLE IF NOT EXISTS category_translations (
+                    english_name VARCHAR(200) PRIMARY KEY,
+                    hebrew_name  VARCHAR(200) NOT NULL,
+                    created_at   TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            """)
+        )
+        # Seed known translations so existing categories are already covered
+        _known_translations = [
+            ("Automotive", "רכב"),
+            ("Beauty & Personal Care", "יופי וטיפוח"),
+            ("Cell Phones & Accessories", "סלולר ואביזרים"),
+            ("Clothing, Shoes & Jewelry", "אופנה ותכשיטים"),
+            ("Electronics", "אלקטרוניקה"),
+            ("Health & Household", "בריאות ומשק בית"),
+            ("Home & Kitchen", "בית ומטבח"),
+            ("Office Products", "משרד"),
+            ("Patio, Lawn & Garden", "גינה וחוץ"),
+            ("Sports & Outdoors", "ספורט ופעילויות חוץ"),
+            ("Tools & Home Improvement", "כלים ושיפוצים"),
+            ("Toys & Games", "צעצועים ומשחקים"),
+            ("Mobility & Daily Living Aids", "ניידות וסיוע יומיומי"),
+            ("Books", "ספרים"),
+            ("Baby Products", "תינוקות"),
+            ("Musical Instruments", "כלי נגינה"),
+            ("Appliances", "מכשירי חשמל"),
+            ("Small Appliance Parts & Accessories", "חלקים ואביזרים למכשירי חשמל"),
+            ("Kitchen & Dining", "מטבח ופינת אוכל"),
+            ("Industrial & Scientific", "תעשייה ומדע"),
+            ("Video Games", "משחקי וידאו"),
+            ("Shoe, Jewelry & Watch Accessories", "אביזרי נעליים, תכשיטים ושעונים"),
+            ("Pet Supplies", "ציוד לחיות מחמד"),
+            ("Arts, Crafts & Sewing", "אמנות, יצירה ותפירה"),
+            ("Camera & Photo", "מצלמות ותמונות"),
+            ("Computers", "מחשבים"),
+            ("Grocery & Gourmet Food", "מכולת ומזון גורמה"),
+            ("Movies & TV", "סרטים וטלוויזיה"),
+            ("Music", "מוזיקה"),
+            ("Garden & Outdoor", "גינה וחוץ"),
+        ]
+        for _en, _he in _known_translations:
+            await conn.execute(__import__("sqlalchemy").text(
+                "INSERT INTO category_translations (english_name, hebrew_name) VALUES (:en, :he) ON CONFLICT DO NOTHING"
+            ), {"en": _en, "he": _he})
         # Seed telegram_sent with ASINs already sent via local scanner (to avoid duplicates)
         _sent_asins = [
             ('B0GY8HCFHG','2026-05-31 17:38:46+00'),('B0FCG39JQ6','2026-05-31 17:38:51+00'),

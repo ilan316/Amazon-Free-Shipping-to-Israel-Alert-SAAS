@@ -170,3 +170,11 @@ class FacebookSent(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     asin: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class CategoryTranslation(Base):
+    __tablename__ = "category_translations"
+
+    english_name: Mapped[str] = mapped_column(String(200), primary_key=True)
+    hebrew_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
