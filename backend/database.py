@@ -306,7 +306,7 @@ async def create_tables():
         ]
         for _en, _he in _known_translations:
             await conn.execute(__import__("sqlalchemy").text(
-                "INSERT INTO category_translations (english_name, hebrew_name) VALUES (:en, :he) ON CONFLICT DO NOTHING"
+                "INSERT INTO category_translations (english_name, hebrew_name, created_at) VALUES (:en, :he, NOW()) ON CONFLICT DO NOTHING"
             ), {"en": _en, "he": _he})
         # Seed telegram_sent with ASINs already sent via local scanner (to avoid duplicates)
         _sent_asins = [
