@@ -346,16 +346,20 @@ async def list_products(
     )
     paused_map = {row.product_id: row.cnt for row in paused_rows}
 
-    # Count notifications since last click per product (resets on click)
+    # Count notifications in current streak: since GREATEST(free_since, last_click)
+    # Matches the auto-pause countdown logic exactly
     notif_rows = await db.execute(text("""
         SELECT nl.product_id, COUNT(*) AS cnt
         FROM notification_log nl
         JOIN products p ON p.id = nl.product_id
         WHERE nl.success = TRUE
-          AND nl.sent_at > COALESCE(
-              (SELECT MAX(ec.clicked_at) FROM email_clicks ec
-               WHERE ec.user_id = nl.user_id AND ec.asin = p.asin),
-              '1970-01-01T00:00:00+00:00'::timestamptz
+          AND nl.sent_at > GREATEST(
+              COALESCE(p.free_since, '1970-01-01T00:00:00+00:00'::timestamptz),
+              COALESCE(
+                  (SELECT MAX(ec.clicked_at) FROM email_clicks ec
+                   WHERE ec.user_id = nl.user_id AND ec.asin = p.asin),
+                  '1970-01-01T00:00:00+00:00'::timestamptz
+              )
           )
         GROUP BY nl.product_id
     """))
