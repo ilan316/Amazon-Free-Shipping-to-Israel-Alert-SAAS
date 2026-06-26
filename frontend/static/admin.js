@@ -1680,6 +1680,7 @@ function _renderFunnel(f) {
       }
     });
   }
+}
 
 async function loadBlogCandidates() {
   const statusEl = document.getElementById("blog-candidates-status");
@@ -1743,5 +1744,4 @@ async function markBlogPublished(asin, btn) {
     btn.textContent = "סמן כפורסם";
     alert("שגיאה בשמירה");
   }
-}
 }
