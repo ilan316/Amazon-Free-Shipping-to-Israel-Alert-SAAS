@@ -2196,9 +2196,7 @@ async def get_blog_candidates(
     published_result = await db.execute(select(BlogPublishedAsin.asin))
     published_asins = {row[0] for row in published_result.all()}
 
-    result = await db.execute(
-        select(Product).where(Product.last_status == "FREE")
-    )
+    result = await db.execute(select(Product))
     products = result.scalars().all()
 
     candidates = []
@@ -2219,6 +2217,7 @@ async def get_blog_candidates(
             "price_ils": price,
             "amazon_category": p.amazon_category or "",
             "image_url": p.image_url or "",
+            "last_status": p.last_status or "",
         })
 
     candidates.sort(key=lambda x: x["price_ils"], reverse=True)

@@ -1713,6 +1713,7 @@ async function loadBlogCandidates() {
           <div style="font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${name}">${name}</div>
           <div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">
             <span dir="ltr">${c.asin}</span> &nbsp;·&nbsp; ₪${Math.round(c.price_ils).toLocaleString()} &nbsp;·&nbsp; ${c.amazon_category}
+            ${c.last_status === "FREE" ? '&nbsp;·&nbsp;<span style="color:var(--success);font-weight:600;">FREE ✓</span>' : ''}
           </div>
         </div>
         <button onclick="markBlogPublished('${c.asin}', this)"
