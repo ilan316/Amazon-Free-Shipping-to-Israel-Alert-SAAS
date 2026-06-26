@@ -2196,7 +2196,9 @@ async def get_blog_candidates(
     published_result = await db.execute(select(BlogPublishedAsin.asin))
     published_asins = {row[0] for row in published_result.all()}
 
-    result = await db.execute(select(Product))
+    result = await db.execute(
+        select(Product).where(Product.last_status == "FREE")
+    )
     products = result.scalars().all()
 
     candidates = []
@@ -2205,9 +2207,6 @@ async def get_blog_candidates(
             continue
         price = _parse_price(p.last_price)
         if price < BLOG_MIN_PRICE_ILS:
-            continue
-        category = (p.amazon_category or "").lower()
-        if not any(kw in category for kw in BLOG_CATEGORY_KEYWORDS):
             continue
         candidates.append({
             "asin": p.asin,
