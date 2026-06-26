@@ -223,6 +223,7 @@
       <button class="admin-tab" onclick="switchTab('testing', this)">🧪 בדיקות מייל</button>
       <button class="admin-tab" onclick="switchTab('analytics', this)">📈 אנליטיקס</button>
       <button class="admin-tab" onclick="switchTab('account', this)">⚙️ הגדרות חשבון</button>
+      <button class="admin-tab" onclick="switchTab('blog', this)">✍️ בלוג</button>
     </div>
 
     <!-- Tab: Dashboard -->
@@ -719,10 +720,21 @@
       </div>
     </div>
 
+    <!-- Tab: Blog -->
+    <div class="tab-panel" id="tab-blog">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+        <h2 style="font-size:1.1rem; margin:0;">✍️ מועמדים לפוסט בלוג</h2>
+        <button class="btn-sm" onclick="loadBlogCandidates()" style="background:var(--brand);color:#111;border:none;padding:7px 16px;border-radius:6px;cursor:pointer;font-weight:600;">רענן רשימה</button>
+      </div>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:14px;">מוצרים חינמיים מקטגוריות אלקטרוניקה מעל ₪200 שעוד לא פורסמו עליהם פוסטים.</p>
+      <div id="blog-candidates-status" style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;"></div>
+      <div id="blog-candidates-list"></div>
+    </div>
+
   </div>
 
   <script src="/static/app.js?v=10"></script>
-  <script src="/static/admin.js?v=43"></script>
+  <script src="/static/admin.js?v=44"></script>
   <script>
     requireAuth();
     loadAdminData();

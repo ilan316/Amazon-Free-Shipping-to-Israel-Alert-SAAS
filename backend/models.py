@@ -178,3 +178,11 @@ class CategoryTranslation(Base):
     english_name: Mapped[str] = mapped_column(String(200), primary_key=True)
     hebrew_name: Mapped[str] = mapped_column(String(200), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class BlogPublishedAsin(Base):
+    __tablename__ = "blog_published_asins"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    asin: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
+    marked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)

@@ -13,7 +13,7 @@ from sqlalchemy import select, func, delete, text
 
 from backend.database import get_db
 from sqlalchemy import cast, Date
-from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen, EmailSendLog, EmailSendRecipient
+from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen, EmailSendLog, EmailSendRecipient, BlogPublishedAsin
 from backend.auth import get_current_admin, hash_password, verify_password, SECRET_KEY, ALGORITHM
 
 
@@ -2171,3 +2171,80 @@ async def check_asin_now(
     import asyncio
     asyncio.create_task(check_single_product(product.asin, product.url))
     return {"message": f"Check triggered for {asin}", "product_id": product.id}
+
+
+BLOG_CATEGORY_KEYWORDS = [
+    "electronics", "computer", "camera", "audio", "phone",
+    "tablet", "gaming", "storage", "wireless", "smart", "tv",
+]
+BLOG_MIN_PRICE_ILS = 200
+
+
+def _parse_price(raw: str | None) -> float:
+    import re
+    try:
+        return float(re.sub(r"[^\d.]", "", str(raw or "")))
+    except (ValueError, TypeError):
+        return 0
+
+
+@router.get("/blog-candidates")
+async def get_blog_candidates(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    published_result = await db.execute(select(BlogPublishedAsin.asin))
+    published_asins = {row[0] for row in published_result.all()}
+
+    result = await db.execute(
+        select(Product).where(Product.last_status == "FREE")
+    )
+    products = result.scalars().all()
+
+    candidates = []
+    for p in products:
+        if p.asin in published_asins:
+            continue
+        price = _parse_price(p.last_price)
+        if price < BLOG_MIN_PRICE_ILS:
+            continue
+        category = (p.amazon_category or "").lower()
+        if not any(kw in category for kw in BLOG_CATEGORY_KEYWORDS):
+            continue
+        candidates.append({
+            "asin": p.asin,
+            "name": p.name or "",
+            "name_he": p.name_he or "",
+            "last_price": p.last_price or "",
+            "price_ils": price,
+            "amazon_category": p.amazon_category or "",
+            "image_url": p.image_url or "",
+        })
+
+    candidates.sort(key=lambda x: x["price_ils"], reverse=True)
+    return {"candidates": candidates, "published_count": len(published_asins)}
+
+
+@router.post("/blog-candidates/{asin}/mark-published")
+async def mark_blog_asin_published(
+    asin: str,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    existing = await db.execute(select(BlogPublishedAsin).where(BlogPublishedAsin.asin == asin))
+    if existing.scalar_one_or_none():
+        return {"message": "already marked"}
+    db.add(BlogPublishedAsin(asin=asin))
+    await db.commit()
+    return {"message": "marked"}
+
+
+@router.delete("/blog-candidates/{asin}/mark-published")
+async def unmark_blog_asin_published(
+    asin: str,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    await db.execute(delete(BlogPublishedAsin).where(BlogPublishedAsin.asin == asin))
+    await db.commit()
+    return {"message": "unmarked"}

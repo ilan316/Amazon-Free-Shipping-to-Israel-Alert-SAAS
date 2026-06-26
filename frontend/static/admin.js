@@ -68,6 +68,7 @@ async function loadAdminData() {
     loadClickStats(),
     loadTemplates(),
     loadSendLogs(),
+    loadBlogCandidates(),
   ]);
 }
 
@@ -1679,4 +1680,67 @@ function _renderFunnel(f) {
       }
     });
   }
+
+async function loadBlogCandidates() {
+  const statusEl = document.getElementById("blog-candidates-status");
+  const listEl = document.getElementById("blog-candidates-list");
+  if (!statusEl || !listEl) return;
+
+  statusEl.textContent = "טוען...";
+  listEl.innerHTML = "";
+
+  const res = await apiFetch("/admin/blog-candidates");
+  if (!res || !res.ok) { statusEl.textContent = "שגיאה בטעינה"; return; }
+  const data = await res.json();
+  const candidates = data.candidates || [];
+
+  statusEl.textContent = `${candidates.length} מועמדים נמצאו (${data.published_count} פורסמו כבר)`;
+
+  if (!candidates.length) {
+    listEl.innerHTML = '<div style="color:var(--text-muted); padding:20px 0;">אין מועמדים כרגע — אין מוצרים חינמיים באלקטרוניקה מעל ₪200 שלא פורסמו עדיין.</div>';
+    return;
+  }
+
+  listEl.innerHTML = candidates.map(c => {
+    const name = c.name_he || c.name || c.asin;
+    const img = c.image_url
+      ? `<img src="${c.image_url}" alt="" style="width:52px;height:52px;object-fit:contain;border-radius:6px;border:1px solid var(--border);background:#fff;">`
+      : `<div style="width:52px;height:52px;border-radius:6px;border:1px solid var(--border);background:var(--surface);"></div>`;
+    return `
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--surface);">
+        ${img}
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${name}">${name}</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">
+            <span dir="ltr">${c.asin}</span> &nbsp;·&nbsp; ₪${Math.round(c.price_ils).toLocaleString()} &nbsp;·&nbsp; ${c.amazon_category}
+          </div>
+        </div>
+        <button onclick="markBlogPublished('${c.asin}', this)"
+          style="flex-shrink:0;background:var(--brand);color:#111;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:600;white-space:nowrap;">
+          סמן כפורסם
+        </button>
+      </div>`;
+  }).join("");
+}
+
+async function markBlogPublished(asin, btn) {
+  btn.disabled = true;
+  btn.textContent = "שומר...";
+  const res = await apiFetch(`/admin/blog-candidates/${asin}/mark-published`, { method: "POST" });
+  if (res && res.ok) {
+    btn.closest("div[style]").remove();
+    const statusEl = document.getElementById("blog-candidates-status");
+    if (statusEl) {
+      const match = statusEl.textContent.match(/(\d+) מועמדים/);
+      const published = statusEl.textContent.match(/\((\d+) פורסמו/);
+      if (match && published) {
+        statusEl.textContent = `${parseInt(match[1]) - 1} מועמדים נמצאו (${parseInt(published[1]) + 1} פורסמו כבר)`;
+      }
+    }
+  } else {
+    btn.disabled = false;
+    btn.textContent = "סמן כפורסם";
+    alert("שגיאה בשמירה");
+  }
+}
 }

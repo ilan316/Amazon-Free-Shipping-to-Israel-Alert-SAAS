@@ -354,6 +354,13 @@ async def create_tables():
             """)
         )
 
+        # Seed Samsung 990 Pro as already-published blog post
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "INSERT INTO blog_published_asins (asin, marked_at) VALUES ('B0BHJJ9Y77', NOW()) ON CONFLICT (asin) DO NOTHING"
+            )
+        )
+
 
 def _apply_rtl_to_html(body: str) -> str:
     """Add dir=rtl/lang=he to <html>, direction:rtl to <body>, and force RTL on content divs."""
