@@ -645,41 +645,21 @@ async def add_to_prices_page(
     card = f"""
       <!-- {title_short} -->
       <div class="price-card">
-        <div class="price-card-img">
-          <a href="{aff_url}" target="_blank" rel="noopener sponsored">
-            <img src="{image_url}" alt="{title_short}" width="100" height="100" loading="lazy" />
-          </a>
-        </div>
+        <a class="price-card-thumb" href="{aff_url}" target="_blank" rel="noopener sponsored">
+          <img src="{image_url}" alt="{title_short}" width="80" height="80" loading="lazy" />
+        </a>
         <div class="price-card-body">
-          <h2>{title_short}</h2>
-          <table class="price-table">
-            <thead>
-              <tr><th>מקור</th><th>מחיר</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>בישראל (הזול ביותר)</td>
-                <td>₪{israel_price}</td>
-              </tr>
-              <tr class="amazon-row">
-                <td>אמזון <small style="font-weight:400;color:#4d5a70;">(כולל מע"מ + משלוח חינם)</small></td>
-                <td>₪{amazon_price}</td>
-              </tr>
-              <tr class="saving">
-                <td>חיסכון</td>
-                <td>~₪{savings}</td>
-              </tr>
-            </tbody>
-          </table>
-          <p class="price-date">* נכון ל-{today_display}</p>
+          <h2 class="price-card-title">{title_short}</h2>
+          <div class="price-chips">
+            <span class="chip chip-israel">🏷 ישראל ₪{israel_price}</span>
+            <span class="chip-arrow">→</span>
+            <span class="chip chip-amazon">📦 אמזון <strong>₪{amazon_price}</strong></span>
+            <span class="chip chip-saving">חסכת ~₪{savings}</span>
+          </div>
           <div class="price-card-footer">
-            <a href="{aff_url}"
-               target="_blank" rel="noopener sponsored" class="btn-amazon">
-              קנה באמזון ←
-            </a>
-            <a href="blog/{slug}.html" class="btn-review">
-              קרא ביקורת מלאה →
-            </a>
+            <a href="{aff_url}" target="_blank" rel="noopener sponsored" class="btn-amazon">קנה באמזון ←</a>
+            <a href="blog/{slug}.html" class="btn-review">ביקורת מלאה →</a>
+            <span class="price-date">{today_display}</span>
           </div>
         </div>
       </div>
