@@ -1712,7 +1712,9 @@ async function loadBlogCandidates() {
       <div data-asin="${c.asin}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--surface);transition:opacity .2s;">
         ${img}
         <div style="flex:1;min-width:0;">
-          <div style="font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${nameEsc}">${name}</div>
+          <div style="font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${nameEsc}">
+            <a href="${c.url}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${name}</a>
+          </div>
           <div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">
             <span dir="ltr">${c.asin}</span> &nbsp;·&nbsp; ₪${Math.round(c.price_ils).toLocaleString()} &nbsp;·&nbsp; ${c.amazon_category}
             <span style="color:var(--success);font-weight:600;">&nbsp;·&nbsp;FREE ✓</span>

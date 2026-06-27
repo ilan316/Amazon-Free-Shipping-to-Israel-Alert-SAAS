@@ -2234,6 +2234,7 @@ async def get_blog_candidates(
             "amazon_category": p.amazon_category or "",
             "image_url": p.image_url or "",
             "last_status": p.last_status or "",
+            "url": p.url or f"https://www.amazon.com/dp/{p.asin}",
         })
 
     candidates.sort(key=lambda x: x["price_ils"], reverse=True)
