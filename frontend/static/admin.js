@@ -1840,11 +1840,17 @@ async function generateBlogDraft(asin) {
     statusEl.innerHTML = `
       <div style="background:rgba(22,125,70,.08);border:1px solid rgba(22,125,70,.25);border-radius:8px;padding:12px 14px;">
         <p style="margin:0 0 6px;font-weight:700;color:#167d46;">✅ דראפט נוצר בהצלחה!</p>
-        <p style="margin:0 0 4px;font-size:0.82rem;">${data.title || ""}</p>
-        <p style="margin:0;font-size:0.82rem;">
-          <a href="${data.github_url}" target="_blank" rel="noopener" style="color:var(--brand-deep,#ff6a00);font-weight:600;">פתח ב-GitHub ←</a>
-          &nbsp;·&nbsp;
-          <a href="${data.preview_url}" target="_blank" rel="noopener" style="color:var(--text-muted);">preview URL</a>
+        <p style="margin:0 0 8px;font-size:0.82rem;">${data.title || ""}</p>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+          <button id="modal-publish-btn"
+            onclick="publishBlogDraft('${asin}','${data.slug}',this)"
+            style="background:#167d46;color:#fff;border:none;padding:7px 18px;border-radius:7px;cursor:pointer;font-weight:700;font-size:0.85rem;">
+            🚀 פרסם עכשיו
+          </button>
+          <a href="${data.preview_url}" target="_blank" rel="noopener" style="font-size:0.82rem;color:var(--text-muted);">preview ←</a>
+        </div>
+        <p style="margin:0;font-size:0.78rem;">
+          <a href="${data.github_url}" target="_blank" rel="noopener" style="color:var(--brand-deep,#ff6a00);">GitHub ←</a>
         </p>
       </div>`;
     btn.textContent = "✍️ צור דראפט נוסף";
@@ -1890,6 +1896,7 @@ async function publishBlogDraft(asin, slug, btn) {
 
   if (res && res.ok) {
     const data = await res.json();
+    closeDraftModal();
     const row = document.querySelector(`[data-asin="${asin}"]`);
     if (row) {
       const actionsEl = row.querySelector(".blog-card-actions");
