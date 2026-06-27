@@ -15,7 +15,7 @@ from sqlalchemy import select, func, delete, text
 from backend.database import get_db
 from sqlalchemy import cast, Date
 from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen, EmailSendLog, EmailSendRecipient, BlogPublishedAsin, BlogDismissedAsin, BlogDraft
-from backend.blog_utils import fetch_amazon_product, generate_with_claude, build_post_html, commit_to_github, publish_draft
+from backend.blog_utils import fetch_amazon_product, generate_with_claude, build_post_html, commit_to_github, publish_draft, add_to_prices_page
 from backend.auth import get_current_admin, hash_password, verify_password, SECRET_KEY, ALGORITHM
 
 
@@ -2331,8 +2331,20 @@ async def generate_blog_draft(
     if draft_row:
         draft_row.slug = slug
         draft_row.title = content.get("title_he", "")
+        draft_row.title_short = content.get("title_short", "")
+        draft_row.israel_price = body.israel_price
+        draft_row.amazon_price = body.amazon_price
+        draft_row.image_url = product.get("image", "")
     else:
-        db.add(BlogDraft(asin=asin, slug=slug, title=content.get("title_he", "")))
+        db.add(BlogDraft(
+            asin=asin,
+            slug=slug,
+            title=content.get("title_he", ""),
+            title_short=content.get("title_short", ""),
+            israel_price=body.israel_price,
+            amazon_price=body.amazon_price,
+            image_url=product.get("image", ""),
+        ))
     await db.commit()
 
     repo = os.getenv("GITHUB_REPO", "")
@@ -2358,10 +2370,25 @@ async def publish_blog_draft(
     asin = body.asin
     slug = body.slug
 
+    draft_row = (await db.execute(select(BlogDraft).where(BlogDraft.asin == asin))).scalar_one_or_none()
+
     try:
         await publish_draft(slug)
     except Exception as e:
         raise HTTPException(502, f"GitHub publish error: {e}")
+
+    if draft_row and draft_row.israel_price and draft_row.amazon_price:
+        try:
+            await add_to_prices_page(
+                asin=asin,
+                slug=slug,
+                title_short=draft_row.title_short or draft_row.title,
+                israel_price=draft_row.israel_price,
+                amazon_price=draft_row.amazon_price,
+                image_url=draft_row.image_url or "",
+            )
+        except Exception as e:
+            raise HTTPException(502, f"prices.html update error: {e}")
 
     existing_pub = await db.execute(select(BlogPublishedAsin).where(BlogPublishedAsin.asin == asin))
     if not existing_pub.scalar_one_or_none():

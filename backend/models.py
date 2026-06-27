@@ -203,4 +203,8 @@ class BlogDraft(Base):
     asin: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
     slug: Mapped[str] = mapped_column(String(200), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    title_short: Mapped[str] = mapped_column(String(300), nullable=False, default="")
+    israel_price: Mapped[float] = mapped_column(nullable=True)
+    amazon_price: Mapped[float] = mapped_column(nullable=True)
+    image_url: Mapped[str] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)

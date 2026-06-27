@@ -263,6 +263,26 @@ async def create_tables():
             )
         )
         await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE blog_drafts ADD COLUMN IF NOT EXISTS title_short VARCHAR(300) NOT NULL DEFAULT ''"
+            )
+        )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE blog_drafts ADD COLUMN IF NOT EXISTS israel_price FLOAT"
+            )
+        )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE blog_drafts ADD COLUMN IF NOT EXISTS amazon_price FLOAT"
+            )
+        )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE blog_drafts ADD COLUMN IF NOT EXISTS image_url VARCHAR(512)"
+            )
+        )
+        await conn.execute(
             __import__("sqlalchemy").text("""
                 CREATE TABLE IF NOT EXISTS category_translations (
                     english_name VARCHAR(200) PRIMARY KEY,

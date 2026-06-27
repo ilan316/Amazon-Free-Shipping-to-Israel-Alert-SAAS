@@ -613,6 +613,86 @@ async def publish_draft(slug: str) -> dict:
     return await commit_to_github(path, updated, f"blog: publish {slug}", sha=sha)
 
 
+async def add_to_prices_page(
+    asin: str,
+    slug: str,
+    title_short: str,
+    israel_price: float,
+    amazon_price: float,
+    image_url: str,
+) -> dict:
+    token = os.getenv("GITHUB_TOKEN")
+    repo = os.getenv("GITHUB_REPO")
+    path = "prices.html"
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.get(url, headers=headers)
+        r.raise_for_status()
+        data = r.json()
+        sha = data["sha"]
+        current = base64.b64decode(data["content"]).decode("utf-8")
+
+    partner_tag = os.getenv("AMAZON_AFFILIATE_TAG") or os.getenv("AMAZON_PARTNER_TAG", "amzfreeil-20")
+    today_display = date.today().strftime("%d/%m/%Y")
+    savings = round(israel_price - amazon_price)
+    aff_url = f"https://www.amazon.com/dp/{asin}?tag={partner_tag}"
+
+    card = f"""
+      <!-- {title_short} -->
+      <div class="price-card">
+        <div class="price-card-img">
+          <a href="{aff_url}" target="_blank" rel="noopener sponsored">
+            <img src="{image_url}" alt="{title_short}" width="100" height="100" loading="lazy" />
+          </a>
+        </div>
+        <div class="price-card-body">
+          <h2>{title_short}</h2>
+          <table class="price-table">
+            <thead>
+              <tr><th>מקור</th><th>מחיר</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>בישראל (הזול ביותר)</td>
+                <td>₪{israel_price}</td>
+              </tr>
+              <tr class="amazon-row">
+                <td>אמזון <small style="font-weight:400;color:#4d5a70;">(כולל מע"מ + משלוח חינם)</small></td>
+                <td>₪{amazon_price}</td>
+              </tr>
+              <tr class="saving">
+                <td>חיסכון</td>
+                <td>~₪{savings}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="price-date">* נכון ל-{today_display}</p>
+          <div class="price-card-footer">
+            <a href="{aff_url}"
+               target="_blank" rel="noopener sponsored" class="btn-amazon">
+              קנה באמזון ←
+            </a>
+            <a href="blog/{slug}.html" class="btn-review">
+              קרא ביקורת מלאה →
+            </a>
+          </div>
+        </div>
+      </div>
+"""
+
+    marker = "\n    </div>\n\n    <!-- Alert CTA -->"
+    if marker not in current:
+        raise ValueError("prices.html: insertion marker not found")
+
+    updated = current.replace(marker, card + "\n    </div>\n\n    <!-- Alert CTA -->")
+    return await commit_to_github(path, updated, f"prices: add {title_short}", sha=sha)
+
+
 async def commit_to_github(path: str, content: str, message: str, sha: str | None = None) -> dict:
     token = os.getenv("GITHUB_TOKEN")
     repo = os.getenv("GITHUB_REPO")
