@@ -73,6 +73,7 @@ async def fetch_amazon_product(asin: str) -> dict:
         or primary.get("medium", {}).get("url", "")
         or primary.get("small", {}).get("url", "")
     )
+    image_url = re.sub(r"\._S[XL]\d+_\.", "._SL1500_.", image_url)
     mfr = item.get("itemInfo", {}).get("manufactureInfo", {}) or {}
     model = mfr.get("model", {}).get("displayValue", "") if mfr else ""
     aff_url = f"https://www.amazon.com/dp/{asin}?tag={partner_tag}"
