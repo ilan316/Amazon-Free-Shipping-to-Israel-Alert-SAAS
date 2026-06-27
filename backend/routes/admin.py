@@ -1,4 +1,5 @@
 import io
+import os
 from datetime import datetime, timedelta
 from typing import Annotated
 
@@ -13,7 +14,8 @@ from sqlalchemy import select, func, delete, text
 
 from backend.database import get_db
 from sqlalchemy import cast, Date
-from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen, EmailSendLog, EmailSendRecipient, BlogPublishedAsin
+from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen, EmailSendLog, EmailSendRecipient, BlogPublishedAsin, BlogDismissedAsin
+from backend.blog_utils import fetch_amazon_product, generate_with_claude, build_post_html, commit_to_github
 from backend.auth import get_current_admin, hash_password, verify_password, SECRET_KEY, ALGORITHM
 
 
@@ -25,6 +27,13 @@ class ChangePasswordRequest(BaseModel):
 class RequestEmailChangeRequest(BaseModel):
     new_email: str
     current_password: str
+
+
+class GenerateBlogDraftRequest(BaseModel):
+    asin: str
+    israel_price: float
+    amazon_price: float
+
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -2198,6 +2207,9 @@ async def get_blog_candidates(
     published_result = await db.execute(select(BlogPublishedAsin.asin))
     published_asins = {row[0] for row in published_result.all()}
 
+    dismissed_result = await db.execute(select(BlogDismissedAsin.asin))
+    dismissed_asins = {row[0] for row in dismissed_result.all()}
+
     result = await db.execute(
         select(Product).where(Product.last_status == "FREE")
     )
@@ -2205,7 +2217,7 @@ async def get_blog_candidates(
 
     candidates = []
     for p in products:
-        if p.asin in published_asins:
+        if p.asin in published_asins or p.asin in dismissed_asins:
             continue
         price = _parse_price(p.last_price)
         if price < BLOG_MIN_PRICE_ILS:
@@ -2251,3 +2263,71 @@ async def unmark_blog_asin_published(
     await db.execute(delete(BlogPublishedAsin).where(BlogPublishedAsin.asin == asin))
     await db.commit()
     return {"message": "unmarked"}
+
+
+@router.post("/blog-candidates/{asin}/dismiss")
+async def dismiss_blog_candidate(
+    asin: str,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    existing = await db.execute(select(BlogDismissedAsin).where(BlogDismissedAsin.asin == asin))
+    if not existing.scalar_one_or_none():
+        db.add(BlogDismissedAsin(asin=asin))
+        await db.commit()
+    return {"message": "dismissed"}
+
+
+@router.delete("/blog-candidates/{asin}/dismiss")
+async def undismiss_blog_candidate(
+    asin: str,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    await db.execute(delete(BlogDismissedAsin).where(BlogDismissedAsin.asin == asin))
+    await db.commit()
+    return {"message": "undismissed"}
+
+
+@router.post("/blog-draft")
+async def generate_blog_draft(
+    body: GenerateBlogDraftRequest,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    asin = body.asin.strip().upper()
+
+    try:
+        product = await fetch_amazon_product(asin)
+    except Exception as e:
+        raise HTTPException(502, f"Amazon API error: {e}")
+
+    try:
+        content = await generate_with_claude(product, body.israel_price, body.amazon_price)
+    except Exception as e:
+        raise HTTPException(502, f"Claude API error: {e}")
+
+    html = build_post_html(product, content, body.israel_price, body.amazon_price)
+    slug = content["slug"]
+
+    try:
+        await commit_to_github(
+            path=f"blog/{slug}.html",
+            content=html,
+            message=f"blog: draft {content.get('title_short', slug)}",
+        )
+    except Exception as e:
+        raise HTTPException(502, f"GitHub commit error: {e}")
+
+    existing = await db.execute(select(BlogDismissedAsin).where(BlogDismissedAsin.asin == asin))
+    if not existing.scalar_one_or_none():
+        db.add(BlogDismissedAsin(asin=asin))
+        await db.commit()
+
+    repo = os.getenv("GITHUB_REPO", "")
+    return {
+        "slug": slug,
+        "title": content.get("title_he", ""),
+        "github_url": f"https://github.com/{repo}/blob/main/blog/{slug}.html",
+        "preview_url": f"https://www.amzfreeil.com/blog/{slug}.html",
+    }

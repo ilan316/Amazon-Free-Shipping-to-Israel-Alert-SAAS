@@ -1704,44 +1704,144 @@ async function loadBlogCandidates() {
 
   listEl.innerHTML = candidates.map(c => {
     const name = c.name_he || c.name || c.asin;
+    const nameEsc = name.replace(/"/g, "&quot;");
     const img = c.image_url
-      ? `<img src="${c.image_url}" alt="" style="width:52px;height:52px;object-fit:contain;border-radius:6px;border:1px solid var(--border);background:#fff;">`
-      : `<div style="width:52px;height:52px;border-radius:6px;border:1px solid var(--border);background:var(--surface);"></div>`;
+      ? `<img src="${c.image_url}" alt="" style="width:52px;height:52px;object-fit:contain;border-radius:6px;border:1px solid var(--border);background:#fff;flex-shrink:0;">`
+      : `<div style="width:52px;height:52px;border-radius:6px;border:1px solid var(--border);background:var(--surface);flex-shrink:0;"></div>`;
     return `
-      <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--surface);">
+      <div data-asin="${c.asin}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--surface);transition:opacity .2s;">
         ${img}
         <div style="flex:1;min-width:0;">
-          <div style="font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${name}">${name}</div>
+          <div style="font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${nameEsc}">${name}</div>
           <div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">
             <span dir="ltr">${c.asin}</span> &nbsp;·&nbsp; ₪${Math.round(c.price_ils).toLocaleString()} &nbsp;·&nbsp; ${c.amazon_category}
-            ${c.last_status === "FREE" ? '&nbsp;·&nbsp;<span style="color:var(--success);font-weight:600;">FREE ✓</span>' : ''}
+            <span style="color:var(--success);font-weight:600;">&nbsp;·&nbsp;FREE ✓</span>
           </div>
         </div>
-        <button onclick="markBlogPublished('${c.asin}', this)"
-          style="flex-shrink:0;background:var(--brand);color:#111;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:600;white-space:nowrap;">
-          סמן כפורסם
-        </button>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0;">
+          <button onclick="openDraftModal('${c.asin}','${nameEsc}','${c.image_url || ''}')"
+            style="background:var(--brand);color:#111;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.82rem;white-space:nowrap;">
+            ✍️ צור דראפט
+          </button>
+          <label style="display:flex;align-items:center;gap:5px;font-size:0.78rem;color:var(--text-muted);cursor:pointer;white-space:nowrap;">
+            <input type="checkbox" onchange="setBlogDismissed('${c.asin}', this.checked, this.closest('[data-asin]'))" style="cursor:pointer;" />
+            בטל מועמדות
+          </label>
+        </div>
       </div>`;
   }).join("");
 }
 
-async function markBlogPublished(asin, btn) {
-  btn.disabled = true;
-  btn.textContent = "שומר...";
-  const res = await apiFetch(`/admin/blog-candidates/${asin}/mark-published`, { method: "POST" });
+async function setBlogDismissed(asin, dismissed, row) {
+  const method = dismissed ? "POST" : "DELETE";
+  const res = await apiFetch(`/admin/blog-candidates/${asin}/dismiss`, { method });
   if (res && res.ok) {
-    btn.closest("div[style]").remove();
-    const statusEl = document.getElementById("blog-candidates-status");
-    if (statusEl) {
-      const match = statusEl.textContent.match(/(\d+) מועמדים/);
-      const published = statusEl.textContent.match(/\((\d+) פורסמו/);
-      if (match && published) {
-        statusEl.textContent = `${parseInt(match[1]) - 1} מועמדים נמצאו (${parseInt(published[1]) + 1} פורסמו כבר)`;
-      }
+    if (dismissed) {
+      row.style.opacity = "0.35";
+      row.querySelector("button").disabled = true;
+    } else {
+      row.style.opacity = "1";
+      row.querySelector("button").disabled = false;
     }
   } else {
-    btn.disabled = false;
-    btn.textContent = "סמן כפורסם";
+    const cb = row.querySelector("input[type=checkbox]");
+    if (cb) cb.checked = !dismissed;
     alert("שגיאה בשמירה");
+  }
+}
+
+function openDraftModal(asin, name, imageUrl) {
+  if (document.getElementById("blog-draft-modal")) return;
+
+  const modal = document.createElement("div");
+  modal.id = "blog-draft-modal";
+  modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;";
+  modal.innerHTML = `
+    <div style="background:var(--bg,#fff);border-radius:14px;padding:28px 26px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);position:relative;" dir="rtl">
+      <button onclick="closeDraftModal()" style="position:absolute;top:12px;left:16px;background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--text-muted);">✕</button>
+      ${imageUrl ? `<img src="${imageUrl}" alt="" style="width:56px;height:56px;object-fit:contain;border-radius:8px;border:1px solid var(--border);background:#fff;float:right;margin-left:12px;margin-bottom:6px;">` : ""}
+      <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 2px;">צור דראפט עבור</p>
+      <p style="font-weight:700;font-size:0.95rem;margin:0 0 20px;clear:right;">${name}</p>
+      <div style="margin-bottom:14px;">
+        <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:4px;">מחיר בישראל (₪)</label>
+        <input id="draft-israel-price" type="number" min="0" step="1" placeholder="למשל: 1490"
+          style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.95rem;box-sizing:border-box;">
+        <p style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 0;">המחיר הנמוך ביותר שנמצא בישראל</p>
+      </div>
+      <div style="margin-bottom:20px;">
+        <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:4px;">מחיר באמזון (₪)</label>
+        <input id="draft-amazon-price" type="number" min="0" step="0.01" placeholder="למשל: 1234.50"
+          style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.95rem;box-sizing:border-box;">
+        <p style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 0;">כולל Import Fees Deposit + משלוח</p>
+      </div>
+      <button id="draft-submit-btn" onclick="generateBlogDraft('${asin}')"
+        style="width:100%;background:var(--brand,#ff9900);color:#111;border:none;padding:12px;border-radius:10px;font-weight:700;font-size:1rem;cursor:pointer;">
+        ✍️ צור דראפט
+      </button>
+      <div id="draft-status" style="margin-top:14px;font-size:0.85rem;min-height:20px;"></div>
+    </div>`;
+
+  modal.addEventListener("click", e => { if (e.target === modal) closeDraftModal(); });
+  document.body.appendChild(modal);
+  document.getElementById("draft-israel-price").focus();
+}
+
+function closeDraftModal() {
+  const m = document.getElementById("blog-draft-modal");
+  if (m) m.remove();
+}
+
+async function generateBlogDraft(asin) {
+  const israelPrice = parseFloat(document.getElementById("draft-israel-price").value);
+  const amazonPrice = parseFloat(document.getElementById("draft-amazon-price").value);
+
+  if (!israelPrice || !amazonPrice) {
+    document.getElementById("draft-status").innerHTML = '<span style="color:var(--error,#c00);">נא למלא את שני המחירים.</span>';
+    return;
+  }
+  if (amazonPrice >= israelPrice) {
+    document.getElementById("draft-status").innerHTML = '<span style="color:var(--error,#c00);">מחיר ישראל חייב להיות גבוה ממחיר אמזון.</span>';
+    return;
+  }
+
+  const btn = document.getElementById("draft-submit-btn");
+  const statusEl = document.getElementById("draft-status");
+  btn.disabled = true;
+  btn.textContent = "⏳ מייצר... (30-60 שניות)";
+  statusEl.innerHTML = '<span style="color:var(--text-muted);">שולח לאמזון API, מייצר תוכן עם Claude, מקמיט לגיטהאב...</span>';
+
+  const res = await apiFetch("/admin/blog-draft", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice }),
+  });
+
+  if (res && res.ok) {
+    const data = await res.json();
+    statusEl.innerHTML = `
+      <div style="background:rgba(22,125,70,.08);border:1px solid rgba(22,125,70,.25);border-radius:8px;padding:12px 14px;">
+        <p style="margin:0 0 6px;font-weight:700;color:#167d46;">✅ דראפט נוצר בהצלחה!</p>
+        <p style="margin:0 0 4px;font-size:0.82rem;">${data.title || ""}</p>
+        <p style="margin:0;font-size:0.82rem;">
+          <a href="${data.github_url}" target="_blank" rel="noopener" style="color:var(--brand-deep,#ff6a00);font-weight:600;">פתח ב-GitHub ←</a>
+          &nbsp;·&nbsp;
+          <a href="${data.preview_url}" target="_blank" rel="noopener" style="color:var(--text-muted);">preview URL</a>
+        </p>
+      </div>`;
+    btn.textContent = "✍️ צור דראפט נוסף";
+    btn.disabled = false;
+
+    const row = document.querySelector(`[data-asin="${asin}"]`);
+    if (row) {
+      row.style.opacity = "0.35";
+      const draftBtn = row.querySelector("button");
+      if (draftBtn) draftBtn.disabled = true;
+    }
+  } else {
+    let errMsg = "שגיאה בייצור הדראפט.";
+    try { const d = await res.json(); errMsg = d.detail || errMsg; } catch (_) {}
+    statusEl.innerHTML = `<span style="color:var(--error,#c00);">❌ ${errMsg}</span>`;
+    btn.disabled = false;
+    btn.textContent = "✍️ נסה שוב";
   }
 }

@@ -186,3 +186,11 @@ class BlogPublishedAsin(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     asin: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
     marked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class BlogDismissedAsin(Base):
+    __tablename__ = "blog_dismissed_asins"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    asin: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
+    dismissed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
