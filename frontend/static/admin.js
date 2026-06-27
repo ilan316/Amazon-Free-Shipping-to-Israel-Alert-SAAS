@@ -1726,8 +1726,15 @@ async function loadBlogCandidates() {
                 style="background:#167d46;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.82rem;white-space:nowrap;">
                 🚀 פרסם
               </button>
-              <a href="https://www.amzfreeil.com/blog/${c.slug}.html" target="_blank" rel="noopener"
-                style="font-size:0.76rem;color:var(--text-muted);text-align:center;">preview ←</a>`
+              <div style="display:flex;gap:8px;align-items:center;">
+                <a href="https://www.amzfreeil.com/blog/${c.slug}.html" target="_blank" rel="noopener"
+                  style="font-size:0.76rem;color:var(--text-muted);">preview ←</a>
+                <span style="color:var(--border);font-size:0.76rem;">|</span>
+                <button onclick="openDraftModal('${c.asin}','${nameEsc}','${c.image_url || ''}')"
+                  style="background:none;border:none;padding:0;font-size:0.76rem;color:var(--brand-deep,#ff6a00);cursor:pointer;text-decoration:underline;">
+                  ✍️ צור מחדש
+                </button>
+              </div>`
             : `<button onclick="openDraftModal('${c.asin}','${nameEsc}','${c.image_url || ''}')"
                 style="background:var(--brand);color:#111;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.82rem;white-space:nowrap;">
                 ✍️ צור דראפט
