@@ -73,7 +73,6 @@ async def fetch_amazon_product(asin: str) -> dict:
         or primary.get("medium", {}).get("url", "")
         or primary.get("small", {}).get("url", "")
     )
-    image_url = re.sub(r"\._S[XL]\d+_\.", "._SL1500_.", image_url)
     mfr = item.get("itemInfo", {}).get("manufactureInfo", {}) or {}
     model = mfr.get("model", {}).get("displayValue", "") if mfr else ""
     aff_url = f"https://www.amazon.com/dp/{asin}?tag={partner_tag}"
@@ -359,9 +358,8 @@ def build_post_html(product: dict, content: dict, israel_price: float, amazon_pr
       src="{image}"
       alt="{product['title']}"
       class="blog-hero-img"
-      width="1000" height="1000"
       loading="eager"
-      style="object-fit:contain;background:#f5f5f5;max-height:420px;"
+      style="object-fit:contain;background:#f5f5f5;max-height:420px;max-width:100%;"
     />
 
     <article class="blog-body">
