@@ -1705,8 +1705,10 @@ async function loadBlogCandidates() {
   listEl.innerHTML = candidates.map(c => {
     const name = c.name_he || c.name || c.asin;
     const nameEsc = name.replace(/"/g, "&quot;");
-    const img = c.image_url
-      ? `<img src="${c.image_url}" alt="" style="width:52px;height:52px;object-fit:contain;border-radius:6px;border:1px solid var(--border);background:#fff;flex-shrink:0;">`
+    const rawImg = c.image_url || "";
+    const largeImg = rawImg.replace(/\._S[XL]\d+_\./g, "._SL400_.");
+    const img = rawImg
+      ? `<img src="${largeImg}" alt="" style="width:52px;height:52px;object-fit:contain;border-radius:6px;border:1px solid var(--border);background:#fff;flex-shrink:0;">`
       : `<div style="width:52px;height:52px;border-radius:6px;border:1px solid var(--border);background:var(--surface);flex-shrink:0;"></div>`;
     return `
       <div data-asin="${c.asin}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--surface);transition:opacity .2s;">
