@@ -47,6 +47,8 @@ async def fetch_amazon_product(asin: str) -> dict:
                 "partnerType": "Associates",
                 "marketplace": marketplace,
                 "resources": [
+                    "images.primary.large",
+                    "images.primary.medium",
                     "images.primary.small",
                     "itemInfo.title",
                     "itemInfo.features",
@@ -65,7 +67,12 @@ async def fetch_amazon_product(asin: str) -> dict:
     item = data["itemsResult"]["items"][0]
     title = item.get("itemInfo", {}).get("title", {}).get("displayValue", "")
     features = item.get("itemInfo", {}).get("features", {}).get("displayValues", [])
-    image_url = item.get("images", {}).get("primary", {}).get("small", {}).get("url", "")
+    primary = item.get("images", {}).get("primary", {})
+    image_url = (
+        primary.get("large", {}).get("url", "")
+        or primary.get("medium", {}).get("url", "")
+        or primary.get("small", {}).get("url", "")
+    )
     mfr = item.get("itemInfo", {}).get("manufactureInfo", {}) or {}
     model = mfr.get("model", {}).get("displayValue", "") if mfr else ""
     aff_url = f"https://www.amazon.com/dp/{asin}?tag={partner_tag}"
@@ -161,7 +168,7 @@ def build_post_html(product: dict, content: dict, israel_price: float, amazon_pr
     today_display = today.strftime("%d/%m/%Y")
     savings = round(israel_price - amazon_price)
     asin = product["asin"]
-    image = product.get("image", "").replace("._SL160_.", "._SL1000_.")
+    image = product.get("image", "")
     aff_url = f"https://www.amazon.com/dp/{asin}?tag={partner_tag}"
     slug = content["slug"]
     blog_url = f"https://www.amzfreeil.com/blog/{slug}.html"
