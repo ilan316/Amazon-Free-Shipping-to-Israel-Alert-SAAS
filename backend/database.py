@@ -481,6 +481,29 @@ async def fix_gmail_template():
         await session.commit()
 
 
+async def migrate_garmin_draft_from_dismissed():
+    """One-time: move B09PSKG7C3 from blog_dismissed_asins to blog_drafts."""
+    from sqlalchemy import select, delete
+    from backend.models import BlogDismissedAsin, BlogDraft
+    async with async_session_factory() as session:
+        dismissed = await session.execute(
+            select(BlogDismissedAsin).where(BlogDismissedAsin.asin == "B09PSKG7C3")
+        )
+        if not dismissed.scalar_one_or_none():
+            return
+        existing_draft = await session.execute(
+            select(BlogDraft).where(BlogDraft.asin == "B09PSKG7C3")
+        )
+        if not existing_draft.scalar_one_or_none():
+            session.add(BlogDraft(
+                asin="B09PSKG7C3",
+                slug="garmin-inreach-mini-2-amazon-israel",
+                title="גרמין inReach Mini 2",
+            ))
+        await session.execute(delete(BlogDismissedAsin).where(BlogDismissedAsin.asin == "B09PSKG7C3"))
+        await session.commit()
+
+
 async def seed_default_templates():
     import os
     from sqlalchemy import select, text

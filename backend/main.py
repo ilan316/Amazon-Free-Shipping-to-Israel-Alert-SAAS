@@ -37,7 +37,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         )
         return response
 
-from backend.database import create_tables, fix_gmail_template, seed_default_templates
+from backend.database import create_tables, fix_gmail_template, seed_default_templates, migrate_garmin_draft_from_dismissed
 from backend.routes import auth, products, settings, admin as admin_routes, tracking, pause as pause_route, webhooks as webhooks_route
 from backend.routes import internal as internal_routes
 
@@ -135,6 +135,7 @@ async def lifespan(app: FastAPI):
     await create_tables()
     await seed_default_templates()
     await fix_gmail_template()
+    await migrate_garmin_draft_from_dismissed()
 
     # Import here to avoid circular imports at module level
     from backend.checker import browser_manager
