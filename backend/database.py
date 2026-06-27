@@ -485,7 +485,7 @@ async def migrate_garmin_draft_from_dismissed():
     """One-time: move B09PSKG7C3 from blog_dismissed_asins to blog_drafts."""
     from sqlalchemy import select, delete
     from backend.models import BlogDismissedAsin, BlogDraft
-    async with async_session_factory() as session:
+    async with AsyncSessionLocal() as session:
         dismissed = await session.execute(
             select(BlogDismissedAsin).where(BlogDismissedAsin.asin == "B09PSKG7C3")
         )
