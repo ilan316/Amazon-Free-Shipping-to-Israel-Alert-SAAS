@@ -14,8 +14,8 @@ from sqlalchemy import select, func, delete, text
 
 from backend.database import get_db
 from sqlalchemy import cast, Date
-from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen, EmailSendLog, EmailSendRecipient, BlogPublishedAsin, BlogDismissedAsin
-from backend.blog_utils import fetch_amazon_product, generate_with_claude, build_post_html, commit_to_github
+from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen, EmailSendLog, EmailSendRecipient, BlogPublishedAsin, BlogDismissedAsin, BlogDraft
+from backend.blog_utils import fetch_amazon_product, generate_with_claude, build_post_html, commit_to_github, publish_draft
 from backend.auth import get_current_admin, hash_password, verify_password, SECRET_KEY, ALGORITHM
 
 
@@ -2210,6 +2210,9 @@ async def get_blog_candidates(
     dismissed_result = await db.execute(select(BlogDismissedAsin.asin))
     dismissed_asins = {row[0] for row in dismissed_result.all()}
 
+    drafts_result = await db.execute(select(BlogDraft.asin, BlogDraft.slug, BlogDraft.title))
+    drafts_map = {row[0]: {"slug": row[1], "title": row[2]} for row in drafts_result.all()}
+
     result = await db.execute(
         select(Product).where(Product.last_status == "FREE")
     )
@@ -2225,6 +2228,7 @@ async def get_blog_candidates(
         category = (p.amazon_category or "").lower()
         if not any(kw in category for kw in BLOG_CATEGORY_KEYWORDS):
             continue
+        draft_info = drafts_map.get(p.asin)
         candidates.append({
             "asin": p.asin,
             "name": p.name or "",
@@ -2235,6 +2239,8 @@ async def get_blog_candidates(
             "image_url": p.image_url or "",
             "last_status": p.last_status or "",
             "url": p.url or f"https://www.amazon.com/dp/{p.asin}",
+            "has_draft": draft_info is not None,
+            "slug": draft_info["slug"] if draft_info else None,
         })
 
     candidates.sort(key=lambda x: x["price_ils"], reverse=True)
@@ -2320,10 +2326,14 @@ async def generate_blog_draft(
     except Exception as e:
         raise HTTPException(502, f"GitHub commit error: {e}")
 
-    existing = await db.execute(select(BlogDismissedAsin).where(BlogDismissedAsin.asin == asin))
-    if not existing.scalar_one_or_none():
-        db.add(BlogDismissedAsin(asin=asin))
-        await db.commit()
+    existing_draft = await db.execute(select(BlogDraft).where(BlogDraft.asin == asin))
+    draft_row = existing_draft.scalar_one_or_none()
+    if draft_row:
+        draft_row.slug = slug
+        draft_row.title = content.get("title_he", "")
+    else:
+        db.add(BlogDraft(asin=asin, slug=slug, title=content.get("title_he", "")))
+    await db.commit()
 
     repo = os.getenv("GITHUB_REPO", "")
     return {
@@ -2331,4 +2341,38 @@ async def generate_blog_draft(
         "title": content.get("title_he", ""),
         "github_url": f"https://github.com/{repo}/blob/main/blog/{slug}.html",
         "preview_url": f"https://www.amzfreeil.com/blog/{slug}.html",
+    }
+
+
+class PublishBlogDraftRequest(BaseModel):
+    asin: str
+    slug: str
+
+
+@router.post("/blog-publish")
+async def publish_blog_draft(
+    body: PublishBlogDraftRequest,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    asin = body.asin
+    slug = body.slug
+
+    try:
+        await publish_draft(slug)
+    except Exception as e:
+        raise HTTPException(502, f"GitHub publish error: {e}")
+
+    existing_pub = await db.execute(select(BlogPublishedAsin).where(BlogPublishedAsin.asin == asin))
+    if not existing_pub.scalar_one_or_none():
+        db.add(BlogPublishedAsin(asin=asin))
+
+    await db.execute(delete(BlogDraft).where(BlogDraft.asin == asin))
+    await db.commit()
+
+    repo = os.getenv("GITHUB_REPO", "")
+    return {
+        "slug": slug,
+        "url": f"https://www.amzfreeil.com/blog/{slug}.html",
+        "github_url": f"https://github.com/{repo}/blob/main/blog/{slug}.html",
     }

@@ -587,7 +587,34 @@ def build_post_html(product: dict, content: dict, israel_price: float, amazon_pr
 </html>"""
 
 
-async def commit_to_github(path: str, content: str, message: str) -> dict:
+async def publish_draft(slug: str) -> dict:
+    token = os.getenv("GITHUB_TOKEN")
+    repo = os.getenv("GITHUB_REPO")
+    path = f"blog/{slug}.html"
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
+
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.get(url, headers=headers)
+        r.raise_for_status()
+        data = r.json()
+        sha = data["sha"]
+        current = base64.b64decode(data["content"]).decode("utf-8")
+
+    updated = current.replace(
+        '<meta name="robots" content="noindex,nofollow" />\n', ""
+    ).replace(
+        '<meta name="robots" content="noindex,nofollow" />', ""
+    )
+
+    return await commit_to_github(path, updated, f"blog: publish {slug}", sha=sha)
+
+
+async def commit_to_github(path: str, content: str, message: str, sha: str | None = None) -> dict:
     token = os.getenv("GITHUB_TOKEN")
     repo = os.getenv("GITHUB_REPO")
     url = f"https://api.github.com/repos/{repo}/contents/{path}"
@@ -600,8 +627,9 @@ async def commit_to_github(path: str, content: str, message: str) -> dict:
     encoded = base64.b64encode(content.encode("utf-8")).decode()
 
     async with httpx.AsyncClient(timeout=30) as client:
-        r = await client.get(url, headers=headers)
-        sha = r.json().get("sha") if r.is_success else None
+        if sha is None:
+            r = await client.get(url, headers=headers)
+            sha = r.json().get("sha") if r.is_success else None
 
         payload = {"message": message, "content": encoded}
         if sha:

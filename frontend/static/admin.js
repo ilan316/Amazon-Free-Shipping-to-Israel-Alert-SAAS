@@ -1720,11 +1720,19 @@ async function loadBlogCandidates() {
             <span style="color:var(--success);font-weight:600;">&nbsp;·&nbsp;FREE ✓</span>
           </div>
         </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0;">
-          <button onclick="openDraftModal('${c.asin}','${nameEsc}','${c.image_url || ''}')"
-            style="background:var(--brand);color:#111;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.82rem;white-space:nowrap;">
-            ✍️ צור דראפט
-          </button>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0;" class="blog-card-actions">
+          ${c.has_draft
+            ? `<button onclick="publishBlogDraft('${c.asin}','${c.slug}',this)"
+                style="background:#167d46;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.82rem;white-space:nowrap;">
+                🚀 פרסם
+              </button>
+              <a href="https://www.amzfreeil.com/blog/${c.slug}.html" target="_blank" rel="noopener"
+                style="font-size:0.76rem;color:var(--text-muted);text-align:center;">preview ←</a>`
+            : `<button onclick="openDraftModal('${c.asin}','${nameEsc}','${c.image_url || ''}')"
+                style="background:var(--brand);color:#111;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.82rem;white-space:nowrap;">
+                ✍️ צור דראפט
+              </button>`
+          }
           <label style="display:flex;align-items:center;gap:5px;font-size:0.78rem;color:var(--text-muted);cursor:pointer;white-space:nowrap;">
             <input type="checkbox" onchange="setBlogDismissed('${c.asin}', this.checked, this.closest('[data-asin]'))" style="cursor:pointer;" />
             בטל מועמדות
@@ -1835,9 +1843,20 @@ async function generateBlogDraft(asin) {
 
     const row = document.querySelector(`[data-asin="${asin}"]`);
     if (row) {
-      row.style.opacity = "0.35";
-      const draftBtn = row.querySelector("button");
-      if (draftBtn) draftBtn.disabled = true;
+      const actionsEl = row.querySelector(".blog-card-actions");
+      if (actionsEl) {
+        actionsEl.innerHTML = `
+          <button onclick="publishBlogDraft('${asin}','${data.slug}',this)"
+            style="background:#167d46;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.82rem;white-space:nowrap;">
+            🚀 פרסם
+          </button>
+          <a href="${data.preview_url}" target="_blank" rel="noopener"
+            style="font-size:0.76rem;color:var(--text-muted);text-align:center;">preview ←</a>
+          <label style="display:flex;align-items:center;gap:5px;font-size:0.78rem;color:var(--text-muted);cursor:pointer;white-space:nowrap;">
+            <input type="checkbox" onchange="setBlogDismissed('${asin}', this.checked, this.closest('[data-asin]'))" style="cursor:pointer;" />
+            בטל מועמדות
+          </label>`;
+      }
     }
   } else {
     let errMsg = "שגיאה בייצור הדראפט.";
@@ -1845,5 +1864,39 @@ async function generateBlogDraft(asin) {
     statusEl.innerHTML = `<span style="color:var(--error,#c00);">❌ ${errMsg}</span>`;
     btn.disabled = false;
     btn.textContent = "✍️ נסה שוב";
+  }
+}
+
+async function publishBlogDraft(asin, slug, btn) {
+  if (!confirm(`לפרסם את הפוסט? (noindex יוסר, הפוסט יהיה גלוי לגוגל)`)) return;
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "⏳ מפרסם...";
+
+  const res = await apiFetch("/admin/blog-publish", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ asin, slug }),
+  });
+
+  if (res && res.ok) {
+    const data = await res.json();
+    const row = document.querySelector(`[data-asin="${asin}"]`);
+    if (row) {
+      const actionsEl = row.querySelector(".blog-card-actions");
+      if (actionsEl) {
+        actionsEl.innerHTML = `
+          <span style="color:#167d46;font-weight:700;font-size:0.82rem;">✅ פורסם</span>
+          <a href="${data.url}" target="_blank" rel="noopener"
+            style="font-size:0.76rem;color:var(--text-muted);">פתח פוסט ←</a>`;
+      }
+      row.style.opacity = "0.45";
+    }
+  } else {
+    let errMsg = "שגיאה בפרסום.";
+    try { const d = await res.json(); errMsg = d.detail || errMsg; } catch (_) {}
+    alert(`❌ ${errMsg}`);
+    btn.disabled = false;
+    btn.textContent = origText;
   }
 }
