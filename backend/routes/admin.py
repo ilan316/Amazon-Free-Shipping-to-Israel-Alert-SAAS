@@ -2376,3 +2376,24 @@ async def publish_blog_draft(
         "url": f"https://www.amzfreeil.com/blog/{slug}.html",
         "github_url": f"https://github.com/{repo}/blob/main/blog/{slug}.html",
     }
+
+
+class RescueDraftRequest(BaseModel):
+    asin: str
+    slug: str
+    title: str = ""
+
+
+@router.post("/blog-rescue-draft")
+async def rescue_draft_from_dismissed(
+    body: RescueDraftRequest,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Move an ASIN from blog_dismissed_asins to blog_drafts (one-time migration)."""
+    await db.execute(delete(BlogDismissedAsin).where(BlogDismissedAsin.asin == body.asin))
+    existing = await db.execute(select(BlogDraft).where(BlogDraft.asin == body.asin))
+    if not existing.scalar_one_or_none():
+        db.add(BlogDraft(asin=body.asin, slug=body.slug, title=body.title))
+    await db.commit()
+    return {"message": "rescued", "asin": body.asin, "slug": body.slug}
