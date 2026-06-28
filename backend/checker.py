@@ -1196,7 +1196,7 @@ class BrowserManager:
             await self._inject_cookies_to_context()
             page = await self._context.new_page()
             try:
-                await page.goto(f"{url}?psc=1&th=1", wait_until="domcontentloaded", timeout=30000)
+                await page.goto(f"{url}?psc=1&th=1", wait_until="domcontentloaded", timeout=60000)
                 await page.screenshot(path=path, full_page=False)
                 logger.info(f"[{asin}] Screenshot saved: {path}")
                 return path
