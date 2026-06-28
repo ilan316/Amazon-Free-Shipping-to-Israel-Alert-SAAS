@@ -702,7 +702,7 @@ function renderAdminProducts() {
       <td>${p.paused_watchers > 0 && p.paused_watchers === p.watchers
         ? '<span class="status-badge" style="background:#f0f0f0;color:#888;border:1px solid #ccc;" title="כל העוקבים של מוצר זה בהשהייה — לא נעשית בדיקה">⏸ בהשהייה</span>'
         : `<span class="status-badge badge-${p.last_status}" title="${STATUS_TOOLTIP[p.last_status] || ''}">${statusLabel(p.last_status)}</span>`
-      }</td>
+      }${p.screenshot_path ? ` <a href="/admin/screenshot/${p.screenshot_path}" target="_blank" title="צפה בצילום מסך מהבדיקה האחרונה" style="text-decoration:none;">📷</a>` : ''}</td>
       <td style="text-align:center;font-size:0.82rem;color:#B12704;font-weight:bold;" dir="ltr">${p.last_price || '—'}</td>
       <td style="text-align:center;">${p.watchers}${p.paused_watchers > 0 ? ` <span title="${p.paused_watchers} עוקבים בהשהייה" style="font-size:0.78rem;color:#888;cursor:help;">⏸${p.paused_watchers}</span>` : ''}</td>
       <td class="ltr">
