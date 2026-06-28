@@ -11,7 +11,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, Depends
 from pydantic import BaseModel
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -67,6 +67,7 @@ async def sync_products(
 
     for p in body.products:
         url = p.url or f"https://www.amazon.com/dp/{p.asin}"
+        name_he = (p.name_he or "")[:290] or None
         stmt = insert(Product).values(
             asin=p.asin,
             name=p.name or p.asin,
@@ -79,7 +80,7 @@ async def sync_products(
             last_price=p.last_price or None,
             image_url=p.image_url or None,
             image_urls=json.dumps(p.image_urls) if p.image_urls else None,
-            name_he=p.name_he or None,
+            name_he=name_he,
             amazon_category=p.amazon_category or None,
             description=p.description or None,
         )
@@ -95,7 +96,7 @@ async def sync_products(
                 "last_price": stmt.excluded.last_price,
                 "image_url": stmt.excluded.image_url,
                 "image_urls": stmt.excluded.image_urls,
-                "name_he": stmt.excluded.name_he,
+                "name_he": func.left(stmt.excluded.name_he, 290),
                 "amazon_category": stmt.excluded.amazon_category,
                 "description": stmt.excluded.description,
             },
