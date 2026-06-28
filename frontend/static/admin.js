@@ -1706,7 +1706,7 @@ async function loadBlogCandidates() {
 
   listEl.innerHTML = candidates.map(c => {
     const name = c.name_he || c.name || c.asin;
-    const nameEsc = name.replace(/"/g, "&quot;");
+    const nameEsc = name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
     const rawImg = c.image_url || "";
     const largeImg = rawImg.replace(/\._S[XL]\d+_\./g, "._SL400_.");
     const img = rawImg
