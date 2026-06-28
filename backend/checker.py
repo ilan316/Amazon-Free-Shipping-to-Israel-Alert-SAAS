@@ -101,6 +101,7 @@ class CheckResult:
     last_price: str = ""
     image_url: str = ""
     amazon_category: str = ""
+    raw_html: str | None = None
 
 
 # ── Selectors ─────────────────────────────────────────────────────────────────
@@ -552,7 +553,9 @@ async def _check_product_httpx(asin: str, url: str, cookies: list) -> CheckResul
             if "amazon.com" not in final_url:
                 return CheckResult(asin, ShippingStatus.ERROR,
                                    error_message=f"Redirected away from amazon.com: {final_url}")
-            return _parse_html_delivery(resp.text, asin)
+            result = _parse_html_delivery(resp.text, asin)
+            result.raw_html = resp.text
+            return result
     except Exception as e:
         logger.warning(f"[{asin}] curl_cffi exception: {type(e).__name__}: {e}")
         return CheckResult(asin, ShippingStatus.ERROR, error_message=f"httpx error: {e}")
@@ -1185,24 +1188,27 @@ class BrowserManager:
 
         return result
 
-    async def take_screenshot(self, asin: str, url: str) -> str | None:
-        """Navigate to the product page and save a viewport screenshot. Returns file path or None."""
+    async def take_screenshot(self, asin: str, url: str, html: str | None = None) -> str | None:
+        """Render the product page and save a viewport screenshot. Returns file path or None.
+
+        If html is provided, uses page.set_content() (no network request).
+        Otherwise falls back to page.goto() — may be blocked by Amazon.
+        """
         from datetime import datetime as _dt
         screenshots_dir = os.path.join(BROWSER_PROFILE_DIR, "screenshots")
         os.makedirs(screenshots_dir, exist_ok=True)
         ts = _dt.utcnow().strftime("%Y%m%d_%H%M%S")
         path = os.path.join(screenshots_dir, f"{asin}_{ts}.png")
-        logger.info(f"[{asin}] Screenshot: acquiring lock...")
+        logger.info(f"[{asin}] Screenshot: acquiring lock (html={'yes' if html else 'no'})...")
         async with self._lock:
-            logger.info(f"[{asin}] Screenshot: lock acquired, injecting cookies...")
             try:
-                await self._inject_cookies_to_context()
-                logger.info(f"[{asin}] Screenshot: cookies done, opening page...")
                 page = await self._context.new_page()
-                logger.info(f"[{asin}] Screenshot: page open, navigating...")
                 try:
-                    await page.goto(f"{url}?psc=1&th=1", wait_until="domcontentloaded", timeout=60000)
-                    logger.info(f"[{asin}] Screenshot: page loaded, capturing...")
+                    if html:
+                        await page.set_content(html, base_url="https://www.amazon.com", timeout=30000)
+                    else:
+                        await self._inject_cookies_to_context()
+                        await page.goto(f"{url}?psc=1&th=1", wait_until="domcontentloaded", timeout=60000)
                     await page.screenshot(path=path, full_page=False)
                     logger.info(f"[{asin}] Screenshot saved: {path}")
                     return path
