@@ -1205,7 +1205,7 @@ class BrowserManager:
                 page = await self._context.new_page()
                 try:
                     if html:
-                        await page.set_content(html, base_url="https://www.amazon.com", timeout=30000)
+                        await page.set_content(html, timeout=30000)
                     else:
                         await self._inject_cookies_to_context()
                         await page.goto(f"{url}?psc=1&th=1", wait_until="domcontentloaded", timeout=60000)
