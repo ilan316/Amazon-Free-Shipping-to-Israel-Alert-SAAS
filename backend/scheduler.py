@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import AsyncSessionLocal
 from backend.models import Product, User, UserProduct, NotificationLog, EmailTemplate, EmailSendLog, EmailSendRecipient, EmailClick
-from backend.checker import browser_manager, ShippingStatus, CheckResult
+from backend.checker import browser_manager, ShippingStatus, CheckResult, save_buybox_snapshot
 from backend.notifier import send_daily_summary, _send_via_resend, _wrap_responsive, _open_pixel
 
 logger = logging.getLogger(__name__)
@@ -33,10 +33,10 @@ logger = logging.getLogger(__name__)
 MAX_CONSECUTIVE_ERRORS = 5
 
 
-async def _take_and_save_screenshot(product_id: int, asin: str, url: str, html: str | None = None):
-    """Take a screenshot of a FREE product page and save the path to DB."""
+async def _take_and_save_screenshot(product_id: int, asin: str, html: str | None, raw_text: str):
+    """Save a buybox snapshot for a FREE product and store the path in DB."""
     try:
-        path = await browser_manager.take_screenshot(asin, url, html=html)
+        path = save_buybox_snapshot(asin, html or "", raw_text)
     except Exception as e:
         logger.error(f"[{asin}] _take_and_save_screenshot error: {e}", exc_info=True)
         return
@@ -99,7 +99,7 @@ async def _update_product(db: AsyncSession, product: Product, result: CheckResul
             product.amazon_category = result.amazon_category
         await db.commit()
         if result.status == ShippingStatus.FREE:
-            asyncio.create_task(_take_and_save_screenshot(product.id, product.asin, product.url, html=result.raw_html))
+            asyncio.create_task(_take_and_save_screenshot(product.id, product.asin, result.raw_html, result.raw_text))
         return False
     elif result.status == ShippingStatus.UNKNOWN:
         # Delivery text found but unclassifiable — update status visibly, not a scraping failure

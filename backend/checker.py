@@ -104,6 +104,90 @@ class CheckResult:
     raw_html: str | None = None
 
 
+_DELIVERY_IDS = [
+    "mir-layout-DELIVERY_BLOCK", "ddmDeliveryMessage", "deliveryMessageMirId",
+    "delivery-message", "price-shipping-message", "exports_feature_div",
+    "shippingMessageInsideBuyBox_feature_div", "availability",
+    "availabilityInsideBuyBox_feature_div", "buybox", "buyBoxInner",
+]
+
+
+def save_buybox_snapshot(asin: str, html: str, raw_text: str) -> str | None:
+    """Extract buybox + delivery block from Amazon HTML and save as annotated .html file."""
+    import html as _html_lib
+    from datetime import datetime as _dt
+
+    snapshots_dir = os.path.join(BROWSER_PROFILE_DIR, "screenshots")
+    os.makedirs(snapshots_dir, exist_ok=True)
+    ts = _dt.utcnow().strftime("%Y%m%d_%H%M%S")
+    path = os.path.join(snapshots_dir, f"{asin}_{ts}.html")
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Find the delivery element that matched
+    delivery_el = None
+    matched_id = None
+    for el_id in _DELIVERY_IDS:
+        el = soup.find(id=el_id)
+        if el and el.get_text(strip=True):
+            delivery_el = el
+            matched_id = el_id
+            break
+
+    exports_el = soup.find(id="exports_feature_div")
+    price_el = (
+        soup.find(id="corePriceDisplay_desktop_feature_div")
+        or soup.find(id="apex_desktop")
+        or soup.find(id="priceblock_ourprice")
+    )
+    title_el = soup.find(id="productTitle")
+    title = _html_lib.escape(title_el.get_text(strip=True)[:120]) if title_el else asin
+
+    def _clean(el):
+        if not el:
+            return "<em style='color:#aaa'>לא נמצא</em>"
+        for tag in el.find_all(["script", "style", "noscript"]):
+            tag.decompose()
+        return str(el)
+
+    delivery_html = _clean(delivery_el)
+    exports_html = _clean(exports_el) if exports_el and exports_el is not delivery_el else ""
+    price_html = _clean(price_el)
+    raw_text_escaped = _html_lib.escape(raw_text or "—")
+    ts_fmt = f"{ts[:4]}-{ts[4:6]}-{ts[6:8]} {ts[9:11]}:{ts[11:13]}:{ts[13:15]} UTC"
+
+    page = f"""<!DOCTYPE html>
+<html dir="ltr">
+<head><meta charset="utf-8">
+<title>Buybox Snapshot — {asin}</title>
+<style>
+body{{font-family:Arial,sans-serif;max-width:960px;margin:24px auto;padding:0 20px;background:#f5f5f5;}}
+.meta{{background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:12px 16px;margin-bottom:14px;font-size:.88rem;}}
+.extracted{{background:#e8f5e9;border:2px solid #4caf50;border-radius:6px;padding:14px 18px;font-size:1.05rem;font-weight:bold;color:#1b5e20;margin-bottom:14px;word-break:break-word;}}
+.section{{background:#fff;border:1px solid #ddd;border-radius:6px;padding:16px;margin-bottom:14px;overflow:auto;}}
+.section h3{{margin:0 0 10px;color:#666;font-size:.8rem;text-transform:uppercase;letter-spacing:.5px;}}
+</style>
+</head>
+<body>
+<h2 style="margin-bottom:10px;">📦 Buybox Snapshot — {asin}</h2>
+<div class="meta"><strong>מוצר:</strong> {title}<br>
+<strong>זמן:</strong> {ts_fmt} &nbsp;|&nbsp; <strong>סלקטור שהותאם:</strong> <code>{matched_id or 'none'}</code></div>
+<div class="extracted">✅ טקסט שחולץ: {raw_text_escaped}</div>
+<div class="section"><h3>Price Block</h3>{price_html}</div>
+<div class="section"><h3>Delivery Block — #{matched_id or 'לא נמצא'}</h3>{delivery_html}</div>
+{"<div class='section'><h3>Exports Block — #exports_feature_div</h3>" + exports_html + "</div>" if exports_html else ""}
+</body></html>"""
+
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(page)
+        logger.info(f"[{asin}] Buybox snapshot saved: {path}")
+        return path
+    except Exception as e:
+        logger.warning(f"[{asin}] Buybox snapshot failed: {e}")
+        return None
+
+
 # ── Selectors ─────────────────────────────────────────────────────────────────
 
 DELIVER_TO_SELECTORS = [
@@ -1188,38 +1272,6 @@ class BrowserManager:
 
         return result
 
-    async def take_screenshot(self, asin: str, url: str, html: str | None = None) -> str | None:
-        """Render the product page and save a viewport screenshot. Returns file path or None.
-
-        If html is provided, uses page.set_content() (no network request).
-        Otherwise falls back to page.goto() — may be blocked by Amazon.
-        """
-        from datetime import datetime as _dt
-        screenshots_dir = os.path.join(BROWSER_PROFILE_DIR, "screenshots")
-        os.makedirs(screenshots_dir, exist_ok=True)
-        ts = _dt.utcnow().strftime("%Y%m%d_%H%M%S")
-        path = os.path.join(screenshots_dir, f"{asin}_{ts}.png")
-        logger.info(f"[{asin}] Screenshot: acquiring lock (html={'yes' if html else 'no'})...")
-        async with self._lock:
-            try:
-                page = await self._context.new_page()
-                try:
-                    if html:
-                        await page.set_content(html, timeout=30000)
-                    else:
-                        await self._inject_cookies_to_context()
-                        await page.goto(f"{url}?psc=1&th=1", wait_until="domcontentloaded", timeout=60000)
-                    await page.screenshot(path=path, full_page=False)
-                    logger.info(f"[{asin}] Screenshot saved: {path}")
-                    return path
-                except Exception as e:
-                    logger.warning(f"[{asin}] Screenshot failed: {e}")
-                    return None
-                finally:
-                    await page.close()
-            except Exception as e:
-                logger.error(f"[{asin}] Screenshot setup failed: {e}", exc_info=True)
-                return None
 
     async def check_many(self, products: list) -> list:
         """Check multiple products in parallel.

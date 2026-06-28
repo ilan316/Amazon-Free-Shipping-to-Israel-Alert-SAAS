@@ -2185,14 +2185,15 @@ async def check_asin_now(
 
 @router.get("/screenshot/{filename}")
 async def serve_screenshot(filename: str):
-    """Serve a product screenshot. No auth — filenames are non-guessable (ASIN+timestamp)."""
+    """Serve a buybox snapshot file (.html). No auth — filenames are non-guessable (ASIN+timestamp)."""
     from backend.checker import BROWSER_PROFILE_DIR
     if "/" in filename or "\\" in filename or ".." in filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
     path = os.path.join(BROWSER_PROFILE_DIR, "screenshots", filename)
     if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="Screenshot not found")
-    return FileResponse(path, media_type="image/png")
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    media_type = "text/html" if filename.endswith(".html") else "image/png"
+    return FileResponse(path, media_type=media_type)
 
 
 BLOG_CATEGORY_KEYWORDS = [
