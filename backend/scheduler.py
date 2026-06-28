@@ -35,7 +35,11 @@ MAX_CONSECUTIVE_ERRORS = 5
 
 async def _take_and_save_screenshot(product_id: int, asin: str, url: str):
     """Take a screenshot of a FREE product page and save the path to DB."""
-    path = await browser_manager.take_screenshot(asin, url)
+    try:
+        path = await browser_manager.take_screenshot(asin, url)
+    except Exception as e:
+        logger.error(f"[{asin}] _take_and_save_screenshot error: {e}", exc_info=True)
+        return
     if path:
         async with AsyncSessionLocal() as db:
             product = await db.get(Product, product_id)
