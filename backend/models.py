@@ -52,6 +52,7 @@ class Product(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     free_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    screenshot_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     source: Mapped[str] = mapped_column(String(20), nullable=False, default="user")
 

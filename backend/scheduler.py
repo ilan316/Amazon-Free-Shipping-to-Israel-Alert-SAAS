@@ -33,6 +33,43 @@ logger = logging.getLogger(__name__)
 MAX_CONSECUTIVE_ERRORS = 5
 
 
+async def _take_and_save_screenshot(product_id: int, asin: str, url: str):
+    """Take a screenshot of a FREE product page and save the path to DB."""
+    path = await browser_manager.take_screenshot(asin, url)
+    if path:
+        async with AsyncSessionLocal() as db:
+            product = await db.get(Product, product_id)
+            if product:
+                product.screenshot_path = path
+                await db.commit()
+
+
+async def cleanup_old_screenshots():
+    """Delete screenshots older than 72 hours and clear their DB paths."""
+    import time
+    from backend.checker import BROWSER_PROFILE_DIR
+    screenshots_dir = os.path.join(BROWSER_PROFILE_DIR, "screenshots")
+    if not os.path.isdir(screenshots_dir):
+        return
+    cutoff = time.time() - 72 * 3600
+    deleted = 0
+    for fname in os.listdir(screenshots_dir):
+        fpath = os.path.join(screenshots_dir, fname)
+        try:
+            if os.path.getmtime(fpath) < cutoff:
+                os.remove(fpath)
+                deleted += 1
+                async with AsyncSessionLocal() as db:
+                    await db.execute(
+                        update(Product).where(Product.screenshot_path == fpath).values(screenshot_path=None)
+                    )
+                    await db.commit()
+        except Exception as e:
+            logger.warning(f"Screenshot cleanup error for {fname}: {e}")
+    if deleted:
+        logger.info(f"Screenshot cleanup: deleted {deleted} old file(s)")
+
+
 async def _update_product(db: AsyncSession, product: Product, result: CheckResult) -> bool:
     """Update product in DB. Returns True if this is the product's first error (notify admin)."""
     product.last_checked = datetime.now(timezone.utc)
@@ -57,6 +94,8 @@ async def _update_product(db: AsyncSession, product: Product, result: CheckResul
         if result.amazon_category and not product.amazon_category:
             product.amazon_category = result.amazon_category
         await db.commit()
+        if result.status == ShippingStatus.FREE:
+            asyncio.create_task(_take_and_save_screenshot(product.id, product.asin, product.url))
         return False
     elif result.status == ShippingStatus.UNKNOWN:
         # Delivery text found but unclassifiable — update status visibly, not a scraping failure

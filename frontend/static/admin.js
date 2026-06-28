@@ -565,7 +565,7 @@ async function toggleUserProducts(userId, email) {
             <tr style="border-bottom:1px solid var(--border);">
               <td dir="ltr" style="padding:5px 8px;"><a href="${p.url}" target="_blank" style="color:var(--brand-dark);font-family:monospace;">${p.asin}</a></td>
               <td class="truncate" style="padding:5px 8px;max-width:220px;">${p.custom_name || p.name || '—'}</td>
-              <td style="text-align:center;padding:5px 8px;"><span class="status-badge badge-${p.last_status}" title="${STATUS_TOOLTIP[p.last_status] || ''}">${statusLabel(p.last_status)}</span></td>
+              <td style="text-align:center;padding:5px 8px;"><span class="status-badge badge-${p.last_status}" title="${STATUS_TOOLTIP[p.last_status] || ''}">${statusLabel(p.last_status)}</span>${p.screenshot_path ? ` <a href="/admin/screenshot/${p.screenshot_path}" target="_blank" title="צפה בצילום מסך מהבדיקה האחרונה" style="text-decoration:none;">📷</a>` : ''}</td>
               <td dir="ltr" style="text-align:center;padding:5px 8px;font-size:0.82rem;color:#B12704;font-weight:bold;">${p.last_price || '—'}</td>
               <td style="text-align:center;padding:5px 8px;">${p.is_paused ? (p.paused_reason === 'auto' ? '<span title="הושהה אוטומטית — 5 ימים חינם ללא קליק" style="cursor:default;">⏸🤖</span>' : '<span title="הושהה ידנית" style="cursor:default;">⏸</span>') : ''}</td>
               <td dir="ltr" style="padding:5px 8px;white-space:nowrap;">${p.added_at ? new Date(p.added_at).toLocaleDateString('he-IL') : '—'}</td>

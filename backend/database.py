@@ -380,6 +380,11 @@ async def create_tables():
                 "INSERT INTO blog_published_asins (asin, marked_at) VALUES ('B0BHJJ9Y77', NOW()) ON CONFLICT (asin) DO NOTHING"
             )
         )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE products ADD COLUMN IF NOT EXISTS screenshot_path VARCHAR(512)"
+            )
+        )
 
 
 def _apply_rtl_to_html(body: str) -> str:

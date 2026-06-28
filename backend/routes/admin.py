@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from jose import JWTError, jwt
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment
@@ -396,6 +396,7 @@ async def list_products(
             "raw_text": p.raw_text[:200] if p.raw_text else "",
             "last_price": p.last_price or "",
             "image_url": p.image_url or f"https://images-na.ssl-images-amazon.com/images/P/{p.asin}.01._SL100_.jpg",
+            "screenshot_path": os.path.basename(p.screenshot_path) if p.screenshot_path else None,
             "status_since": p.status_since.isoformat() if p.status_since else None,
             "notification_count": notif_map.get(p.id, 0),
             "notification_count_total": notif_total_map.get(p.id, 0),
@@ -2180,6 +2181,22 @@ async def check_asin_now(
     import asyncio
     asyncio.create_task(check_single_product(product.asin, product.url))
     return {"message": f"Check triggered for {asin}", "product_id": product.id}
+
+
+@router.get("/screenshot/{filename}")
+async def serve_screenshot(
+    filename: str,
+    admin: Annotated[User, Depends(get_current_admin)],
+):
+    """Serve a product screenshot file from the Railway volume."""
+    from backend.checker import BROWSER_PROFILE_DIR
+    # Prevent path traversal
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    path = os.path.join(BROWSER_PROFILE_DIR, "screenshots", filename)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Screenshot not found")
+    return FileResponse(path, media_type="image/png")
 
 
 BLOG_CATEGORY_KEYWORDS = [

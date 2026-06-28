@@ -1185,6 +1185,27 @@ class BrowserManager:
 
         return result
 
+    async def take_screenshot(self, asin: str, url: str) -> str | None:
+        """Navigate to the product page and save a viewport screenshot. Returns file path or None."""
+        from datetime import datetime as _dt
+        screenshots_dir = os.path.join(BROWSER_PROFILE_DIR, "screenshots")
+        os.makedirs(screenshots_dir, exist_ok=True)
+        ts = _dt.utcnow().strftime("%Y%m%d_%H%M%S")
+        path = os.path.join(screenshots_dir, f"{asin}_{ts}.png")
+        async with self._lock:
+            await self._inject_cookies_to_context()
+            page = await self._context.new_page()
+            try:
+                await page.goto(f"{url}?psc=1&th=1", wait_until="domcontentloaded", timeout=30000)
+                await page.screenshot(path=path, full_page=False)
+                logger.info(f"[{asin}] Screenshot saved: {path}")
+                return path
+            except Exception as e:
+                logger.warning(f"[{asin}] Screenshot failed: {e}")
+                return None
+            finally:
+                await page.close()
+
     async def check_many(self, products: list) -> list:
         """Check multiple products in parallel.
 
