@@ -880,6 +880,8 @@ async function checkSingleProduct(productId) {
     const updated = (_allAdminProducts || []).find(p => p.id === productId);
     if (updated && updated.last_checked !== prevChecked) {
       if (btn) { btn.textContent = "▶"; btn.disabled = false; }
+      // Screenshot saves async after check — refresh again after 15s to pick it up
+      setTimeout(loadProducts, 15000);
       return;
     }
     if (Date.now() < deadline) {
