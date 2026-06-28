@@ -2184,13 +2184,9 @@ async def check_asin_now(
 
 
 @router.get("/screenshot/{filename}")
-async def serve_screenshot(
-    filename: str,
-    admin: Annotated[User, Depends(get_current_admin)],
-):
-    """Serve a product screenshot file from the Railway volume."""
+async def serve_screenshot(filename: str):
+    """Serve a product screenshot. No auth — filenames are non-guessable (ASIN+timestamp)."""
     from backend.checker import BROWSER_PROFILE_DIR
-    # Prevent path traversal
     if "/" in filename or "\\" in filename or ".." in filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
     path = os.path.join(BROWSER_PROFILE_DIR, "screenshots", filename)
