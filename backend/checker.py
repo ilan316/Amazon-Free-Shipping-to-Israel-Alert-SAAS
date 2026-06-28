@@ -1197,9 +1197,12 @@ class BrowserManager:
             logger.info(f"[{asin}] Screenshot: lock acquired, injecting cookies...")
             try:
                 await self._inject_cookies_to_context()
+                logger.info(f"[{asin}] Screenshot: cookies done, opening page...")
                 page = await self._context.new_page()
+                logger.info(f"[{asin}] Screenshot: page open, navigating...")
                 try:
                     await page.goto(f"{url}?psc=1&th=1", wait_until="domcontentloaded", timeout=60000)
+                    logger.info(f"[{asin}] Screenshot: page loaded, capturing...")
                     await page.screenshot(path=path, full_page=False)
                     logger.info(f"[{asin}] Screenshot saved: {path}")
                     return path
