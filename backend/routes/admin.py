@@ -1,6 +1,9 @@
 import io
+import logging
 import os
 from datetime import datetime, timedelta
+
+logger = logging.getLogger(__name__)
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -2326,9 +2329,15 @@ async def generate_blog_draft(
     try:
         content = await generate_with_claude(product, body.israel_price, body.amazon_price)
     except Exception as e:
+        logger.error("blog-draft Claude API error for %s: %s", asin, e, exc_info=True)
         raise HTTPException(502, f"Claude API error: {e}")
 
-    html = build_post_html(product, content, body.israel_price, body.amazon_price)
+    try:
+        html = build_post_html(product, content, body.israel_price, body.amazon_price)
+    except Exception as e:
+        logger.error("blog-draft build_post_html error for %s: %s", asin, e, exc_info=True)
+        raise HTTPException(502, f"Build HTML error: {e}")
+
     slug = content["slug"]
 
     try:
@@ -2338,6 +2347,7 @@ async def generate_blog_draft(
             message=f"blog: draft {content.get('title_short', slug)}",
         )
     except Exception as e:
+        logger.error("blog-draft GitHub commit error for %s: %s", asin, e, exc_info=True)
         raise HTTPException(502, f"GitHub commit error: {e}")
 
     existing_draft = await db.execute(select(BlogDraft).where(BlogDraft.asin == asin))
