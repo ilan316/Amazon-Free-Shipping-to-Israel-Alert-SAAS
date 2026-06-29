@@ -2324,6 +2324,7 @@ async def generate_blog_draft(
     try:
         product = await fetch_amazon_product(asin)
     except Exception as e:
+        logger.error("blog-draft Amazon API error for %s: %s", asin, e, exc_info=True)
         raise HTTPException(502, f"Amazon API error: {e}")
 
     try:

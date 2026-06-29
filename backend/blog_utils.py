@@ -3,6 +3,7 @@ Blog draft generation utilities.
 Amazon API → Claude → build HTML → commit to GitHub.
 """
 import json
+import logging
 import re
 import base64
 import os
@@ -10,6 +11,8 @@ from datetime import date
 
 import httpx
 import anthropic
+
+logger = logging.getLogger(__name__)
 
 
 MONTHS_HE = [
@@ -64,7 +67,12 @@ async def fetch_amazon_product(asin: str) -> dict:
         product_resp.raise_for_status()
         data = product_resp.json()
 
-    item = data["itemsResult"]["items"][0]
+    logger.info("fetch_amazon_product raw response keys: %s", list(data.keys()))
+    items = data.get("itemsResult", {}).get("items", [])
+    if not items:
+        logger.error("fetch_amazon_product: no items for ASIN %s — response: %s", asin, json.dumps(data)[:500])
+        raise ValueError(f"ASIN {asin} not found in Amazon Creators API response")
+    item = items[0]
     title = item.get("itemInfo", {}).get("title", {}).get("displayValue", "")
     features = item.get("itemInfo", {}).get("features", {}).get("displayValues", [])
     primary = item.get("images", {}).get("primary", {})
