@@ -2323,6 +2323,26 @@ async def generate_blog_draft(
 
     try:
         product = await fetch_amazon_product(asin)
+    except ValueError as e:
+        if "ItemNotAccessible" in str(e):
+            # Amazon API blocked this ASIN — fall back to DB product data
+            logger.info("blog-draft: ItemNotAccessible for %s — falling back to DB", asin)
+            db_product = (await db.execute(select(Product).where(Product.asin == asin))).scalar_one_or_none()
+            if not db_product:
+                raise HTTPException(404, f"מוצר {asin} לא נמצא")
+            partner_tag = os.getenv("AMAZON_AFFILIATE_TAG") or os.getenv("AMAZON_PARTNER_TAG", "amzfreeil-20")
+            features = [db_product.raw_text[:800]] if db_product.raw_text else []
+            product = {
+                "asin": asin,
+                "title": db_product.name,
+                "features": features,
+                "image": db_product.image_url or f"https://images-na.ssl-images-amazon.com/images/P/{asin}.01.L.jpg",
+                "model": "",
+                "url": f"https://www.amazon.com/dp/{asin}?tag={partner_tag}",
+            }
+        else:
+            logger.error("blog-draft Amazon API error for %s: %s", asin, e, exc_info=True)
+            raise HTTPException(502, f"Amazon API error: {e}")
     except Exception as e:
         logger.error("blog-draft Amazon API error for %s: %s", asin, e, exc_info=True)
         raise HTTPException(502, f"Amazon API error: {e}")

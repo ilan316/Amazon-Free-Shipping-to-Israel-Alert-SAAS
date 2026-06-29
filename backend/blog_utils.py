@@ -67,11 +67,14 @@ async def fetch_amazon_product(asin: str) -> dict:
         product_resp.raise_for_status()
         data = product_resp.json()
 
-    logger.info("fetch_amazon_product raw response keys: %s", list(data.keys()))
     items = data.get("itemsResult", {}).get("items", [])
     if not items:
-        logger.error("fetch_amazon_product: no items for ASIN %s — response: %s", asin, json.dumps(data)[:500])
-        raise ValueError(f"ASIN {asin} not found in Amazon Creators API response")
+        errors = data.get("errors", [])
+        err_code = errors[0].get("code", "Unknown") if errors else "NoItems"
+        logger.error("fetch_amazon_product: no items for ASIN %s — code: %s", asin, err_code)
+        if err_code == "ItemNotAccessible":
+            raise ValueError(f"המוצר {asin} חסום ב-Amazon API (ItemNotAccessible) — נסה ASIN אחר")
+        raise ValueError(f"לא נמצא מוצר עבור ASIN {asin} (קוד: {err_code})")
     item = items[0]
     title = item.get("itemInfo", {}).get("title", {}).get("displayValue", "")
     features = item.get("itemInfo", {}).get("features", {}).get("displayValues", [])
