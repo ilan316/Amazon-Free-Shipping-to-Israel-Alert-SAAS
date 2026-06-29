@@ -2422,7 +2422,7 @@ async def publish_blog_draft(
     except Exception as e:
         raise HTTPException(502, f"GitHub publish error: {e}")
 
-    if draft_row and draft_row.israel_price and draft_row.amazon_price:
+    if draft_row and draft_row.amazon_price:
         try:
             await add_to_prices_page(
                 asin=asin,

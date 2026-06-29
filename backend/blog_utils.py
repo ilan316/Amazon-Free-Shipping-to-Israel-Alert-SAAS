@@ -632,7 +632,7 @@ async def add_to_prices_page(
     asin: str,
     slug: str,
     title_short: str,
-    israel_price: float,
+    israel_price: float | None,
     amazon_price: float,
     image_url: str,
 ) -> dict:
@@ -654,8 +654,18 @@ async def add_to_prices_page(
 
     partner_tag = os.getenv("AMAZON_AFFILIATE_TAG") or os.getenv("AMAZON_PARTNER_TAG", "amzfreeil-20")
     today_display = date.today().strftime("%d/%m/%Y")
-    savings = round(israel_price - amazon_price)
     aff_url = f"https://www.amazon.com/dp/{asin}?tag={partner_tag}"
+
+    if israel_price is not None:
+        savings = round(israel_price - amazon_price)
+        price_rows = f"""
+              <tr><td>בישראל (הזול ביותר)</td><td>₪{israel_price}</td></tr>
+              <tr class="amazon-row"><td>אמזון <small style="font-weight:400;color:#4d5a70;">(כולל מע"מ + משלוח חינם)</small></td><td>₪{amazon_price}</td></tr>
+              <tr class="saving"><td>חיסכון</td><td>~₪{savings}</td></tr>"""
+    else:
+        price_rows = f"""
+              <tr class="amazon-row"><td>אמזון <small style="font-weight:400;color:#4d5a70;">(כולל מע"מ + משלוח חינם)</small></td><td>₪{amazon_price}</td></tr>
+              <tr><td>זמינות בישראל</td><td>לא נמכר בישראל</td></tr>"""
 
     card = f"""
       <!-- {title_short} -->
@@ -669,10 +679,7 @@ async def add_to_prices_page(
           <h2 class="price-card-title">{title_short}</h2>
           <table class="price-table">
             <thead><tr><th>מקור</th><th>מחיר</th></tr></thead>
-            <tbody>
-              <tr><td>בישראל (הזול ביותר)</td><td>₪{israel_price}</td></tr>
-              <tr class="amazon-row"><td>אמזון <small style="font-weight:400;color:#4d5a70;">(כולל מע"מ + משלוח חינם)</small></td><td>₪{amazon_price}</td></tr>
-              <tr class="saving"><td>חיסכון</td><td>~₪{savings}</td></tr>
+            <tbody>{price_rows}
             </tbody>
           </table>
           <span class="price-date">* נכון ל-{today_display}</span>
