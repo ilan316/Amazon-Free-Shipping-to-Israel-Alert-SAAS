@@ -817,10 +817,16 @@ def _format_price(raw: str | None) -> str:
     return f'{p} ש"ח' if p else ""
 
 
+def _escape_md(text: str) -> str:
+    for ch in ("_", "*", "`", "["):
+        text = text.replace(ch, f"\\{ch}")
+    return text
+
+
 def _telegram_caption(product: Product) -> str:
     tag = os.environ.get("AMAZON_AFFILIATE_TAG", "").strip()
     url = f"https://www.amazon.com/dp/{product.asin}?tag={tag}" if tag else f"https://www.amazon.com/dp/{product.asin}"
-    name_he = product.name_he or product.name or product.asin
+    name_he = _escape_md(product.name_he or product.name or product.asin)
     price = _format_price(product.last_price)
     category = product.amazon_category or ""
     cat_emoji, cat_he = next(
