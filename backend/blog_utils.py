@@ -87,10 +87,20 @@ async def fetch_amazon_product(asin: str) -> dict:
     }
 
 
-async def generate_with_claude(product: dict, israel_price: float, amazon_price: float) -> dict:
+async def generate_with_claude(product: dict, israel_price: float | None, amazon_price: float) -> dict:
     today_display = date.today().strftime("%d/%m/%Y")
-    savings = round(israel_price - amazon_price)
     features_text = "\n".join(f"- {f}" for f in product.get("features", []))
+
+    if israel_price is not None:
+        savings = round(israel_price - amazon_price)
+        price_context = f"""מחיר בישראל: ₪{israel_price}
+מחיר באמזון (כולל מע"מ ייבוא + משלוח חינם): ₪{amazon_price}
+חיסכון: ~₪{savings}"""
+        angle = "השוואת מחירים — המוצר נמכר בישראל אך זול יותר באמזון"
+    else:
+        price_context = f"""מחיר באמזון (כולל מע"מ ייבוא + משלוח חינם): ₪{amazon_price}
+זמינות בישראל: המוצר אינו נמכר בחנויות בישראל — ניתן להשיגו רק דרך אמזון"""
+        angle = "בלעדיות אמזון — המוצר אינו זמין בישראל"
 
     prompt = f"""אתה כותב תוכן בעברית לאתר amzfreeil.com — אתר ישראלי שעוזר לאנשים לקנות מאמזון.
 
@@ -100,15 +110,14 @@ ASIN: {product['asin']}
 מאפיינים (מדף אמזון הרשמי):
 {features_text}
 
-מחיר בישראל: ₪{israel_price}
-מחיר באמזון (כולל מע"מ ייבוא + משלוח חינם): ₪{amazon_price}
-חיסכון: ~₪{savings}
+{price_context}
 תאריך: {today_display}
+זווית הפוסט: {angle}
 
 החזר JSON בדיוק בפורמט הבא (ללא markdown, ללא טקסט לפני/אחרי):
 {{
   "slug": "שם-קובץ-קצר-באנגלית-amazon-israel",
-  "title_he": "כותרת מלאה בעברית לפוסט — כדאי לקנות מאמזון לישראל? (2026)",
+  "title_he": "כותרת מלאה בעברית לפוסט — {'כדאי לקנות מאמזון לישראל?' if israel_price is not None else 'המוצר שלא תמצאו בישראל — רק באמזון'} (2026)",
   "title_short": "שם קצר של המוצר (עברית+אנגלית)",
   "description_he": "תיאור SEO בעברית, עד 155 תווים",
   "eyebrow": "אייקון + קטגוריה (למשל: 💻 ביקורת מוצר)",
@@ -145,7 +154,8 @@ ASIN: {product['asin']}
 - אל תמציא מפרטים — רק מה שמופיע ב"מאפיינים"
 - slug: קצר, אנגלית, מקפים, מסתיים ב-amazon-israel
 - FAQs: בדיוק 4 שאלות
-- specs_rows: חלץ מהמאפיינים (4-8 שורות)"""
+- specs_rows: חלץ מהמאפיינים (4-8 שורות)
+- {"אם המוצר לא נמכר בישראל: הדגש את הבלעדיות והעובדה שזו הדרך היחידה להשיגו. אל תמציא מחיר ישראלי." if israel_price is None else "הדגש את החיסכון הכספי ביחס לקנייה בישראל."}"""
 
     client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     message = await client.messages.create(
@@ -160,13 +170,13 @@ ASIN: {product['asin']}
     return json.loads(raw)
 
 
-def build_post_html(product: dict, content: dict, israel_price: float, amazon_price: float) -> str:
+def build_post_html(product: dict, content: dict, israel_price: float | None, amazon_price: float) -> str:
     partner_tag = os.getenv("AMAZON_AFFILIATE_TAG") or os.getenv("AMAZON_PARTNER_TAG", "amzfreeil-20")
     today = date.today()
     today_he = f"{today.day} ב{MONTHS_HE[today.month - 1]} {today.year}"
     today_iso = today.isoformat()
     today_display = today.strftime("%d/%m/%Y")
-    savings = round(israel_price - amazon_price)
+    savings = round(israel_price - amazon_price) if israel_price is not None else None
     asin = product["asin"]
     image = product.get("image", "")
     aff_url = f"https://www.amazon.com/dp/{asin}?tag={partner_tag}"
@@ -367,7 +377,7 @@ def build_post_html(product: dict, content: dict, israel_price: float, amazon_pr
       <div class="blog-takeaway">
         <p class="blog-takeaway__title">✅ בקצרה — מה חשוב לדעת</p>
         <ul>
-          <li>נכון ל-{today_display}: בישראל ₪{israel_price} | באמזון (כולל מע"מ + משלוח חינם) ₪{amazon_price} — חיסכון של ~₪{savings}</li>
+          {"<li>נכון ל-" + today_display + ": בישראל ₪" + str(israel_price) + " | באמזון (כולל מע\"מ + משלוח חינם) ₪" + str(amazon_price) + " — חיסכון של ~₪" + str(savings) + "</li>" if israel_price is not None else "<li>המוצר <strong>אינו נמכר בישראל</strong> — ניתן להשיגו רק דרך אמזון</li><li>מחיר באמזון (כולל מע\"מ + משלוח חינם): ₪" + str(amazon_price) + " נכון ל-" + today_display + "</li>"}
           <li>המשלוח החינם <strong>זמני ומשתנה</strong> — בדקו לפני רכישה</li>
         </ul>
       </div>
@@ -413,21 +423,15 @@ def build_post_html(product: dict, content: dict, israel_price: float, amazon_pr
             </tr>
           </thead>
           <tbody>
-            <tr style="border-bottom:1px solid rgba(23,32,51,.07);">
-              <td style="padding:10px 14px;">בישראל (הזול ביותר)</td>
-              <td style="padding:10px 14px;font-weight:700;">₪{israel_price}</td>
-            </tr>
+            {"" if israel_price is None else f'<tr style="border-bottom:1px solid rgba(23,32,51,.07);"><td style="padding:10px 14px;">בישראל (הזול ביותר)</td><td style="padding:10px 14px;font-weight:700;">₪' + str(israel_price) + '</td></tr>'}
             <tr style="background:rgba(22,125,70,.05);border-bottom:1px solid rgba(23,32,51,.07);">
               <td style="padding:10px 14px;">אמזון <small style="color:#4d5a70;">(כולל מע"מ ייבוא + משלוח חינם)</small></td>
               <td style="padding:10px 14px;font-weight:700;color:#167d46;">₪{amazon_price}</td>
             </tr>
-            <tr style="border-bottom:1px solid rgba(23,32,51,.07);">
-              <td style="padding:10px 14px;">חיסכון</td>
-              <td style="padding:10px 14px;font-weight:700;color:#167d46;">~₪{savings}</td>
-            </tr>
+            {"" if savings is None else f'<tr style="border-bottom:1px solid rgba(23,32,51,.07);"><td style="padding:10px 14px;">חיסכון</td><td style="padding:10px 14px;font-weight:700;color:#167d46;">~₪' + str(savings) + '</td></tr>'}
           </tbody>
         </table>
-        <p style="font-size:.8rem;color:#4d5a70;margin:0 0 16px;">* נכון ל-{today_display}. המחירים משתנים — בדקו לפני רכישה.</p>
+        {"<p style=\"font-size:.8rem;color:#4d5a70;margin:0 0 16px;\">* נכון ל-" + today_display + ". המחירים משתנים — בדקו לפני רכישה.</p>" if israel_price is not None else "<p style=\"font-size:.8rem;color:#4d5a70;margin:0 0 16px;\">* מחיר באמזון נכון ל-" + today_display + ". עשוי להשתנות — בדקו לפני רכישה.</p>"}
 
         <div style="background:rgba(255,153,0,.08);border:1.5px solid rgba(255,153,0,.4);border-radius:12px;padding:14px 18px;margin:16px 0;font-size:.9rem;line-height:1.7;">
           <strong>⚠️ חשוב: המחיר באמזון כולל כבר את מע"מ הייבוא</strong><br>

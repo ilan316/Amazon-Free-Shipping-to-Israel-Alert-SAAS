@@ -31,7 +31,7 @@ class RequestEmailChangeRequest(BaseModel):
 
 class GenerateBlogDraftRequest(BaseModel):
     asin: str
-    israel_price: float
+    israel_price: float | None = None
     amazon_price: float
 
 

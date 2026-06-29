@@ -1784,13 +1784,13 @@ function openDraftModal(asin, name, imageUrl) {
       <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 2px;">צור דראפט עבור</p>
       <p style="font-weight:700;font-size:0.95rem;margin:0 0 20px;clear:right;">${name}</p>
       <div style="margin-bottom:14px;">
-        <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:4px;">מחיר בישראל (₪)</label>
-        <input id="draft-israel-price" type="number" min="0" step="1" placeholder="למשל: 1490"
+        <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:4px;">מחיר בישראל (₪) <span style="font-weight:400;color:var(--text-muted);">— אופציונלי</span></label>
+        <input id="draft-israel-price" type="number" min="0" step="1" placeholder="ריק = לא נמכר בישראל"
           style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.95rem;box-sizing:border-box;">
-        <p style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 0;">המחיר הנמוך ביותר שנמצא בישראל</p>
+        <p style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 0;">השאר ריק אם המוצר לא נמכר בישראל</p>
       </div>
       <div style="margin-bottom:20px;">
-        <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:4px;">מחיר באמזון (₪)</label>
+        <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:4px;">מחיר באמזון (₪) <span style="color:var(--error,#c00);font-size:0.8rem;">*חובה</span></label>
         <input id="draft-amazon-price" type="number" min="0" step="0.01" placeholder="למשל: 1234.50"
           style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.95rem;box-sizing:border-box;">
         <p style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 0;">כולל Import Fees Deposit + משלוח</p>
@@ -1805,6 +1805,7 @@ function openDraftModal(asin, name, imageUrl) {
   modal.addEventListener("click", e => { if (e.target === modal) closeDraftModal(); });
   document.body.appendChild(modal);
   document.getElementById("draft-israel-price").focus();
+  // focus moves to amazon-price after israel-price if left empty
 }
 
 function closeDraftModal() {
@@ -1813,14 +1814,15 @@ function closeDraftModal() {
 }
 
 async function generateBlogDraft(asin) {
-  const israelPrice = parseFloat(document.getElementById("draft-israel-price").value);
+  const israelPriceRaw = document.getElementById("draft-israel-price").value.trim();
+  const israelPrice = israelPriceRaw !== "" ? parseFloat(israelPriceRaw) : null;
   const amazonPrice = parseFloat(document.getElementById("draft-amazon-price").value);
 
-  if (!israelPrice || !amazonPrice) {
-    document.getElementById("draft-status").innerHTML = '<span style="color:var(--error,#c00);">נא למלא את שני המחירים.</span>';
+  if (!amazonPrice) {
+    document.getElementById("draft-status").innerHTML = '<span style="color:var(--error,#c00);">נא למלא את מחיר האמזון.</span>';
     return;
   }
-  if (amazonPrice >= israelPrice) {
+  if (israelPrice !== null && amazonPrice >= israelPrice) {
     document.getElementById("draft-status").innerHTML = '<span style="color:var(--error,#c00);">מחיר ישראל חייב להיות גבוה ממחיר אמזון.</span>';
     return;
   }
