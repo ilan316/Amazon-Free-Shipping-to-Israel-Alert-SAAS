@@ -1287,7 +1287,7 @@ async def run_hebrew_backfill():
                 continue
             try:
                 msg = client.messages.create(
-                    model="claude-haiku-4-5-20251001",
+                    model="claude-sonnet-4-6",
                     max_tokens=60,
                     messages=[{"role": "user", "content": f"תרגם לעברית קצרה ומובנת (עד 7 מילים, שמור את שם המותג, ללא מרכאות): {p.name}"}],
                 )
