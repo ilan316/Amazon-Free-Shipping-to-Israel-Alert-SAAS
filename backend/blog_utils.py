@@ -133,18 +133,10 @@ ASIN: {product['asin']}
   "description_he": "תיאור SEO בעברית, עד 155 תווים",
   "eyebrow": "אייקון + קטגוריה (למשל: 💻 ביקורת מוצר)",
   "reading_time": "כ-5 דקות",
-  "section1_p1": "<p>פסקה ראשונה — מה המוצר ולמה פופולרי (HTML, <bdi> לאנגלית)</p>",
-  "section1_p2": "<p>פסקה שנייה — ייחודיות המוצר</p>",
+  "section1_p1": "<p>פסקה עובדתית אחת — תאר את המוצר לפי הספציפיקציות בלבד (HTML, <bdi> לאנגלית). אל תוסיף 'פופולרי', 'אהוב', 'כולם מדברים'. השתמש במספרים מהמאפיינים. סיים עם: — לפי מפרט היצרן</p>",
   "specs_rows": [
     {{"label": "מפרט", "value": "ערך"}}
   ],
-  "who_profile1_title": "🎮 כותרת פרופיל 1",
-  "who_profile1_text": "<p>טקסט פרופיל 1 (HTML)</p>",
-  "who_profile2_title": "🖥️ כותרת פרופיל 2",
-  "who_profile2_text": "<p>טקסט פרופיל 2</p>",
-  "who_profile3_title": "💼 כותרת פרופיל 3",
-  "who_profile3_text": "<p>טקסט פרופיל 3</p>",
-  "tip_html": "<p class=\\"blog-tip\\">💡 <strong>טיפ:</strong> טקסט טיפ שימושי</p>",
   "pros": ["יתרון 1", "יתרון 2", "יתרון 3", "יתרון 4", "יתרון 5"],
   "cons": ["מה לשים לב 1", "מה לשים לב 2", "מה לשים לב 3", "מה לשים לב 4"],
   "faqs": [
@@ -394,9 +386,8 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
       </div>
 
       <section>
-        <h2>מה זה {content['title_short']} ולמה כולם מדברים עליו?</h2>
+        <h2>סקירה קצרה על {content['title_short']}</h2>
         {content['section1_p1']}
-        {content['section1_p2']}
       </section>
 
       <section>
@@ -413,16 +404,6 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
         </table>
       </section>
 
-      <section>
-        <h2>למי זה מתאים?</h2>
-        <h3>{content['who_profile1_title']}</h3>
-        {content['who_profile1_text']}
-        <h3>{content['who_profile2_title']}</h3>
-        {content['who_profile2_text']}
-        <h3>{content['who_profile3_title']}</h3>
-        {content['who_profile3_text']}
-        {content['tip_html']}
-      </section>
 
       <section>
         <h2>כמה עולה {content['title_short']}?</h2>
@@ -471,24 +452,6 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
         </div>
       </section>
 
-      <section>
-        <h2>איך לקנות — מדריך קצר</h2>
-        <h3>שלב 1: ודאו שהמוצר מתאים לכם</h3>
-        <p>קראו את המפרט למעלה וודאו שהמוצר תואם לציוד שלכם.</p>
-        <h3>שלב 2: ודאו שיש חשבון אמזון</h3>
-        <p>אם אין — פתחו אחד. אין עלות. כתובת המשלוח תהיה הכתובת שלכם בישראל.</p>
-        <h3>שלב 3: בדקו שהמוצר מציג <bdi>"FREE Shipping to Israel"</bdi></h3>
-        <p>בדף המוצר, תחת סעיף <bdi>"Delivery"</bdi>, חפשו את הכיתוב הזה. אם הוא מופיע — אתם מוכנים לרכישה.</p>
-        <h3>שלב 4: קנו</h3>
-        <p>לחצו על הכפתור למטה. תוודאו שהמוכר הוא <bdi>Amazon.com</bdi> או <bdi>Sold by Amazon</bdi> — לא מוכר צד שלישי.</p>
-        <div style="text-align:center;margin:28px 0;">
-          <a href="{aff_url}" target="_blank" rel="noopener sponsored"
-             style="display:inline-block;background:linear-gradient(135deg,#ff9900,#ff6a00);color:#172033;font-weight:800;padding:14px 32px;border-radius:14px;text-decoration:none;font-size:1.05rem;box-shadow:0 8px 24px rgba(255,153,0,.35);">
-            צפה במוצר באמזון ←
-          </a>
-          <p style="font-size:.78rem;color:#4d5a70;margin:10px 0 0;">קישור שותף — לא עולה לכם יותר</p>
-        </div>
-      </section>
 
       <section>
         <h2>יתרונות וחסרונות</h2>
