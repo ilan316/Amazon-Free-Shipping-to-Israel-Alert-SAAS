@@ -36,6 +36,8 @@ class GenerateBlogDraftRequest(BaseModel):
     asin: str
     israel_price: float | None = None
     amazon_price: float
+    manual_title: str | None = None
+    manual_features: list[str] | None = None
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -2321,31 +2323,32 @@ async def generate_blog_draft(
 ):
     asin = body.asin.strip().upper()
 
-    try:
-        product = await fetch_amazon_product(asin)
-    except ValueError as e:
-        if "ItemNotAccessible" in str(e):
-            # Amazon API blocked this ASIN — fall back to DB product data
-            logger.info("blog-draft: ItemNotAccessible for %s — falling back to DB", asin)
-            db_product = (await db.execute(select(Product).where(Product.asin == asin))).scalar_one_or_none()
-            if not db_product:
-                raise HTTPException(404, f"מוצר {asin} לא נמצא")
-            partner_tag = os.getenv("AMAZON_AFFILIATE_TAG") or os.getenv("AMAZON_PARTNER_TAG", "amzfreeil-20")
-            features = [db_product.raw_text[:800]] if db_product.raw_text else []
-            product = {
-                "asin": asin,
-                "title": db_product.name,
-                "features": features,
-                "image": db_product.image_url or f"https://images-na.ssl-images-amazon.com/images/P/{asin}.01.L.jpg",
-                "model": "",
-                "url": f"https://www.amazon.com/dp/{asin}?tag={partner_tag}",
-            }
-        else:
+    if body.manual_title and body.manual_features is not None:
+        # Manual override — user provided data directly (e.g. when API is blocked)
+        partner_tag = os.getenv("AMAZON_AFFILIATE_TAG") or os.getenv("AMAZON_PARTNER_TAG", "amzfreeil-20")
+        product = {
+            "asin": asin,
+            "title": body.manual_title.strip(),
+            "features": [f.strip() for f in body.manual_features if f.strip()],
+            "image": f"https://images-na.ssl-images-amazon.com/images/P/{asin}.01.L.jpg",
+            "model": "",
+            "url": f"https://www.amazon.com/dp/{asin}?tag={partner_tag}",
+        }
+    else:
+        try:
+            product = await fetch_amazon_product(asin)
+        except ValueError as e:
+            if "ItemNotAccessible" in str(e):
+                logger.info("blog-draft: ItemNotAccessible for %s — asking for manual input", asin)
+                raise HTTPException(
+                    status_code=422,
+                    detail={"blocked": True, "asin": asin, "message": f"המוצר {asin} חסום ב-Amazon API — הזן title ו-features ידנית"},
+                )
             logger.error("blog-draft Amazon API error for %s: %s", asin, e, exc_info=True)
             raise HTTPException(502, f"Amazon API error: {e}")
-    except Exception as e:
-        logger.error("blog-draft Amazon API error for %s: %s", asin, e, exc_info=True)
-        raise HTTPException(502, f"Amazon API error: {e}")
+        except Exception as e:
+            logger.error("blog-draft Amazon API error for %s: %s", asin, e, exc_info=True)
+            raise HTTPException(502, f"Amazon API error: {e}")
 
     try:
         content = await generate_with_claude(product, body.israel_price, body.amazon_price)
