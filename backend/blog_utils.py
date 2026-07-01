@@ -56,6 +56,8 @@ async def fetch_amazon_product(asin: str) -> dict:
                     "itemInfo.title",
                     "itemInfo.features",
                     "itemInfo.manufactureInfo",
+                    "itemInfo.byLineInfo",
+                    "browseNodeInfo.browseNodes",
                 ],
             },
             headers={
@@ -86,6 +88,9 @@ async def fetch_amazon_product(asin: str) -> dict:
     )
     mfr = item.get("itemInfo", {}).get("manufactureInfo", {}) or {}
     model = mfr.get("model", {}).get("displayValue", "") if mfr else ""
+    brand = item.get("itemInfo", {}).get("byLineInfo", {}).get("brand", {}).get("displayValue", "")
+    browse_nodes = item.get("browseNodeInfo", {}).get("browseNodes", [])
+    category = browse_nodes[0].get("displayName", "") if browse_nodes else ""
     aff_url = f"https://www.amazon.com/dp/{asin}?tag={partner_tag}"
 
     return {
@@ -94,6 +99,8 @@ async def fetch_amazon_product(asin: str) -> dict:
         "features": features,
         "image": image_url,
         "model": model,
+        "brand": brand,
+        "category": category,
         "url": aff_url,
     }
 
@@ -186,8 +193,15 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
     slug = content["slug"]
     blog_url = f"https://www.amzfreeil.com/blog/{slug}.html"
 
+    extra_specs_rows = []
+    if product.get("brand"):
+        extra_specs_rows.append({"label": "מותג", "value": product["brand"]})
+    if product.get("category"):
+        extra_specs_rows.append({"label": "קטגוריה", "value": product["category"]})
+    all_specs_rows = extra_specs_rows + content.get("specs_rows", [])
+
     specs_rows_html = ""
-    for i, row in enumerate(content.get("specs_rows", [])):
+    for i, row in enumerate(all_specs_rows):
         bg = "background:rgba(0,0,0,.02);" if i % 2 == 1 else ""
         specs_rows_html += (
             f'            <tr style="{bg}border-bottom:1px solid rgba(23,32,51,.07);">\n'
@@ -238,7 +252,8 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
             "@type": "Product",
             "name": product["title"],
             "description": content["product_schema_description"],
-            "brand": {"@type": "Brand", "name": product["title"].split()[0]},
+            "brand": {"@type": "Brand", "name": product.get("brand") or product["title"].split()[0]},
+            "category": product.get("category", ""),
             "sku": asin,
             "offers": {
                 "@type": "Offer",

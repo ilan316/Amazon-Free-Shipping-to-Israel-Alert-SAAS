@@ -1880,14 +1880,40 @@ async function generateBlogDraft(asin) {
   } else {
     let errMsg = "שגיאה בייצור הדראפט.";
     let blocked = false;
+    let missingFields = null;
     try {
       const d = await res.json();
       if (d.detail && typeof d.detail === "object" && d.detail.blocked) {
         blocked = true;
+      } else if (d.detail && typeof d.detail === "object" && d.detail.missing_fields) {
+        missingFields = d.detail;
       } else {
         errMsg = (typeof d.detail === "string" ? d.detail : null) || errMsg;
       }
     } catch (_) {}
+
+    if (missingFields) {
+      statusEl.innerHTML = `
+        <div style="background:rgba(200,0,0,.06);border:1px solid rgba(200,0,0,.2);border-radius:8px;padding:14px 16px;">
+          <p style="margin:0 0 10px;font-weight:700;color:#c00;">⚠️ חסרים מותג/קטגוריה ב-Amazon API</p>
+          <p style="margin:0 0 12px;font-size:0.83rem;color:var(--text-muted);">כותרת ומפרט נשלפו בהצלחה — נא להשלים ידנית רק את השדות החסרים:</p>
+          ${missingFields.missing_brand ? `
+          <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">מותג (brand)</label>
+          <input id="manual-brand" type="text" placeholder="למשל: Samsung"
+            style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;margin-bottom:10px;" />` : ""}
+          ${missingFields.missing_category ? `
+          <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">קטגוריה (category)</label>
+          <input id="manual-category" type="text" placeholder="למשל: Electronics"
+            style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;margin-bottom:10px;" />` : ""}
+          <button onclick="generateBlogDraftMissingFields('${asin}')"
+            style="background:var(--brand);color:#111;border:none;padding:8px 18px;border-radius:7px;cursor:pointer;font-weight:700;font-size:0.85rem;">
+            ✍️ צור דראפט עם נתונים ידניים
+          </button>
+        </div>`;
+      btn.disabled = false;
+      btn.textContent = "✍️ נסה שוב";
+      return;
+    }
 
     if (blocked) {
       statusEl.innerHTML = `
@@ -1900,6 +1926,12 @@ async function generateBlogDraft(asin) {
           <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">נקודות מפרט (כל נקודה בשורה נפרדת)</label>
           <textarea id="manual-features" rows="6" placeholder="Studio Monitor Sound for Mixing &amp; Mastering&#10;Wide frequency response 5Hz–80 kHz&#10;Open Back Design with HD driver units&#10;..."
             style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;resize:vertical;margin-bottom:10px;"></textarea>
+          <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">מותג (brand) <span style="font-weight:400;color:var(--text-muted);">— אופציונלי</span></label>
+          <input id="manual-brand" type="text" placeholder="למשל: Samsung"
+            style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;margin-bottom:10px;" />
+          <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">קטגוריה (category) <span style="font-weight:400;color:var(--text-muted);">— אופציונלי</span></label>
+          <input id="manual-category" type="text" placeholder="למשל: Electronics"
+            style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;margin-bottom:10px;" />
           <button onclick="generateBlogDraftManual('${asin}')"
             style="background:var(--brand);color:#111;border:none;padding:8px 18px;border-radius:7px;cursor:pointer;font-weight:700;font-size:0.85rem;">
             ✍️ צור דראפט עם נתונים ידניים
@@ -1918,6 +1950,8 @@ async function generateBlogDraftManual(asin) {
   const featuresRaw = document.getElementById("manual-features")?.value.trim();
   if (!title || !featuresRaw) { alert("נא למלא כותרת ונקודות מפרט"); return; }
   const features = featuresRaw.split("\n").map(l => l.trim()).filter(Boolean);
+  const brand = document.getElementById("manual-brand")?.value.trim() || "";
+  const category = document.getElementById("manual-category")?.value.trim() || "";
 
   const israelPriceRaw = document.getElementById("draft-israel-price")?.value.trim();
   const israelPrice = israelPriceRaw !== "" ? parseFloat(israelPriceRaw) : null;
@@ -1929,7 +1963,45 @@ async function generateBlogDraftManual(asin) {
   const res = await apiFetch("/admin/blog-draft", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, manual_title: title, manual_features: features }),
+    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, manual_title: title, manual_features: features, manual_brand: brand, manual_category: category }),
+  });
+
+  if (res && res.ok) {
+    const data = await res.json();
+    statusEl.innerHTML = `
+      <div style="background:rgba(22,125,70,.08);border:1px solid rgba(22,125,70,.25);border-radius:8px;padding:12px 14px;">
+        <p style="margin:0 0 6px;font-weight:700;color:#167d46;">✅ דראפט נוצר בהצלחה!</p>
+        <p style="margin:0 0 8px;font-size:0.82rem;">${data.title || ""}</p>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+          <button id="modal-publish-btn" onclick="publishBlogDraft('${asin}','${data.slug}',this)"
+            style="background:#167d46;color:#fff;border:none;padding:7px 18px;border-radius:7px;cursor:pointer;font-weight:700;font-size:0.85rem;">
+            🚀 פרסם עכשיו
+          </button>
+          <a href="${data.preview_url}" target="_blank" rel="noopener" style="font-size:0.82rem;color:var(--text-muted);">preview ←</a>
+        </div>
+      </div>`;
+  } else {
+    let errMsg = "שגיאה בייצור הדראפט.";
+    try { const d = await res.json(); errMsg = (typeof d.detail === "string" ? d.detail : null) || errMsg; } catch (_) {}
+    statusEl.innerHTML = `<span style="color:var(--error,#c00);">❌ ${errMsg}</span>`;
+  }
+}
+
+async function generateBlogDraftMissingFields(asin) {
+  const brand = document.getElementById("manual-brand")?.value.trim() || "";
+  const category = document.getElementById("manual-category")?.value.trim() || "";
+
+  const israelPriceRaw = document.getElementById("draft-israel-price")?.value.trim();
+  const israelPrice = israelPriceRaw !== "" ? parseFloat(israelPriceRaw) : null;
+  const amazonPrice = parseFloat(document.getElementById("draft-amazon-price")?.value);
+
+  const statusEl = document.getElementById("draft-status");
+  statusEl.innerHTML = '<span style="color:var(--text-muted);">שולח נתונים ידניים, מייצר תוכן עם Claude, מקמיט לגיטהאב...</span>';
+
+  const res = await apiFetch("/admin/blog-draft", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, manual_brand: brand, manual_category: category }),
   });
 
   if (res && res.ok) {

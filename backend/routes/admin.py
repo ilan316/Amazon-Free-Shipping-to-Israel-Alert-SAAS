@@ -38,6 +38,8 @@ class GenerateBlogDraftRequest(BaseModel):
     amazon_price: float
     manual_title: str | None = None
     manual_features: list[str] | None = None
+    manual_brand: str | None = None
+    manual_category: str | None = None
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -2332,6 +2334,8 @@ async def generate_blog_draft(
             "features": [f.strip() for f in body.manual_features if f.strip()],
             "image": f"https://images-na.ssl-images-amazon.com/images/P/{asin}.01.L.jpg",
             "model": "",
+            "brand": (body.manual_brand or "").strip(),
+            "category": (body.manual_category or "").strip(),
             "url": f"https://www.amazon.com/dp/{asin}?tag={partner_tag}",
         }
     else:
@@ -2349,6 +2353,27 @@ async def generate_blog_draft(
         except Exception as e:
             logger.error("blog-draft Amazon API error for %s: %s", asin, e, exc_info=True)
             raise HTTPException(502, f"Amazon API error: {e}")
+
+        missing_brand = not product.get("brand")
+        missing_category = not product.get("category")
+        if missing_brand or missing_category:
+            if body.manual_brand or body.manual_category:
+                if missing_brand:
+                    product["brand"] = (body.manual_brand or "").strip()
+                if missing_category:
+                    product["category"] = (body.manual_category or "").strip()
+            else:
+                logger.info("blog-draft: missing brand/category for %s — asking for manual input", asin)
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "missing_fields": True,
+                        "asin": asin,
+                        "missing_brand": missing_brand,
+                        "missing_category": missing_category,
+                        "message": f"למוצר {asin} חסרים מותג/קטגוריה ב-Amazon API — הזן ידנית",
+                    },
+                )
 
     try:
         content = await generate_with_claude(product, body.israel_price, body.amazon_price)
