@@ -1154,6 +1154,114 @@ async def run_send_facebook_product():
             logger.warning(f"=== Facebook product send failed: {product.asin} ===")
 
 
+def _blog_telegram_caption(title: str, slug: str) -> str:
+    url = f"https://www.amzfreeil.com/blog/{slug}.html"
+    lines = [
+        f"{_RTL}📝 פוסט חדש בבלוג",
+        "",
+        f"{_RTL}*{_escape_md(title)}*",
+        "",
+        f"{_RTL}--",
+        "",
+        f"{_RTL}📖 סקירה מלאה, מחירים והשוואה מול אמזון",
+        f"[👉 קראו עכשיו]({url})",
+        "",
+        f"{_RTL}📢 @amzfreeil",
+    ]
+    return "\n".join(lines)
+
+
+def _blog_facebook_caption(title: str, slug: str) -> str:
+    url = f"https://www.amzfreeil.com/blog/{slug}.html"
+    lines = [
+        f"{_RTL}📝 פוסט חדש בבלוג",
+        "",
+        f"{_RTL}{title}",
+        "",
+        f"{_RTL}--",
+        "",
+        f"{_RTL}📖 סקירה מלאה, מחירים והשוואה מול אמזון",
+        f"{_RTL}👉 {url}",
+        "",
+        f"{_RTL}📢 @amzfreeil",
+    ]
+    return "\n".join(lines)
+
+
+async def send_blog_post_to_telegram(title: str, slug: str, image_url: str | None) -> bool:
+    """Announce a newly published blog post in the @amzfreeil Telegram channel."""
+    if os.environ.get("TELEGRAM_BLOG_ENABLED", "true").lower() == "false":
+        logger.info("[telegram_blog] disabled via TELEGRAM_BLOG_ENABLED=false — skipping")
+        return False
+
+    token = os.environ.get("TELEGRAM_PRODUCT_BOT_TOKEN", "")
+    chat_id = os.environ.get("TELEGRAM_PRODUCT_CHAT_ID", "")
+    if not token or not chat_id:
+        logger.warning("TELEGRAM_PRODUCT_BOT_TOKEN or TELEGRAM_PRODUCT_CHAT_ID not set — skipping blog send")
+        return False
+
+    caption = _blog_telegram_caption(title, slug)
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            if image_url:
+                resp = await client.post(
+                    f"https://api.telegram.org/bot{token}/sendPhoto",
+                    data={"chat_id": chat_id, "photo": image_url,
+                          "caption": caption, "parse_mode": "Markdown"},
+                )
+            else:
+                resp = await client.post(
+                    f"https://api.telegram.org/bot{token}/sendMessage",
+                    json={"chat_id": chat_id, "text": caption, "parse_mode": "Markdown"},
+                )
+        if resp.status_code == 200:
+            return True
+        logger.warning(f"[telegram_blog] send failed for {slug}: {resp.text[:200]}")
+        return False
+    except Exception as e:
+        logger.warning(f"[telegram_blog] send error for {slug}: {e}")
+        return False
+
+
+async def send_blog_post_to_facebook(title: str, slug: str, image_url: str | None) -> bool:
+    """Announce a newly published blog post on the AmzFreeIL Facebook page."""
+    if os.environ.get("FACEBOOK_BLOG_ENABLED", "true").lower() == "false":
+        logger.info("[facebook_blog] disabled via FACEBOOK_BLOG_ENABLED=false — skipping")
+        return False
+
+    user_token = os.environ.get("FACEBOOK_PAGE_TOKEN", "")
+    page_id = os.environ.get("FACEBOOK_PAGE_ID", "")
+    if not user_token or not page_id:
+        logger.warning("FACEBOOK_PAGE_TOKEN or FACEBOOK_PAGE_ID not set — skipping blog send")
+        return False
+
+    page_token = await _get_facebook_page_token(user_token, page_id)
+    if not page_token:
+        logger.warning("[facebook_blog] could not obtain page access token — skipping")
+        return False
+
+    caption = _blog_facebook_caption(title, slug)
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            if image_url:
+                resp = await client.post(
+                    f"https://graph.facebook.com/v19.0/{page_id}/photos",
+                    data={"url": image_url, "caption": caption, "access_token": page_token},
+                )
+            else:
+                resp = await client.post(
+                    f"https://graph.facebook.com/v19.0/{page_id}/feed",
+                    data={"message": caption, "access_token": page_token},
+                )
+        if resp.status_code == 200:
+            return True
+        logger.warning(f"[facebook_blog] send failed for {slug}: {resp.text[:300]}")
+        return False
+    except Exception as e:
+        logger.warning(f"[facebook_blog] send error for {slug}: {e}")
+        return False
+
+
 async def run_cleanup_orphans():
     """Delete user-source products with no watchers. Runs once daily at 02:00 IL."""
     logger.info("=== Orphan cleanup started ===")

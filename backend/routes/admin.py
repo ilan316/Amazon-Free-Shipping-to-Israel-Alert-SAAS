@@ -19,6 +19,7 @@ from backend.database import get_db
 from sqlalchemy import cast, Date
 from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen, EmailSendLog, EmailSendRecipient, BlogPublishedAsin, BlogDismissedAsin, BlogDraft
 from backend.blog_utils import fetch_amazon_product, generate_with_claude, build_post_html, commit_to_github, publish_draft, add_to_prices_page
+from backend.scheduler import send_blog_post_to_telegram, send_blog_post_to_facebook
 from backend.auth import get_current_admin, hash_password, verify_password, SECRET_KEY, ALGORITHM
 
 
@@ -2463,6 +2464,19 @@ async def publish_blog_draft(
         except Exception as e:
             raise HTTPException(502, f"prices.html update error: {e}")
 
+    telegram_sent = False
+    facebook_sent = False
+    if draft_row:
+        title = draft_row.title_short or draft_row.title
+        try:
+            telegram_sent = await send_blog_post_to_telegram(title, slug, draft_row.image_url)
+        except Exception as e:
+            logger.warning(f"blog-publish telegram send error: {e}")
+        try:
+            facebook_sent = await send_blog_post_to_facebook(title, slug, draft_row.image_url)
+        except Exception as e:
+            logger.warning(f"blog-publish facebook send error: {e}")
+
     existing_pub = await db.execute(select(BlogPublishedAsin).where(BlogPublishedAsin.asin == asin))
     if not existing_pub.scalar_one_or_none():
         db.add(BlogPublishedAsin(asin=asin))
@@ -2475,6 +2489,8 @@ async def publish_blog_draft(
         "slug": slug,
         "url": f"https://www.amzfreeil.com/blog/{slug}.html",
         "github_url": f"https://github.com/{repo}/blob/main/blog/{slug}.html",
+        "telegram_sent": telegram_sent,
+        "facebook_sent": facebook_sent,
     }
 
 
