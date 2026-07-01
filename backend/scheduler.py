@@ -649,7 +649,9 @@ async def run_telegram_report():
     Queries Railway GraphQL for deployments + log errors in the last 24h."""
     logger.info("=== Telegram report started ===")
 
-    railway_token = os.environ.get("RAILWAY_TOKEN", "")
+    # RAILWAY_TOKEN (auto-injected project token) can't call the GraphQL API —
+    # deployments/environmentLogs require an account-level Personal Access Token.
+    railway_token = os.environ.get("RAILWAY_API_TOKEN", "")
     project_id = os.environ.get("RAILWAY_PROJECT_ID", "")
     service_id = os.environ.get("RAILWAY_SERVICE_ID", "")
     env_id = os.environ.get("RAILWAY_ENVIRONMENT_ID", "")
@@ -661,13 +663,19 @@ async def run_telegram_report():
     current_time = now.strftime("%Y-%m-%d %H:%M UTC")
 
     if not railway_token:
-        await send_telegram(f"Railway Monitor - aware-wisdom\n\nStatus: ERROR\nFailed: RAILWAY_TOKEN not set\nTime: {current_time}")
+        await send_telegram(f"Railway Monitor - aware-wisdom\n\nStatus: ERROR\nFailed: RAILWAY_API_TOKEN not set\nTime: {current_time}")
         return
 
     headers = {
         "Authorization": f"Bearer {railway_token}",
         "Content-Type": "application/json",
     }
+
+    def _unwrap(resp: httpx.Response, field: str):
+        body = resp.json() or {}
+        if body.get("errors"):
+            raise RuntimeError(f"Railway GraphQL error on {field}: {body['errors']}")
+        return (body.get("data") or {}).get(field)
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
@@ -676,7 +684,7 @@ async def run_telegram_report():
                 f'{{ deployments(input: {{ projectId: "{project_id}", serviceId: "{service_id}" }}) '
                 f'{{ edges {{ node {{ id status createdAt }} }} }} }}'
             })
-            deployments = ((dep_resp.json() or {}).get("data") or {}).get("deployments", {}).get("edges", [])
+            deployments = (_unwrap(dep_resp, "deployments") or {}).get("edges", [])
             recent = [d["node"] for d in deployments
                       if datetime.fromisoformat(d["node"]["createdAt"].replace("Z", "+00:00")) >= since]
             failed = [d for d in recent if d["status"] in ("FAILED", "CRASHED")]
@@ -689,7 +697,7 @@ async def run_telegram_report():
                     f'{{ environmentLogs(environmentId: "{env_id}", afterDate: "{after_date}", beforeLimit: 500) '
                     f'{{ message severity timestamp }} }}'
                 })
-                page = ((log_resp.json() or {}).get("data") or {}).get("environmentLogs", [])
+                page = _unwrap(log_resp, "environmentLogs") or []
                 if not page:
                     break
                 all_logs.extend(page)
