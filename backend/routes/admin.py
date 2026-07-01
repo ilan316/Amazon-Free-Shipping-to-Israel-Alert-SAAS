@@ -13,7 +13,7 @@ from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, delete, text
+from sqlalchemy import select, func, delete, text, or_
 
 from backend.database import get_db
 from sqlalchemy import cast, Date
@@ -2229,8 +2229,17 @@ async def get_blog_candidates(
     drafts_result = await db.execute(select(BlogDraft.asin, BlogDraft.slug, BlogDraft.title))
     drafts_map = {row[0]: {"slug": row[1], "title": row[2]} for row in drafts_result.all()}
 
+    from datetime import timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=26)
     result = await db.execute(
-        select(Product).where(Product.last_status == "FREE")
+        select(Product)
+        .where(Product.last_status == "FREE")
+        .where(
+            or_(
+                Product.source == "scanner",
+                Product.last_checked >= cutoff,
+            )
+        )
     )
     products = result.scalars().all()
 
