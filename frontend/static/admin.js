@@ -1684,6 +1684,72 @@ function _renderFunnel(f) {
   }
 }
 
+const BLOG_CATEGORY_MAP = {
+  'Kitchen & Dining': 'Home & Kitchen',
+  'Shoe, Jewelry & Watch Accessories': 'Clothing, Shoes & Jewelry',
+  'Video Games': 'Electronics',
+  'Industrial & Scientific': 'Tools & Home Improvement'
+};
+
+const BLOG_CATEGORY_LABELS = {
+  'Automotive': 'רכב',
+  'Beauty & Personal Care': 'יופי וטיפוח',
+  'Cell Phones & Accessories': 'סלולר ואביזרים',
+  'Clothing, Shoes & Jewelry': 'אופנה ותכשיטים',
+  'Electronics': 'אלקטרוניקה',
+  'Health & Household': 'בריאות ומשק בית',
+  'Home & Kitchen': 'בית ומטבח',
+  'Office Products': 'משרד',
+  'Patio, Lawn & Garden': 'גינה וחוץ',
+  'Sports & Outdoors': 'ספורט ופעילויות חוץ',
+  'Tools & Home Improvement': 'כלים ושיפוצים',
+  'Toys & Games': 'צעצועים ומשחקים',
+  'Mobility & Daily Living Aids': 'ניידות וסיוע יומיומי',
+  'Books': 'ספרים',
+  'Baby Products': 'תינוקות',
+  'Musical Instruments': 'כלי נגינה',
+  'Appliances': 'מכשירי חשמל',
+  'Small Appliance Parts & Accessories': 'חלקים ואביזרים למכשירי חשמל'
+};
+
+let blogAllCandidates = [];
+let blogActiveCategory = null;
+
+function blogCategoryFor(c) {
+  const raw = c.amazon_category || '';
+  return raw ? (BLOG_CATEGORY_MAP[raw] || raw) : '';
+}
+
+function buildBlogCategoryFilters(candidates) {
+  const wrap = document.getElementById("blog-category-filters");
+  if (!wrap) return;
+
+  const counts = {};
+  candidates.forEach(c => {
+    const cat = blogCategoryFor(c);
+    if (cat) counts[cat] = (counts[cat] || 0) + 1;
+  });
+
+  const cats = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+  if (!cats.length) { wrap.innerHTML = ""; return; }
+
+  const btnStyle = (active) => `background:${active ? "var(--brand)" : "var(--surface)"};color:${active ? "#111" : "inherit"};border:1px solid var(--border);padding:6px 12px;border-radius:16px;cursor:pointer;font-size:0.8rem;font-weight:${active ? 700 : 500};white-space:nowrap;`;
+
+  const allBtn = `<button onclick="applyBlogCategoryFilter(null)" style="${btnStyle(blogActiveCategory === null)}">הכל (${candidates.length})</button>`;
+  const catBtns = cats.map(cat => {
+    const label = BLOG_CATEGORY_LABELS[cat] || cat;
+    return `<button onclick="applyBlogCategoryFilter('${cat.replace(/'/g, "\\'")}')" style="${btnStyle(blogActiveCategory === cat)}">${label} (${counts[cat]})</button>`;
+  }).join("");
+
+  wrap.innerHTML = allBtn + catBtns;
+}
+
+function applyBlogCategoryFilter(cat) {
+  blogActiveCategory = cat;
+  buildBlogCategoryFilters(blogAllCandidates);
+  renderBlogCandidatesList(cat ? blogAllCandidates.filter(c => blogCategoryFor(c) === cat) : blogAllCandidates);
+}
+
 async function loadBlogCandidates() {
   const statusEl = document.getElementById("blog-candidates-status");
   const listEl = document.getElementById("blog-candidates-list");
@@ -1695,12 +1761,20 @@ async function loadBlogCandidates() {
   const res = await apiFetch("/admin/blog-candidates");
   if (!res || !res.ok) { statusEl.textContent = "שגיאה בטעינה"; return; }
   const data = await res.json();
-  const candidates = data.candidates || [];
+  blogAllCandidates = data.candidates || [];
+  blogActiveCategory = null;
 
-  statusEl.textContent = `${candidates.length} מועמדים נמצאו (${data.published_count} פורסמו כבר)`;
+  statusEl.textContent = `${blogAllCandidates.length} מועמדים נמצאו (${data.published_count} פורסמו כבר)`;
+  buildBlogCategoryFilters(blogAllCandidates);
+  renderBlogCandidatesList(blogAllCandidates);
+}
+
+function renderBlogCandidatesList(candidates) {
+  const listEl = document.getElementById("blog-candidates-list");
+  if (!listEl) return;
 
   if (!candidates.length) {
-    listEl.innerHTML = '<div style="color:var(--text-muted); padding:20px 0;">אין מועמדים כרגע — אין מוצרים חינמיים באלקטרוניקה מעל ₪200 שלא פורסמו עדיין.</div>';
+    listEl.innerHTML = '<div style="color:var(--text-muted); padding:20px 0;">אין מועמדים בקטגוריה זו כרגע.</div>';
     return;
   }
 
