@@ -2469,11 +2469,15 @@ async def publish_blog_draft(
     if draft_row:
         title = draft_row.title_short or draft_row.title
         try:
-            telegram_sent = await send_blog_post_to_telegram(title, slug, draft_row.image_url)
+            telegram_sent = await send_blog_post_to_telegram(
+                title, slug, draft_row.image_url, draft_row.amazon_price, draft_row.israel_price
+            )
         except Exception as e:
             logger.warning(f"blog-publish telegram send error: {e}")
         try:
-            facebook_sent = await send_blog_post_to_facebook(title, slug, draft_row.image_url)
+            facebook_sent = await send_blog_post_to_facebook(
+                title, slug, draft_row.image_url, draft_row.amazon_price, draft_row.israel_price
+            )
         except Exception as e:
             logger.warning(f"blog-publish facebook send error: {e}")
 

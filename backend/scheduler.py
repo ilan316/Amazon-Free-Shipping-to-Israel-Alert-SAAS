@@ -1154,41 +1154,73 @@ async def run_send_facebook_product():
             logger.warning(f"=== Facebook product send failed: {product.asin} ===")
 
 
-def _blog_telegram_caption(title: str, slug: str) -> str:
+def _blog_telegram_caption(title: str, slug: str, amazon_price: float | None, israel_price: float | None) -> str:
     url = f"https://www.amzfreeil.com/blog/{slug}.html"
-    lines = [
-        f"{_RTL}📝 פוסט חדש בבלוג",
+    name_he = _escape_md(title)
+    price = _format_price(str(amazon_price)) if amazon_price else ""
+    today = datetime.now().strftime("%d/%m/%Y")
+
+    header_lines = [
+        f"{_RTL}✈️ משלוח חינם לישראל | 📝 סקירה חדשה בבלוג",
         "",
-        f"{_RTL}*{_escape_md(title)}*",
+        f"{_RTL}*{name_he}*",
         "",
-        f"{_RTL}--",
+    ]
+    footer_lines = [f"{_RTL}--", ""]
+    if price:
+        footer_lines.append(f"{_RTL}💰 מחיר: *{price}*")
+    if israel_price and amazon_price:
+        savings = round(israel_price - amazon_price)
+        footer_lines.append(f"{_RTL}💸 מחיר מקביל בישראל: ~₪{israel_price:g} — חיסכון של ~₪{savings}")
+    footer_lines += [
+        f"{_RTL}ℹ️ משלוח חינם מותנה בהזמנה מינימלית של $49 — ניתן לצרף מוצרים נוספים",
+        f"{_RTL}🚚 משלוח חינם לישראל 🇮🇱",
+        f"{_RTL}📅 נכון ל-{today}. המחירים משתנים — בדקו לפני רכישה.",
         "",
-        f"{_RTL}📖 סקירה מלאה, מחירים והשוואה מול אמזון",
-        f"[👉 קראו עכשיו]({url})",
+        f"[👉 לקריאת הסקירה המלאה]({url})",
+        "",
+        f"{_RTL}📘 הצטרף לדף הפייסבוק → https://www.facebook.com/AmzFreeIL",
         "",
         f"{_RTL}📢 @amzfreeil",
     ]
-    return "\n".join(lines)
+    return "\n".join(header_lines + footer_lines)
 
 
-def _blog_facebook_caption(title: str, slug: str) -> str:
+def _blog_facebook_caption(title: str, slug: str, amazon_price: float | None, israel_price: float | None) -> str:
     url = f"https://www.amzfreeil.com/blog/{slug}.html"
-    lines = [
-        f"{_RTL}📝 פוסט חדש בבלוג",
+    price = _format_price(str(amazon_price)) if amazon_price else ""
+    today = datetime.now().strftime("%d/%m/%Y")
+
+    header_lines = [
+        f"{_RTL}✈️ משלוח חינם לישראל | 📝 סקירה חדשה בבלוג",
         "",
         f"{_RTL}{title}",
         "",
-        f"{_RTL}--",
-        "",
-        f"{_RTL}📖 סקירה מלאה, מחירים והשוואה מול אמזון",
-        f"{_RTL}👉 {url}",
-        "",
-        f"{_RTL}📢 @amzfreeil",
     ]
-    return "\n".join(lines)
+    footer_lines = [f"{_RTL}--", ""]
+    if price:
+        footer_lines.append(f"{_RTL}💰 מחיר: {price}")
+    if israel_price and amazon_price:
+        savings = round(israel_price - amazon_price)
+        footer_lines.append(f"{_RTL}💸 מחיר מקביל בישראל: ~₪{israel_price:g} — חיסכון של ~₪{savings}")
+    footer_lines += [
+        f"{_RTL}ℹ️ משלוח חינם מותנה בהזמנה מינימלית של $49 — ניתן לצרף מוצרים נוספים",
+        f"{_RTL}🚚 משלוח חינם לישראל 🇮🇱",
+        f"{_RTL}📅 נכון ל-{today}. המחירים משתנים — בדקו לפני רכישה.",
+        "",
+        f"{_RTL}👉 לקריאת הסקירה המלאה: {url}",
+        "",
+        f"{_RTL}📱 יש עוד הרבה מוצרים שלא מגיעים לפה — כולם בטלגרם → t.me/amzfreeil",
+        "",
+        f"{_RTL}📢 AMZ Free Ship Alert",
+    ]
+    return "\n".join(header_lines + footer_lines)
 
 
-async def send_blog_post_to_telegram(title: str, slug: str, image_url: str | None) -> bool:
+async def send_blog_post_to_telegram(
+    title: str, slug: str, image_url: str | None,
+    amazon_price: float | None = None, israel_price: float | None = None,
+) -> bool:
     """Announce a newly published blog post in the @amzfreeil Telegram channel."""
     if os.environ.get("TELEGRAM_BLOG_ENABLED", "true").lower() == "false":
         logger.info("[telegram_blog] disabled via TELEGRAM_BLOG_ENABLED=false — skipping")
@@ -1200,7 +1232,7 @@ async def send_blog_post_to_telegram(title: str, slug: str, image_url: str | Non
         logger.warning("TELEGRAM_PRODUCT_BOT_TOKEN or TELEGRAM_PRODUCT_CHAT_ID not set — skipping blog send")
         return False
 
-    caption = _blog_telegram_caption(title, slug)
+    caption = _blog_telegram_caption(title, slug, amazon_price, israel_price)
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             if image_url:
@@ -1223,7 +1255,10 @@ async def send_blog_post_to_telegram(title: str, slug: str, image_url: str | Non
         return False
 
 
-async def send_blog_post_to_facebook(title: str, slug: str, image_url: str | None) -> bool:
+async def send_blog_post_to_facebook(
+    title: str, slug: str, image_url: str | None,
+    amazon_price: float | None = None, israel_price: float | None = None,
+) -> bool:
     """Announce a newly published blog post on the AmzFreeIL Facebook page."""
     if os.environ.get("FACEBOOK_BLOG_ENABLED", "true").lower() == "false":
         logger.info("[facebook_blog] disabled via FACEBOOK_BLOG_ENABLED=false — skipping")
@@ -1240,7 +1275,7 @@ async def send_blog_post_to_facebook(title: str, slug: str, image_url: str | Non
         logger.warning("[facebook_blog] could not obtain page access token — skipping")
         return False
 
-    caption = _blog_facebook_caption(title, slug)
+    caption = _blog_facebook_caption(title, slug, amazon_price, israel_price)
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             if image_url:
