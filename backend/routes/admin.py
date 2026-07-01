@@ -2204,12 +2204,6 @@ async def serve_screenshot(filename: str):
     return FileResponse(path, media_type=media_type)
 
 
-BLOG_CATEGORY_KEYWORDS = [
-    "electronics", "computer", "camera", "audio", "phone",
-    "tablet", "gaming", "storage", "wireless", "smart", "tv",
-    "headphone", "speaker", "monitor", "keyboard", "mouse",
-    "drone", "gps", "navigation", "wearable", "watch",
-]
 BLOG_MIN_PRICE_ILS = 200
 
 
@@ -2246,9 +2240,6 @@ async def get_blog_candidates(
             continue
         price = _parse_price(p.last_price)
         if price < BLOG_MIN_PRICE_ILS:
-            continue
-        category = (p.amazon_category or "").lower()
-        if not any(kw in category for kw in BLOG_CATEGORY_KEYWORDS):
             continue
         draft_info = drafts_map.get(p.asin)
         candidates.append({
