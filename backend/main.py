@@ -1,4 +1,6 @@
 import os
+import time
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -279,9 +281,10 @@ async def _get_category_he(db, english_name: str) -> str:
     if row:
         return row.hebrew_name
 
-    # New category — translate via Claude API
-    hebrew_name = english_name  # fallback
-    try:
+    # New category — translate via Claude API.
+    # The anthropic client is synchronous/blocking, so run it in a thread to
+    # avoid stalling the event loop of the single worker.
+    def _translate_sync() -> str:
         import anthropic
         client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
         msg = client.messages.create(
@@ -292,7 +295,11 @@ async def _get_category_he(db, english_name: str) -> str:
                 "content": f'תרגם את שם קטגוריית המוצר הזו מאמזון לעברית קצרה ומדויקת. ענה רק עם התרגום, ללא הסברים: "{english_name}"'
             }]
         )
-        hebrew_name = msg.content[0].text.strip().strip('"')
+        return msg.content[0].text.strip().strip('"')
+
+    hebrew_name = english_name  # fallback
+    try:
+        hebrew_name = await asyncio.to_thread(_translate_sync)
     except Exception as e:
         logging.warning(f"Category translation failed for '{english_name}': {e}")
 
@@ -306,17 +313,29 @@ async def _get_category_he(db, english_name: str) -> str:
     return hebrew_name
 
 
+# In-memory cache for the public free-products response. The backend runs with
+# --workers 1, so a module-level dict is shared across all requests. The product
+# list is refreshed by the scanner once a day, so a 30-minute TTL is safe and
+# turns virtually every visitor request into an instant cache hit.
+_free_products_cache: dict = {"data": None, "ts": 0.0}
+_FREE_PRODUCTS_TTL = 1800  # seconds (30 min)
+
+
 @app.get("/api/public/free-products")
 async def public_free_products():
     """Public endpoint — returns all products currently with FREE shipping to Israel.
     Used by amzfreeil.com/free-products.html (no auth required, CORS open)."""
+    # Serve from cache when fresh.
+    if _free_products_cache["data"] is not None and \
+            time.time() - _free_products_cache["ts"] < _FREE_PRODUCTS_TTL:
+        return _free_products_cache["data"]
+
     from backend.database import AsyncSessionLocal
-    from backend.models import Product
-    from sqlalchemy import select
+    from backend.models import Product, CategoryTranslation
+    from sqlalchemy import select, or_
     from datetime import datetime, timedelta, timezone
     tag = os.environ.get("AMAZON_AFFILIATE_TAG", "amzfreeil-20").strip()
     cutoff = datetime.now(timezone.utc) - timedelta(hours=26)
-    from sqlalchemy import or_
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(Product)
@@ -331,13 +350,23 @@ async def public_free_products():
         )
         products = result.scalars().all()
 
-        # Build category translation map for all unique categories in one pass
+        # Fetch all known category translations in a single query (no N+1).
         unique_cats = {p.amazon_category for p in products if p.amazon_category}
         cat_map: dict[str, str] = {}
-        for cat in unique_cats:
-            cat_map[cat] = await _get_category_he(db, cat)
+        if unique_cats:
+            rows = (await db.execute(
+                select(CategoryTranslation)
+                .where(CategoryTranslation.english_name.in_(unique_cats))
+            )).scalars().all()
+            cat_map = {r.english_name: r.hebrew_name for r in rows}
 
-    return [
+            # Translate any genuinely new categories (usually none). This only
+            # happens on a cache miss, and _get_category_he runs the blocking
+            # Claude call in a thread so it won't stall the event loop.
+            for cat in unique_cats - cat_map.keys():
+                cat_map[cat] = await _get_category_he(db, cat)
+
+    data = [
         {
             "asin": p.asin,
             "name": p.name or p.asin,
@@ -352,6 +381,10 @@ async def public_free_products():
         }
         for p in products
     ]
+
+    _free_products_cache["data"] = data
+    _free_products_cache["ts"] = time.time()
+    return data
 
 
 @app.get("/system-message")
