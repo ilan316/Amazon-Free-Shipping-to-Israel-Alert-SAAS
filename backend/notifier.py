@@ -178,7 +178,7 @@ def _wrap_responsive(html_body: str, is_rtl: bool = True) -> str:
   </style>
 </head>
 <body{body_dir} style="margin:0;padding:0;background:#f3f3f3;font-family:Arial,'Segoe UI',sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f3f3;padding:24px 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f3f3;padding:24px 12px;">
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" class="email-container"
              style="max-width:600px;width:100%;background:#ffffff;border-radius:10px;
@@ -448,7 +448,7 @@ def send_user_alert(user, product, result) -> bool:
 </head>
 <body{body_dir} style="margin:0;padding:0;background:#f3f3f3;font-family:Arial,'Segoe UI',sans-serif;">
   <div style="display:none;max-height:0;overflow:hidden;">{_t(lang, "preheader")}</div>
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f3f3;padding:24px 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f3f3;padding:24px 12px;">
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" class="email-container" style="max-width:600px;width:100%;">
         <tr>
@@ -622,7 +622,7 @@ def send_daily_summary(user, free_products: list, pause_warnings: dict = None) -
 </head>
 <body{body_dir} style="margin:0;padding:0;background:#f3f3f3;font-family:Arial,'Segoe UI',sans-serif;">
   <div style="display:none;max-height:0;overflow:hidden;">{_t(lang, "preheader")}</div>
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f3f3;padding:24px 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f3f3;padding:24px 12px;">
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" class="email-container" style="max-width:600px;width:100%;">
         <tr>
@@ -775,7 +775,7 @@ def send_no_click_reminder(user, product, days_free: int) -> bool:
 </head>
 <body{body_dir} style="margin:0;padding:0;background:#f3f3f3;font-family:Arial,'Segoe UI',sans-serif;">
   <div style="display:none;max-height:0;overflow:hidden;">{preheader}</div>
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f3f3;padding:24px 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f3f3;padding:24px 12px;">
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" class="email-container"
              style="max-width:600px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e8e8e8;">
@@ -859,7 +859,7 @@ _NEWSLETTER_HTML_TEMPLATE = """\
 </head>
 <body dir="rtl" style="margin:0;padding:0;background:#f3f3f3;font-family:Arial,'Segoe UI',sans-serif;">
   <div style="display:none;max-height:0;overflow:hidden;">3 חידושים חדשים שיעזרו לך למצוא עוד יותר משלוח חינם מאמזון לישראל 🚀</div>
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f3f3;padding:24px 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f3f3;padding:24px 12px;">
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" class="email-container"
              style="max-width:600px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e8e8e8;">
@@ -999,7 +999,7 @@ _TELEGRAM_INVITE_HTML = """\
 </head>
 <body dir="rtl" style="margin:0;padding:0;background:#f3f3f3;font-family:Arial,'Segoe UI',sans-serif;">
   <div style="display:none;max-height:0;overflow:hidden;">המוצרים החינמיים הכי טובים — עכשיו גם בטלגרם, ישירות לנייד שלך 📱</div>
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f3f3;padding:24px 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f3f3;padding:24px 12px;">
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" class="email-container"
              style="max-width:600px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e8e8e8;">
