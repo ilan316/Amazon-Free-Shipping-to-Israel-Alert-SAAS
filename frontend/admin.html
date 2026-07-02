@@ -722,36 +722,52 @@
 
     <!-- Tab: Blog -->
     <div class="tab-panel" id="tab-blog">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
-        <h2 style="font-size:1.1rem; margin:0;">✍️ מועמדים לפוסט בלוג</h2>
-        <div style="display:flex; gap:8px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+        <h2 style="font-size:1.1rem; margin:0;">✍️ בלוג</h2>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button class="btn-sm" onclick="exportBlogCandidatesCsv()" style="background:#fff;color:var(--brand);border:1px solid var(--brand);padding:7px 16px;border-radius:6px;cursor:pointer;font-weight:600;">ייצוא CSV</button>
-          <button class="btn-sm" onclick="loadBlogCandidates()" style="background:var(--brand);color:#111;border:none;padding:7px 16px;border-radius:6px;cursor:pointer;font-weight:600;">רענן רשימה</button>
         </div>
       </div>
-      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:14px;">מוצרים חינמיים מעל ₪200 שעוד לא פורסמו עליהם פוסטים.</p>
-      <div id="blog-category-filters" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;"></div>
-      <div id="blog-candidates-status" style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;"></div>
-      <div id="blog-candidates-list"></div>
 
-      <div style="margin-top:32px; display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
-        <h2 style="font-size:1.05rem; margin:0;">🕒 פוסטים מתוזמנים לשידור</h2>
-        <button class="btn-sm" onclick="loadBlogSocialQueue()" style="background:#fff;color:var(--brand);border:1px solid var(--brand);padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem;">רענן</button>
+      <div style="display:flex; gap:6px; margin-bottom:16px; border-bottom:1px solid var(--border);">
+        <button class="blog-subtab-btn" data-subtab="candidates" onclick="switchBlogSubTab('candidates')"
+          style="background:none;border:none;border-bottom:2px solid var(--brand);padding:9px 4px;margin-left:18px;cursor:pointer;font-weight:700;font-size:0.9rem;color:var(--text);">מועמדים</button>
+        <button class="blog-subtab-btn" data-subtab="queue" onclick="switchBlogSubTab('queue')"
+          style="background:none;border:none;border-bottom:2px solid transparent;padding:9px 4px;margin-left:18px;cursor:pointer;font-weight:700;font-size:0.9rem;color:var(--text-muted);">🕒 מתוזמנים לשידור</button>
+        <button class="blog-subtab-btn" data-subtab="published" onclick="switchBlogSubTab('published')"
+          style="background:none;border:none;border-bottom:2px solid transparent;padding:9px 4px;margin-left:18px;cursor:pointer;font-weight:700;font-size:0.9rem;color:var(--text-muted);">📚 פורסמו</button>
       </div>
-      <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:10px;">פוסטים שפורסמו לאתר וממתינים לשידור אוטומטי בטלגרם/פייסבוק, בזמן רנדומלי בטווח 06:00-22:00.</p>
-      <div id="blog-social-queue-list" style="font-size:0.85rem;"></div>
 
-      <div style="margin-top:32px; display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
-        <h2 style="font-size:1.05rem; margin:0;">📚 פוסטים שפורסמו</h2>
-        <button class="btn-sm" onclick="loadBlogPublished()" style="background:#fff;color:var(--brand);border:1px solid var(--brand);padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem;">רענן</button>
+      <div id="blog-subtab-candidates" class="blog-subtab-panel">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+          <p style="font-size:0.85rem; color:var(--text-muted); margin:0;">מוצרים חינמיים מעל ₪200 שעוד לא פורסמו עליהם פוסטים.</p>
+          <button class="btn-sm" onclick="loadBlogCandidates()" style="background:var(--brand);color:#111;border:none;padding:7px 16px;border-radius:6px;cursor:pointer;font-weight:600;">רענן רשימה</button>
+        </div>
+        <div id="blog-category-filters" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;"></div>
+        <div id="blog-candidates-status" style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;"></div>
+        <div id="blog-candidates-list"></div>
       </div>
-      <div id="blog-published-list" style="font-size:0.85rem;"></div>
+
+      <div id="blog-subtab-queue" class="blog-subtab-panel" style="display:none;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
+          <p style="font-size:0.82rem; color:var(--text-muted); margin:0;">פוסטים שפורסמו לאתר וממתינים לשידור אוטומטי בטלגרם/פייסבוק, בזמן רנדומלי בטווח 06:00-22:00.</p>
+          <button class="btn-sm" onclick="loadBlogSocialQueue()" style="background:#fff;color:var(--brand);border:1px solid var(--brand);padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem;">רענן</button>
+        </div>
+        <div id="blog-social-queue-list" style="font-size:0.85rem;"></div>
+      </div>
+
+      <div id="blog-subtab-published" class="blog-subtab-panel" style="display:none;">
+        <div style="display:flex; align-items:center; justify-content:flex-end; margin-bottom:10px;">
+          <button class="btn-sm" onclick="loadBlogPublished()" style="background:#fff;color:var(--brand);border:1px solid var(--brand);padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem;">רענן</button>
+        </div>
+        <div id="blog-published-list" style="font-size:0.85rem;"></div>
+      </div>
     </div>
 
   </div>
 
   <script src="/static/app.js?v=10"></script>
-  <script src="/static/admin.js?v=50"></script>
+  <script src="/static/admin.js?v=51"></script>
   <script>
     requireAuth();
     loadAdminData();

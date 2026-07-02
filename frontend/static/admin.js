@@ -1829,6 +1829,17 @@ function renderBlogCandidatesList(candidates) {
   }).join("");
 }
 
+function switchBlogSubTab(name) {
+  document.querySelectorAll(".blog-subtab-panel").forEach(el => {
+    el.style.display = el.id === `blog-subtab-${name}` ? "" : "none";
+  });
+  document.querySelectorAll(".blog-subtab-btn").forEach(btn => {
+    const active = btn.dataset.subtab === name;
+    btn.style.borderBottomColor = active ? "var(--brand)" : "transparent";
+    btn.style.color = active ? "var(--text)" : "var(--text-muted)";
+  });
+}
+
 function exportBlogCandidatesCsv() {
   if (!blogAllCandidates || !blogAllCandidates.length) { alert("אין מועמדים לייצוא"); return; }
   const headers = ['שם המוצר', 'קישור למוצר', 'קטגוריה', 'מחיר', 'ASIN', 'קישור לתמונה'];
