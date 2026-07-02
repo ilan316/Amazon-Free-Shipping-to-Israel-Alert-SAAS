@@ -69,6 +69,8 @@ async function loadAdminData() {
     loadTemplates(),
     loadSendLogs(),
     loadBlogCandidates(),
+    loadBlogSocialQueue(),
+    loadBlogPublished(),
   ]);
 }
 
@@ -1823,6 +1825,75 @@ function renderBlogCandidatesList(candidates) {
             בטל מועמדות
           </label>
         </div>
+      </div>`;
+  }).join("");
+}
+
+function exportBlogCandidatesCsv() {
+  if (!blogAllCandidates || !blogAllCandidates.length) { alert("אין מועמדים לייצוא"); return; }
+  const headers = ['שם המוצר', 'קישור למוצר', 'קטגוריה', 'מחיר', 'ASIN', 'קישור לתמונה'];
+  const rows = blogAllCandidates.map(c => [
+    c.name_he || c.name || '',
+    c.url || '',
+    c.amazon_category || '',
+    c.price_ils || '',
+    c.asin || '',
+    c.image_url || '',
+  ]);
+  _downloadCSV('blog_candidates.csv', headers, rows);
+}
+
+async function loadBlogSocialQueue() {
+  const listEl = document.getElementById("blog-social-queue-list");
+  if (!listEl) return;
+  const res = await apiFetch("/admin/blog-social-queue");
+  if (!res || !res.ok) { listEl.innerHTML = '<div style="color:var(--text-muted);">שגיאה בטעינה</div>'; return; }
+  const data = await res.json();
+  const queue = data.queue || [];
+  if (!queue.length) {
+    listEl.innerHTML = '<div style="color:var(--text-muted); padding:10px 0;">אין פוסטים ממתינים לשידור.</div>';
+    return;
+  }
+  listEl.innerHTML = queue.map(q => {
+    const dt = q.scheduled_at ? new Date(q.scheduled_at).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' }) : '';
+    const status = (q.telegram_sent && q.facebook_sent)
+      ? '<span style="color:var(--success);font-weight:600;">✅ שודר</span>'
+      : `<span style="color:var(--text-muted);">${q.telegram_sent ? '📨 טלגרם ✓' : ''} ${q.facebook_sent ? '📘 פייסבוק ✓' : ''}</span>`;
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--surface);">
+        <div style="min-width:0;flex:1;">
+          <a href="https://www.amzfreeil.com/blog/${q.slug}.html" target="_blank" rel="noopener" style="font-weight:600;color:inherit;text-decoration:none;">${q.title || q.slug}</a>
+          <div style="font-size:0.76rem;color:var(--text-muted);"><span dir="ltr">${q.asin}</span></div>
+        </div>
+        <div style="font-size:0.82rem;white-space:nowrap;">🕒 ${dt}</div>
+        <div style="font-size:0.8rem;white-space:nowrap;">${status}</div>
+      </div>`;
+  }).join("");
+}
+
+async function loadBlogPublished() {
+  const listEl = document.getElementById("blog-published-list");
+  if (!listEl) return;
+  const res = await apiFetch("/admin/blog-published");
+  if (!res || !res.ok) { listEl.innerHTML = '<div style="color:var(--text-muted);">שגיאה בטעינה</div>'; return; }
+  const data = await res.json();
+  const published = data.published || [];
+  if (!published.length) {
+    listEl.innerHTML = '<div style="color:var(--text-muted); padding:10px 0;">עדיין לא פורסמו פוסטים.</div>';
+    return;
+  }
+  listEl.innerHTML = published.map(p => {
+    const dt = p.marked_at ? new Date(p.marked_at).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' }) : '';
+    const link = p.slug ? `https://www.amzfreeil.com/blog/${p.slug}.html` : null;
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--surface);">
+        <div style="min-width:0;flex:1;">
+          ${link
+            ? `<a href="${link}" target="_blank" rel="noopener" style="font-weight:600;color:inherit;text-decoration:none;">${p.title || p.slug}</a>`
+            : `<span style="font-weight:600;">${p.title || p.asin}</span>`}
+          <div style="font-size:0.76rem;color:var(--text-muted);"><span dir="ltr">${p.asin}</span></div>
+        </div>
+        <div style="font-size:0.82rem;white-space:nowrap;">📅 ${dt}</div>
       </div>`;
   }).join("");
 }

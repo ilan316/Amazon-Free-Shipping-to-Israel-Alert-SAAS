@@ -19,7 +19,7 @@ from backend.database import get_db
 from sqlalchemy import cast, Date
 from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen, EmailSendLog, EmailSendRecipient, BlogPublishedAsin, BlogDismissedAsin, BlogDraft
 from backend.blog_utils import fetch_amazon_product, generate_with_claude, build_post_html, commit_to_github, publish_draft, add_to_prices_page
-from backend.scheduler import send_blog_post_to_telegram, send_blog_post_to_facebook
+from backend.scheduler import queue_blog_social_post
 from backend.auth import get_current_admin, hash_password, verify_password, SECRET_KEY, ALGORITHM
 
 
@@ -2307,6 +2307,49 @@ async def dismiss_blog_candidate(
     return {"message": "dismissed"}
 
 
+@router.get("/blog-published")
+async def get_blog_published(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    result = await db.execute(select(BlogPublishedAsin).order_by(BlogPublishedAsin.marked_at.desc()))
+    rows = result.scalars().all()
+    return {
+        "published": [
+            {
+                "asin": r.asin,
+                "slug": r.slug,
+                "title": r.title,
+                "marked_at": r.marked_at.isoformat() if r.marked_at else None,
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.get("/blog-social-queue")
+async def get_blog_social_queue(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    from backend.models import BlogSocialQueue
+    result = await db.execute(select(BlogSocialQueue).order_by(BlogSocialQueue.scheduled_at.asc()))
+    rows = result.scalars().all()
+    return {
+        "queue": [
+            {
+                "asin": r.asin,
+                "slug": r.slug,
+                "title": r.title,
+                "scheduled_at": r.scheduled_at.isoformat() if r.scheduled_at else None,
+                "telegram_sent": r.telegram_sent,
+                "facebook_sent": r.facebook_sent,
+            }
+            for r in rows
+        ]
+    }
+
+
 @router.delete("/blog-candidates/{asin}/dismiss")
 async def undismiss_blog_candidate(
     asin: str,
@@ -2464,26 +2507,24 @@ async def publish_blog_draft(
         except Exception as e:
             raise HTTPException(502, f"prices.html update error: {e}")
 
-    telegram_sent = False
-    facebook_sent = False
+    scheduled_at = None
     if draft_row:
         title = draft_row.title_short or draft_row.title
         try:
-            telegram_sent = await send_blog_post_to_telegram(
-                title, slug, draft_row.image_url, draft_row.amazon_price, draft_row.israel_price
+            scheduled_at = await queue_blog_social_post(
+                asin, slug, title, draft_row.image_url, draft_row.amazon_price, draft_row.israel_price
             )
         except Exception as e:
-            logger.warning(f"blog-publish telegram send error: {e}")
-        try:
-            facebook_sent = await send_blog_post_to_facebook(
-                title, slug, draft_row.image_url, draft_row.amazon_price, draft_row.israel_price
-            )
-        except Exception as e:
-            logger.warning(f"blog-publish facebook send error: {e}")
+            logger.warning(f"blog-publish queue error: {e}")
 
     existing_pub = await db.execute(select(BlogPublishedAsin).where(BlogPublishedAsin.asin == asin))
-    if not existing_pub.scalar_one_or_none():
-        db.add(BlogPublishedAsin(asin=asin))
+    pub_row = existing_pub.scalar_one_or_none()
+    pub_title = (draft_row.title_short or draft_row.title) if draft_row else None
+    if pub_row:
+        pub_row.slug = slug
+        pub_row.title = pub_title
+    else:
+        db.add(BlogPublishedAsin(asin=asin, slug=slug, title=pub_title))
 
     await db.execute(delete(BlogDraft).where(BlogDraft.asin == asin))
     await db.commit()
@@ -2493,8 +2534,7 @@ async def publish_blog_draft(
         "slug": slug,
         "url": f"https://www.amzfreeil.com/blog/{slug}.html",
         "github_url": f"https://github.com/{repo}/blob/main/blog/{slug}.html",
-        "telegram_sent": telegram_sent,
-        "facebook_sent": facebook_sent,
+        "social_scheduled_at": scheduled_at.isoformat() if scheduled_at else None,
     }
 
 

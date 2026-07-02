@@ -385,6 +385,16 @@ async def create_tables():
                 "ALTER TABLE products ADD COLUMN IF NOT EXISTS screenshot_path VARCHAR(512)"
             )
         )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE blog_published_asins ADD COLUMN IF NOT EXISTS slug VARCHAR(200)"
+            )
+        )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE blog_published_asins ADD COLUMN IF NOT EXISTS title VARCHAR(500)"
+            )
+        )
 
 
 def _apply_rtl_to_html(body: str) -> str:

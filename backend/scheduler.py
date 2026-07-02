@@ -1297,6 +1297,122 @@ async def send_blog_post_to_facebook(
         return False
 
 
+_BLOG_SOCIAL_WINDOW_START_HOUR = 6
+_BLOG_SOCIAL_WINDOW_END_HOUR = 22
+_BLOG_SOCIAL_MIN_GAP_MINUTES = 60
+_BLOG_SOCIAL_MAX_GAP_MINUTES = 120
+
+
+def _blog_social_window_bounds() -> tuple[datetime, datetime]:
+    """Return (window_start, window_end) in IL time for the active blog-social
+    window, rolling to tomorrow if today's 06:00-22:00 window already closed."""
+    import pytz
+
+    il_tz = pytz.timezone("Asia/Jerusalem")
+    now_il = datetime.now(il_tz)
+    window_start = now_il.replace(hour=_BLOG_SOCIAL_WINDOW_START_HOUR, minute=0, second=0, microsecond=0)
+    window_end = now_il.replace(hour=_BLOG_SOCIAL_WINDOW_END_HOUR, minute=0, second=0, microsecond=0)
+
+    if now_il >= window_end:
+        window_start += timedelta(days=1)
+        window_end += timedelta(days=1)
+    elif now_il > window_start:
+        window_start = now_il
+
+    return window_start, window_end
+
+
+def _random_blog_social_time(
+    window_start: datetime, window_end: datetime, existing_times_utc: list[datetime],
+) -> datetime:
+    """Pick a random UTC datetime within [window_start, window_end] (IL time),
+    kept at least 60-120 (random) minutes away from any already-queued blog post
+    that day, so consecutive publishes don't cluster minutes apart.
+
+    Only other blog-queue entries are considered here — this is intentionally
+    independent of the separate scanner "product post" cron jobs.
+    """
+    import random
+
+    span_seconds = int((window_end - window_start).total_seconds())
+
+    min_gap = timedelta(minutes=random.randint(_BLOG_SOCIAL_MIN_GAP_MINUTES, _BLOG_SOCIAL_MAX_GAP_MINUTES))
+    for _ in range(200):
+        offset = random.randint(0, max(span_seconds, 0))
+        candidate = window_start + timedelta(seconds=offset)
+        if all(abs((candidate - t).total_seconds()) >= min_gap.total_seconds() for t in existing_times_utc):
+            return candidate.astimezone(timezone.utc)
+
+    # Window is packed (many posts queued for the same day) — fall back to
+    # placing it right after the last existing slot, even if that spills past 22:00.
+    reference = max(existing_times_utc, default=window_start)
+    return (reference + min_gap).astimezone(timezone.utc)
+
+
+async def queue_blog_social_post(
+    asin: str, slug: str, title: str, image_url: str | None,
+    amazon_price: float | None = None, israel_price: float | None = None,
+) -> datetime:
+    """Queue a blog post's Telegram/Facebook announcement for a random time today
+    (within the 06:00-22:00 IL active window, spaced 60-120 min apart from other
+    queued blog posts) instead of sending immediately."""
+    from backend.models import BlogSocialQueue
+
+    window_start, window_end = _blog_social_window_bounds()
+    async with AsyncSessionLocal() as db:
+        existing = (await db.execute(
+            select(BlogSocialQueue.scheduled_at).where(
+                BlogSocialQueue.scheduled_at >= window_start.astimezone(timezone.utc),
+                BlogSocialQueue.scheduled_at <= window_end.astimezone(timezone.utc),
+            )
+        )).scalars().all()
+
+        scheduled_at = _random_blog_social_time(window_start, window_end, list(existing))
+        db.add(BlogSocialQueue(
+            asin=asin, slug=slug, title=title, image_url=image_url,
+            amazon_price=amazon_price, israel_price=israel_price,
+            scheduled_at=scheduled_at,
+        ))
+        await db.commit()
+    logger.info(f"[blog_social_queue] queued {slug} for {scheduled_at.isoformat()}")
+    return scheduled_at
+
+
+async def run_send_blog_social_queue():
+    """Send any due blog-post announcements. Runs every few minutes."""
+    from backend.models import BlogSocialQueue
+
+    now = datetime.now(timezone.utc)
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(BlogSocialQueue).where(
+                BlogSocialQueue.scheduled_at <= now,
+                or_(BlogSocialQueue.telegram_sent.is_(False), BlogSocialQueue.facebook_sent.is_(False)),
+            )
+        )
+        due = result.scalars().all()
+        if not due:
+            return
+
+        logger.info(f"=== Blog social queue: {len(due)} due ===")
+        for row in due:
+            if not row.telegram_sent:
+                try:
+                    row.telegram_sent = await send_blog_post_to_telegram(
+                        row.title, row.slug, row.image_url, row.amazon_price, row.israel_price
+                    )
+                except Exception as e:
+                    logger.warning(f"[blog_social_queue] telegram send error for {row.slug}: {e}")
+            if not row.facebook_sent:
+                try:
+                    row.facebook_sent = await send_blog_post_to_facebook(
+                        row.title, row.slug, row.image_url, row.amazon_price, row.israel_price
+                    )
+                except Exception as e:
+                    logger.warning(f"[blog_social_queue] facebook send error for {row.slug}: {e}")
+            await db.commit()
+
+
 async def run_cleanup_orphans():
     """Delete user-source products with no watchers. Runs once daily at 02:00 IL."""
     logger.info("=== Orphan cleanup started ===")

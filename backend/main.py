@@ -168,7 +168,7 @@ async def lifespan(app: FastAPI):
 
     scheduler.start()
 
-    from backend.scheduler import run_inactivity_check, run_automation_emails, check_decodo_quota, run_telegram_report, run_hebrew_backfill, run_send_telegram_product, run_send_facebook_product, run_cleanup_orphans, cleanup_old_screenshots
+    from backend.scheduler import run_inactivity_check, run_automation_emails, check_decodo_quota, run_telegram_report, run_hebrew_backfill, run_send_telegram_product, run_send_facebook_product, run_cleanup_orphans, cleanup_old_screenshots, run_send_blog_social_queue
 
     telegram_hour = int(os.environ.get("TELEGRAM_REPORT_HOUR", "8"))
     telegram_minute = int(os.environ.get("TELEGRAM_REPORT_MINUTE", "0"))
@@ -205,6 +205,9 @@ async def lifespan(app: FastAPI):
 
     _upsert_job(cleanup_old_screenshots, "screenshot_cleanup", dict(
         trigger="interval", hours=1, misfire_grace_time=300
+    ))
+    _upsert_job(run_send_blog_social_queue, "blog_social_queue", dict(
+        trigger="interval", minutes=5, misfire_grace_time=300
     ))
 
     # Read daily check time from DB (cron trigger — no timer reset on deploy)

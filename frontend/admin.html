@@ -724,12 +724,28 @@
     <div class="tab-panel" id="tab-blog">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
         <h2 style="font-size:1.1rem; margin:0;">✍️ מועמדים לפוסט בלוג</h2>
-        <button class="btn-sm" onclick="loadBlogCandidates()" style="background:var(--brand);color:#111;border:none;padding:7px 16px;border-radius:6px;cursor:pointer;font-weight:600;">רענן רשימה</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-sm" onclick="exportBlogCandidatesCsv()" style="background:#fff;color:var(--brand);border:1px solid var(--brand);padding:7px 16px;border-radius:6px;cursor:pointer;font-weight:600;">ייצוא CSV</button>
+          <button class="btn-sm" onclick="loadBlogCandidates()" style="background:var(--brand);color:#111;border:none;padding:7px 16px;border-radius:6px;cursor:pointer;font-weight:600;">רענן רשימה</button>
+        </div>
       </div>
       <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:14px;">מוצרים חינמיים מעל ₪200 שעוד לא פורסמו עליהם פוסטים.</p>
       <div id="blog-category-filters" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;"></div>
       <div id="blog-candidates-status" style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;"></div>
       <div id="blog-candidates-list"></div>
+
+      <div style="margin-top:32px; display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+        <h2 style="font-size:1.05rem; margin:0;">🕒 פוסטים מתוזמנים לשידור</h2>
+        <button class="btn-sm" onclick="loadBlogSocialQueue()" style="background:#fff;color:var(--brand);border:1px solid var(--brand);padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem;">רענן</button>
+      </div>
+      <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:10px;">פוסטים שפורסמו לאתר וממתינים לשידור אוטומטי בטלגרם/פייסבוק, בזמן רנדומלי בטווח 06:00-22:00.</p>
+      <div id="blog-social-queue-list" style="font-size:0.85rem;"></div>
+
+      <div style="margin-top:32px; display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+        <h2 style="font-size:1.05rem; margin:0;">📚 פוסטים שפורסמו</h2>
+        <button class="btn-sm" onclick="loadBlogPublished()" style="background:#fff;color:var(--brand);border:1px solid var(--brand);padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem;">רענן</button>
+      </div>
+      <div id="blog-published-list" style="font-size:0.85rem;"></div>
     </div>
 
   </div>

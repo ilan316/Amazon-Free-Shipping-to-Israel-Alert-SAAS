@@ -186,6 +186,8 @@ class BlogPublishedAsin(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     asin: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
+    slug: Mapped[str] = mapped_column(String(200), nullable=True)
+    title: Mapped[str] = mapped_column(String(500), nullable=True)
     marked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 
@@ -208,4 +210,20 @@ class BlogDraft(Base):
     israel_price: Mapped[float] = mapped_column(nullable=True)
     amazon_price: Mapped[float] = mapped_column(nullable=True)
     image_url: Mapped[str] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class BlogSocialQueue(Base):
+    __tablename__ = "blog_social_queue"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    asin: Mapped[str] = mapped_column(String(10), nullable=False)
+    slug: Mapped[str] = mapped_column(String(200), nullable=False)
+    title: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    israel_price: Mapped[float] = mapped_column(nullable=True)
+    amazon_price: Mapped[float] = mapped_column(nullable=True)
+    image_url: Mapped[str] = mapped_column(String(512), nullable=True)
+    scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    telegram_sent: Mapped[bool] = mapped_column(Boolean, default=False)
+    facebook_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
