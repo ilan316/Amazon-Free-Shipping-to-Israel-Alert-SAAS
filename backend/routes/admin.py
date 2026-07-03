@@ -2442,25 +2442,32 @@ async def generate_blog_draft(
 
     slug = content["slug"]
 
+    # Already-published post: strip the noindex meta build_post_html adds *before*
+    # the commit, so a single write keeps the post indexed. (Committing then
+    # calling publish_draft did two writes to the same file and raced GitHub's
+    # eventual consistency → 409 Conflict.)
+    commit_message = f"blog: draft {content.get('title_short', slug)}"
+    if pub_row:
+        html = html.replace(
+            '<meta name="robots" content="noindex,nofollow" />\n', ""
+        ).replace(
+            '<meta name="robots" content="noindex,nofollow" />', ""
+        )
+        commit_message = f"blog: update {content.get('title_short', slug)}"
+
     try:
         await commit_to_github(
             path=f"blog/{slug}.html",
             content=html,
-            message=f"blog: draft {content.get('title_short', slug)}",
+            message=commit_message,
         )
     except Exception as e:
         logger.error("blog-draft GitHub commit error for %s: %s", asin, e, exc_info=True)
         raise HTTPException(502, f"GitHub commit error: {e}")
 
-    # Already-published post: strip the noindex meta build_post_html added so the
-    # updated post stays indexed, refresh the stored title, and return without
-    # creating a new draft row (no re-publish side effects like social queue).
+    # Already-published post: refresh the stored title and return without creating
+    # a new draft row (no re-publish side effects like social queue).
     if pub_row:
-        try:
-            await publish_draft(slug)
-        except Exception as e:
-            logger.error("blog-draft republish error for %s: %s", asin, e, exc_info=True)
-            raise HTTPException(502, f"Republish error: {e}")
         pub_row.title = content.get("title_short") or content.get("title_he", "")
         await db.commit()
         repo = os.getenv("GITHUB_REPO", "")
