@@ -2425,6 +2425,15 @@ async def generate_blog_draft(
         logger.error("blog-draft Claude API error for %s: %s", asin, e, exc_info=True)
         raise HTTPException(502, f"Claude API error: {e}")
 
+    # If this ASIN is already published, update the live post in place: reuse
+    # the original slug (Claude invents a new one each run) so we overwrite the
+    # same file instead of forking a new URL.
+    pub_row = (await db.execute(
+        select(BlogPublishedAsin).where(BlogPublishedAsin.asin == asin)
+    )).scalar_one_or_none()
+    if pub_row and pub_row.slug:
+        content["slug"] = pub_row.slug
+
     try:
         html = build_post_html(product, content, body.israel_price, body.amazon_price)
     except Exception as e:
@@ -2442,6 +2451,26 @@ async def generate_blog_draft(
     except Exception as e:
         logger.error("blog-draft GitHub commit error for %s: %s", asin, e, exc_info=True)
         raise HTTPException(502, f"GitHub commit error: {e}")
+
+    # Already-published post: strip the noindex meta build_post_html added so the
+    # updated post stays indexed, refresh the stored title, and return without
+    # creating a new draft row (no re-publish side effects like social queue).
+    if pub_row:
+        try:
+            await publish_draft(slug)
+        except Exception as e:
+            logger.error("blog-draft republish error for %s: %s", asin, e, exc_info=True)
+            raise HTTPException(502, f"Republish error: {e}")
+        pub_row.title = content.get("title_short") or content.get("title_he", "")
+        await db.commit()
+        repo = os.getenv("GITHUB_REPO", "")
+        return {
+            "republished": True,
+            "slug": slug,
+            "title": content.get("title_he", ""),
+            "github_url": f"https://github.com/{repo}/blob/main/blog/{slug}.html",
+            "preview_url": f"https://www.amzfreeil.com/blog/{slug}.html",
+        }
 
     existing_draft = await db.execute(select(BlogDraft).where(BlogDraft.asin == asin))
     draft_row = existing_draft.scalar_one_or_none()

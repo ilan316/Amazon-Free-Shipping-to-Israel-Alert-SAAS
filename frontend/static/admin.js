@@ -1896,6 +1896,7 @@ async function loadBlogPublished() {
   listEl.innerHTML = published.map(p => {
     const dt = p.marked_at ? new Date(p.marked_at).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' }) : '';
     const link = p.slug ? `https://www.amzfreeil.com/blog/${p.slug}.html` : null;
+    const titleEsc = String(p.title || p.asin).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     return `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--surface);">
         <div style="min-width:0;flex:1;">
@@ -1904,7 +1905,14 @@ async function loadBlogPublished() {
             : `<span style="font-weight:600;">${p.title || p.asin}</span>`}
           <div style="font-size:0.76rem;color:var(--text-muted);"><span dir="ltr">${p.asin}</span></div>
         </div>
-        <div style="font-size:0.82rem;white-space:nowrap;">📅 ${dt}</div>
+        <div style="display:flex;align-items:center;gap:10px;white-space:nowrap;">
+          <button onclick="openDraftModal('${p.asin}','${titleEsc}','')"
+            title="ייצר מחדש את התוכן ועדכן את הפוסט החי"
+            style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 10px;cursor:pointer;font-size:0.8rem;color:var(--text-muted);">
+            🔄 עדכן
+          </button>
+          <span style="font-size:0.82rem;">📅 ${dt}</span>
+        </div>
       </div>`;
   }).join("");
 }
@@ -1997,6 +2005,17 @@ async function generateBlogDraft(asin) {
 
   if (res && res.ok) {
     const data = await res.json();
+    if (data.republished) {
+      statusEl.innerHTML = `
+        <div style="background:rgba(22,125,70,.08);border:1px solid rgba(22,125,70,.25);border-radius:8px;padding:12px 14px;">
+          <p style="margin:0 0 6px;font-weight:700;color:#167d46;">✅ הפוסט המפורסם עודכן ופורסם מחדש!</p>
+          <p style="margin:0 0 8px;font-size:0.82rem;">${data.title || ""}</p>
+          <a href="${data.preview_url}" target="_blank" rel="noopener" style="font-size:0.82rem;color:var(--brand-deep,#ff6a00);">צפה בפוסט ←</a>
+        </div>`;
+      if (typeof btn !== "undefined" && btn) { btn.textContent = "✍️ עדכן שוב"; btn.disabled = false; }
+      loadBlogPublished();
+      return;
+    }
     statusEl.innerHTML = `
       <div style="background:rgba(22,125,70,.08);border:1px solid rgba(22,125,70,.25);border-radius:8px;padding:12px 14px;">
         <p style="margin:0 0 6px;font-weight:700;color:#167d46;">✅ דראפט נוצר בהצלחה!</p>
@@ -2124,6 +2143,17 @@ async function generateBlogDraftManual(asin) {
 
   if (res && res.ok) {
     const data = await res.json();
+    if (data.republished) {
+      statusEl.innerHTML = `
+        <div style="background:rgba(22,125,70,.08);border:1px solid rgba(22,125,70,.25);border-radius:8px;padding:12px 14px;">
+          <p style="margin:0 0 6px;font-weight:700;color:#167d46;">✅ הפוסט המפורסם עודכן ופורסם מחדש!</p>
+          <p style="margin:0 0 8px;font-size:0.82rem;">${data.title || ""}</p>
+          <a href="${data.preview_url}" target="_blank" rel="noopener" style="font-size:0.82rem;color:var(--brand-deep,#ff6a00);">צפה בפוסט ←</a>
+        </div>`;
+      if (typeof btn !== "undefined" && btn) { btn.textContent = "✍️ עדכן שוב"; btn.disabled = false; }
+      loadBlogPublished();
+      return;
+    }
     statusEl.innerHTML = `
       <div style="background:rgba(22,125,70,.08);border:1px solid rgba(22,125,70,.25);border-radius:8px;padding:12px 14px;">
         <p style="margin:0 0 6px;font-weight:700;color:#167d46;">✅ דראפט נוצר בהצלחה!</p>
@@ -2162,6 +2192,17 @@ async function generateBlogDraftMissingFields(asin) {
 
   if (res && res.ok) {
     const data = await res.json();
+    if (data.republished) {
+      statusEl.innerHTML = `
+        <div style="background:rgba(22,125,70,.08);border:1px solid rgba(22,125,70,.25);border-radius:8px;padding:12px 14px;">
+          <p style="margin:0 0 6px;font-weight:700;color:#167d46;">✅ הפוסט המפורסם עודכן ופורסם מחדש!</p>
+          <p style="margin:0 0 8px;font-size:0.82rem;">${data.title || ""}</p>
+          <a href="${data.preview_url}" target="_blank" rel="noopener" style="font-size:0.82rem;color:var(--brand-deep,#ff6a00);">צפה בפוסט ←</a>
+        </div>`;
+      if (typeof btn !== "undefined" && btn) { btn.textContent = "✍️ עדכן שוב"; btn.disabled = false; }
+      loadBlogPublished();
+      return;
+    }
     statusEl.innerHTML = `
       <div style="background:rgba(22,125,70,.08);border:1px solid rgba(22,125,70,.25);border-radius:8px;padding:12px 14px;">
         <p style="margin:0 0 6px;font-weight:700;color:#167d46;">✅ דראפט נוצר בהצלחה!</p>
