@@ -140,6 +140,8 @@ ASIN: {product['asin']}
   "description_he": "תיאור SEO בעברית, עד 155 תווים",
   "eyebrow": "אייקון + קטגוריה (למשל: 💻 ביקורת מוצר)",
   "reading_time": "כ-5 דקות",
+  "intro_p1": "<p>2-3 משפטים בשפה פשוטה: מה המוצר, מה הוא עושה, ולמי הוא מתאים — בלי מפרט טכני יבש (HTML, <bdi> לאנגלית)</p>",
+  "use_cases": ["שימוש/קהל יעד 1", "שימוש 2", "שימוש 3", "שימוש 4"],
   "section1_p1": "<p>פסקה עובדתית אחת — תאר את המוצר לפי הספציפיקציות בלבד (HTML, <bdi> לאנגלית). אל תוסיף 'פופולרי', 'אהוב', 'כולם מדברים'. השתמש במספרים מהמאפיינים. סיים עם: — לפי מפרט היצרן</p>",
   "specs_rows": [
     {{"label": "מפרט", "value": "ערך"}}
@@ -164,6 +166,8 @@ ASIN: {product['asin']}
 - אל תמציא מפרטים — רק מה שמופיע ב"מאפיינים"
 - slug: קצר, אנגלית, מקפים, מסתיים ב-amazon-israel
 - FAQs: בדיוק 4 שאלות
+- intro_p1: הסבר פשוט מה המוצר עושה ולמי הוא מתאים — לא מפרט. מותר להשתמש בשימושים אופייניים של קטגוריית המוצר (למשל: כלי רוטרי → חיתוך/חריטה/ליטוש). אל תמציא מחירים.
+- use_cases: 3-5 שימושים או קהלי יעד קונקרטיים
 - specs_rows: חלץ מהמאפיינים (4-8 שורות)
 - {"אם המוצר לא נמכר בישראל: הדגש את הבלעדיות והעובדה שזו הדרך היחידה להשיגו. אל תמציא מחיר ישראלי." if israel_price is None else "הדגש את החיסכון הכספי ביחס לקנייה בישראל."}"""
 
@@ -233,6 +237,17 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
       </div>
 """
 
+    use_cases_html = "\n".join(f"              <li>{u}</li>" for u in content.get("use_cases", []))
+    who_box_html = ""
+    if use_cases_html:
+        who_box_html = (
+            '        <div style="background:rgba(22,125,70,.06);border:1px solid rgba(22,125,70,.2);border-radius:14px;padding:16px 20px;margin:16px 0;">\n'
+            '          <p style="font-weight:700;margin:0 0 10px;color:#167d46;">👤 למי זה מתאים?</p>\n'
+            '          <ul style="margin:0;padding-right:18px;line-height:1.9;font-size:.92rem;">\n'
+            f"{use_cases_html}\n"
+            "          </ul>\n"
+            "        </div>\n"
+        )
     pros_html = "\n".join(f"              <li>{p}</li>" for p in content.get("pros", []))
     cons_html = "\n".join(f"              <li>{c}</li>" for c in content.get("cons", []))
 
@@ -424,8 +439,9 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
       </div>
 
       <section>
-        <h2>סקירה קצרה על {content['title_short']}</h2>
-        {content['section1_p1']}
+        <h2>מה זה {content['title_short']} ולמי הוא מתאים?</h2>
+        {content.get('intro_p1', '')}
+{who_box_html}        {content['section1_p1']}
       </section>
 
       <section>
