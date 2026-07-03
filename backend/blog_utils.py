@@ -179,9 +179,61 @@ ASIN: {product['asin']}
     )
 
     raw = message.content[0].text.strip()
+    return await _parse_claude_json(raw, client)
+
+
+def _extract_json_block(raw: str) -> str:
+    """Strip markdown fences and any prose around the JSON object."""
+    raw = raw.strip()
     raw = re.sub(r"^```(?:json)?\s*", "", raw)
     raw = re.sub(r"\s*```$", "", raw)
-    return json.loads(raw)
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        raw = raw[start:end + 1]
+    return raw.strip()
+
+
+async def _parse_claude_json(raw: str, client: "anthropic.AsyncAnthropic", _attempts: int = 2) -> dict:
+    """
+    Parse JSON returned by Claude. LLM output occasionally contains an
+    unescaped quote/newline inside a Hebrew string, which breaks json.loads.
+    On failure, ask Claude to repair its own output into valid JSON, up to
+    a few times, before giving up.
+    """
+    cleaned = _extract_json_block(raw)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError as first_err:
+        last_err = first_err
+        current = cleaned
+        for attempt in range(_attempts):
+            logger.warning(
+                "blog-draft: Claude JSON invalid (%s) — repair attempt %d/%d",
+                last_err, attempt + 1, _attempts,
+            )
+            try:
+                repair = await client.messages.create(
+                    model="claude-sonnet-4-6",
+                    max_tokens=4096,
+                    messages=[{
+                        "role": "user",
+                        "content": (
+                            "הטקסט הבא אמור להיות JSON תקין אך יש בו שגיאת תחביר "
+                            f"({last_err.msg} בסביבות תו {last_err.pos}). "
+                            "החזר את אותו תוכן בדיוק כ-JSON תקין בלבד — ללא markdown, "
+                            "ללא הסבר, ללא טקסט לפני או אחרי. הקפד להבריח (escape) "
+                            "מרכאות כפולות ותווי שורה חדשה בתוך ערכי מחרוזת.\n\n"
+                            + current
+                        ),
+                    }],
+                )
+                current = _extract_json_block(repair.content[0].text.strip())
+                return json.loads(current)
+            except json.JSONDecodeError as e:
+                last_err = e
+                continue
+        raise last_err
 
 
 ELECTRONICS_KEYWORDS = [
