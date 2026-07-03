@@ -692,11 +692,12 @@ async def add_to_prices_page(
       </div>
 """
 
-    marker = "\n    </div>\n\n    <!-- Alert CTA -->"
+    marker = '<div class="prices-grid">\n'
     if marker not in current:
         raise ValueError("prices.html: insertion marker not found")
 
-    updated = current.replace(marker, card + "\n    </div>\n\n    <!-- Alert CTA -->")
+    # Insert newest card at the top of the grid (newest → oldest)
+    updated = current.replace(marker, marker + card, 1)
     return await commit_to_github(path, updated, f"prices: add {title_short}", sha=sha)
 
 
