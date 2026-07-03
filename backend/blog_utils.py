@@ -672,7 +672,7 @@ async def add_to_prices_page(
       <!-- {title_short} -->
       <div class="price-card">
         <div class="price-card-img">
-          <a href="{aff_url}" target="_blank" rel="noopener sponsored">
+          <a href="blog/{slug}.html">
             <img src="{image_url}" alt="{title_short}" width="110" height="110" loading="lazy" />
           </a>
         </div>
