@@ -18,7 +18,7 @@ from sqlalchemy import select, func, delete, text, or_
 from backend.database import get_db
 from sqlalchemy import cast, Date
 from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen, EmailSendLog, EmailSendRecipient, BlogPublishedAsin, BlogDismissedAsin, BlogDraft
-from backend.blog_utils import fetch_amazon_product, generate_with_claude, build_post_html, commit_to_github, publish_draft, add_to_prices_page
+from backend.blog_utils import fetch_amazon_product, generate_with_claude, build_post_html, commit_to_github, publish_draft, add_to_prices_page, get_github_file
 from backend.scheduler import queue_blog_social_post
 from backend.auth import get_current_admin, hash_password, verify_password, SECRET_KEY, ALGORITHM
 
@@ -2324,6 +2324,60 @@ async def get_blog_published(
             }
             for r in rows
         ]
+    }
+
+
+class EditBlogPostRequest(BaseModel):
+    asin: str
+    find: str
+    replace: str
+
+
+@router.post("/blog-edit")
+async def edit_blog_post(
+    body: EditBlogPostRequest,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Light manual find & replace on a published post's HTML — no Claude regen."""
+    asin = body.asin.strip().upper()
+    if not body.find:
+        raise HTTPException(400, "יש להזין טקסט לחיפוש")
+
+    pub_row = (await db.execute(
+        select(BlogPublishedAsin).where(BlogPublishedAsin.asin == asin)
+    )).scalar_one_or_none()
+    if not pub_row or not pub_row.slug:
+        raise HTTPException(404, "הפוסט לא נמצא")
+
+    slug = pub_row.slug
+    path = f"blog/{slug}.html"
+
+    try:
+        current, sha = await get_github_file(path)
+    except Exception as e:
+        logger.error("blog-edit fetch error for %s: %s", slug, e, exc_info=True)
+        raise HTTPException(502, f"GitHub fetch error: {e}")
+
+    count = current.count(body.find)
+    if count == 0:
+        raise HTTPException(404, {"message": "הטקסט לא נמצא בפוסט"})
+    if count > 1:
+        raise HTTPException(422, {"multiple": True, "count": count,
+                                  "message": f"הטקסט מופיע {count} פעמים — הוסף עוד מילים כדי שיהיה ייחודי"})
+
+    updated = current.replace(body.find, body.replace)
+
+    try:
+        await commit_to_github(path, updated, f"blog: edit {slug}", sha=sha)
+    except Exception as e:
+        logger.error("blog-edit commit error for %s: %s", slug, e, exc_info=True)
+        raise HTTPException(502, f"GitHub commit error: {e}")
+
+    return {
+        "slug": slug,
+        "replacements": count,
+        "preview_url": f"https://www.amzfreeil.com/blog/{slug}.html",
     }
 
 

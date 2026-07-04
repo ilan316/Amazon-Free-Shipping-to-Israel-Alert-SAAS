@@ -770,6 +770,23 @@ async def add_to_prices_page(
     return await commit_to_github(path, updated, f"prices: add {title_short}", sha=sha)
 
 
+async def get_github_file(path: str) -> tuple[str, str]:
+    """Fetch a file from the repo. Returns (decoded_content, sha)."""
+    token = os.getenv("GITHUB_TOKEN")
+    repo = os.getenv("GITHUB_REPO")
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.get(url, headers=headers)
+        r.raise_for_status()
+        data = r.json()
+        content = base64.b64decode(data["content"]).decode("utf-8")
+        return content, data["sha"]
+
+
 async def commit_to_github(path: str, content: str, message: str, sha: str | None = None) -> dict:
     token = os.getenv("GITHUB_TOKEN")
     repo = os.getenv("GITHUB_REPO")

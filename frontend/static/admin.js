@@ -1906,6 +1906,11 @@ async function loadBlogPublished() {
           <div style="font-size:0.76rem;color:var(--text-muted);"><span dir="ltr">${p.asin}</span></div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;white-space:nowrap;">
+          <button onclick="openEditModal('${p.asin}','${p.slug || ''}')"
+            title="תיקון ידני קל של טקסט/תרגום — מצא והחלף, בלי לייצר מחדש"
+            style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 10px;cursor:pointer;font-size:0.8rem;color:var(--text-muted);">
+            ✏️ ערוך טקסט
+          </button>
           <button onclick="openDraftModal('${p.asin}','${titleEsc}','')"
             title="ייצר מחדש את התוכן ועדכן את הפוסט החי"
             style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 10px;cursor:pointer;font-size:0.8rem;color:var(--text-muted);">
@@ -1975,6 +1980,100 @@ function openDraftModal(asin, name, imageUrl) {
 function closeDraftModal() {
   const m = document.getElementById("blog-draft-modal");
   if (m) m.remove();
+}
+
+function openEditModal(asin, slug) {
+  if (document.getElementById("blog-edit-modal")) return;
+  const previewUrl = slug ? `https://www.amzfreeil.com/blog/${slug}.html` : null;
+
+  const modal = document.createElement("div");
+  modal.id = "blog-edit-modal";
+  modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;";
+  modal.innerHTML = `
+    <div style="background:var(--bg,#fff);border-radius:14px;padding:28px 26px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);position:relative;" dir="rtl">
+      <button onclick="closeEditModal()" style="position:absolute;top:12px;left:16px;background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--text-muted);">✕</button>
+      <p style="font-weight:700;font-size:0.95rem;margin:0 0 4px;">✏️ תיקון טקסט ידני</p>
+      <p style="font-size:0.78rem;color:var(--text-muted);margin:0 0 16px;">
+        מצא והחלף — לתיקוני כתיב/תרגום קלים, בלי לייצר את הפוסט מחדש.
+        ${previewUrl ? `<a href="${previewUrl}" target="_blank" rel="noopener" style="color:var(--brand-deep,#ff6a00);">פתח את הפוסט להעתקת טקסט ←</a>` : ""}
+      </p>
+      <div style="margin-bottom:14px;">
+        <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:4px;">הטקסט הקיים (מצא)</label>
+        <textarea id="edit-find" rows="3" placeholder="הדבק כאן את הטקסט המדויק לתיקון"
+          style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.9rem;box-sizing:border-box;resize:vertical;font-family:inherit;"></textarea>
+      </div>
+      <div style="margin-bottom:18px;">
+        <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:4px;">הטקסט החדש (החלף ב)</label>
+        <textarea id="edit-replace" rows="3" placeholder="הטקסט המתוקן"
+          style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.9rem;box-sizing:border-box;resize:vertical;font-family:inherit;"></textarea>
+      </div>
+      <button id="edit-submit-btn" onclick="submitBlogEdit('${asin}')"
+        style="width:100%;background:var(--brand,#ff9900);color:#111;border:none;padding:12px;border-radius:10px;font-weight:700;font-size:1rem;cursor:pointer;">
+        💾 שמור ופרסם
+      </button>
+      <div id="edit-status" style="margin-top:14px;font-size:0.85rem;min-height:20px;"></div>
+      <p style="margin:10px 0 0;font-size:0.72rem;color:var(--text-muted);">⚠️ תיקון זה יידרס אם תלחץ "🔄 עדכן" (יצירה מחדש) על מוצר זה בעתיד.</p>
+    </div>`;
+
+  modal.addEventListener("click", e => { if (e.target === modal) closeEditModal(); });
+  document.body.appendChild(modal);
+  document.getElementById("edit-find").focus();
+}
+
+function closeEditModal() {
+  const m = document.getElementById("blog-edit-modal");
+  if (m) m.remove();
+}
+
+async function submitBlogEdit(asin) {
+  const find = document.getElementById("edit-find").value;
+  const replace = document.getElementById("edit-replace").value;
+  const statusEl = document.getElementById("edit-status");
+  const btn = document.getElementById("edit-submit-btn");
+
+  if (!find.trim()) {
+    statusEl.innerHTML = '<span style="color:var(--error,#c00);">נא להזין את הטקסט הקיים לחיפוש.</span>';
+    return;
+  }
+  if (find === replace) {
+    statusEl.innerHTML = '<span style="color:var(--error,#c00);">הטקסט החדש זהה לקיים.</span>';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "⏳ שומר...";
+  statusEl.innerHTML = '<span style="color:var(--text-muted);">מעדכן את הקובץ בגיטהאב...</span>';
+
+  const res = await apiFetch("/admin/blog-edit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ asin, find, replace }),
+  });
+
+  if (res && res.ok) {
+    const data = await res.json();
+    statusEl.innerHTML = `
+      <div style="background:rgba(22,125,70,.08);border:1px solid rgba(22,125,70,.25);border-radius:8px;padding:12px 14px;">
+        <p style="margin:0 0 6px;font-weight:700;color:#167d46;">✅ עודכן! (ייתכן שדקה עד שהאתר יתעדכן)</p>
+        <a href="${data.preview_url}" target="_blank" rel="noopener" style="font-size:0.82rem;color:var(--brand-deep,#ff6a00);">צפה בפוסט ←</a>
+      </div>`;
+    btn.textContent = "💾 תיקון נוסף";
+    btn.disabled = false;
+    document.getElementById("edit-find").value = "";
+    document.getElementById("edit-replace").value = "";
+    return;
+  }
+
+  let msg = "שגיאה בשמירה.";
+  try {
+    const err = await res.json();
+    const detail = err && err.detail;
+    if (typeof detail === "string") msg = detail;
+    else if (detail && detail.message) msg = detail.message;
+  } catch (e) {}
+  statusEl.innerHTML = `<span style="color:var(--error,#c00);">${msg}</span>`;
+  btn.textContent = "💾 שמור ופרסם";
+  btn.disabled = false;
 }
 
 async function generateBlogDraft(asin) {
