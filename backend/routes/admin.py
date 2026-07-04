@@ -2331,6 +2331,7 @@ class EditBlogPostRequest(BaseModel):
     asin: str
     find: str
     replace: str
+    replace_all: bool = False
 
 
 @router.post("/blog-edit")
@@ -2362,9 +2363,9 @@ async def edit_blog_post(
     count = current.count(body.find)
     if count == 0:
         raise HTTPException(404, {"message": "הטקסט לא נמצא בפוסט"})
-    if count > 1:
+    if count > 1 and not body.replace_all:
         raise HTTPException(422, {"multiple": True, "count": count,
-                                  "message": f"הטקסט מופיע {count} פעמים — הוסף עוד מילים כדי שיהיה ייחודי"})
+                                  "message": f"הטקסט מופיע {count} פעמים — הוסף עוד מילים כדי שיהיה ייחודי, או החלף את כולם"})
 
     updated = current.replace(body.find, body.replace)
 

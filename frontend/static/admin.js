@@ -2025,7 +2025,7 @@ function closeEditModal() {
   if (m) m.remove();
 }
 
-async function submitBlogEdit(asin) {
+async function submitBlogEdit(asin, replaceAll) {
   const find = document.getElementById("edit-find").value;
   const replace = document.getElementById("edit-replace").value;
   const statusEl = document.getElementById("edit-status");
@@ -2047,14 +2047,15 @@ async function submitBlogEdit(asin) {
   const res = await apiFetch("/admin/blog-edit", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ asin, find, replace }),
+    body: JSON.stringify({ asin, find, replace, replace_all: !!replaceAll }),
   });
 
   if (res && res.ok) {
     const data = await res.json();
+    const many = data.replacements > 1 ? ` (${data.replacements} מופעים)` : "";
     statusEl.innerHTML = `
       <div style="background:rgba(22,125,70,.08);border:1px solid rgba(22,125,70,.25);border-radius:8px;padding:12px 14px;">
-        <p style="margin:0 0 6px;font-weight:700;color:#167d46;">✅ עודכן! (ייתכן שדקה עד שהאתר יתעדכן)</p>
+        <p style="margin:0 0 6px;font-weight:700;color:#167d46;">✅ עודכן!${many} (ייתכן שדקה עד שהאתר יתעדכן)</p>
         <a href="${data.preview_url}" target="_blank" rel="noopener" style="font-size:0.82rem;color:var(--brand-deep,#ff6a00);">צפה בפוסט ←</a>
       </div>`;
     btn.textContent = "💾 תיקון נוסף";
@@ -2065,12 +2066,30 @@ async function submitBlogEdit(asin) {
   }
 
   let msg = "שגיאה בשמירה.";
+  let detail = null;
   try {
     const err = await res.json();
-    const detail = err && err.detail;
+    detail = err && err.detail;
     if (typeof detail === "string") msg = detail;
     else if (detail && detail.message) msg = detail.message;
   } catch (e) {}
+
+  // Multiple occurrences: offer a "replace all" button instead of a dead end
+  if (detail && detail.multiple) {
+    const escFind = String(find).replace(/'/g, "\\'").replace(/"/g, "&quot;");
+    statusEl.innerHTML = `
+      <div style="background:rgba(200,120,0,.08);border:1px solid rgba(200,120,0,.3);border-radius:8px;padding:12px 14px;">
+        <p style="margin:0 0 8px;font-size:0.85rem;">${msg}</p>
+        <button onclick="submitBlogEdit('${asin}', true)"
+          style="background:#c87800;color:#fff;border:none;padding:7px 16px;border-radius:7px;cursor:pointer;font-weight:700;font-size:0.83rem;">
+          🔁 החלף את כל ה-${detail.count} המופעים
+        </button>
+      </div>`;
+    btn.textContent = "💾 שמור ופרסם";
+    btn.disabled = false;
+    return;
+  }
+
   statusEl.innerHTML = `<span style="color:var(--error,#c00);">${msg}</span>`;
   btn.textContent = "💾 שמור ופרסם";
   btn.disabled = false;
