@@ -428,18 +428,29 @@ async def contact_form(request: Request, body: ContactRequest):
     return {"ok": True}
 
 
+_health_cache: dict = {"ts": 0.0, "data": None}
+_HEALTH_TTL = 30.0  # seconds
+
+
 @app.api_route("/health", methods=["GET", "HEAD"])
 async def health():
+    # scheduler.get_job() hits the SQLAlchemyJobStore (Postgres) synchronously,
+    # blocking the single-worker event loop (~215ms/round-trip to the DB region).
+    # Railway health-checks this frequently, so cache the jobstore reads with a
+    # short TTL to keep the DB hit to at most once per _HEALTH_TTL seconds.
+    now = time.monotonic()
+    cached = _health_cache["data"]
+    if cached is not None and (now - _health_cache["ts"]) < _HEALTH_TTL:
+        return {"status": "ok", "scheduler_running": scheduler.running, **cached}
+
     job = scheduler.get_job("global_check")
     summary_job = scheduler.get_job("daily_summary")
     next_run = job.next_run_time.isoformat() if job and job.next_run_time else None
     next_summary = summary_job.next_run_time.isoformat() if summary_job and summary_job.next_run_time else None
-    return {
-        "status": "ok",
-        "scheduler_running": scheduler.running,
-        "next_check_at": next_run,
-        "next_summary_at": next_summary,
-    }
+    data = {"next_check_at": next_run, "next_summary_at": next_summary}
+    _health_cache["data"] = data
+    _health_cache["ts"] = now
+    return {"status": "ok", "scheduler_running": scheduler.running, **data}
 
 
 
