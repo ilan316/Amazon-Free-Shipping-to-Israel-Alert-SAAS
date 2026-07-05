@@ -1906,6 +1906,7 @@ async function loadBlogPublished() {
           <div style="font-size:0.76rem;color:var(--text-muted);"><span dir="ltr">${p.asin}</span></div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;white-space:nowrap;">
+          <span style="font-size:0.82rem;" title="צפיות בעמוד ההשוואת מחירים">👁️ ${(p.views ?? 0).toLocaleString('he-IL')}</span>
           <button onclick="openEditModal('${p.asin}','${p.slug || ''}')"
             title="תיקון ידני קל של טקסט/תרגום — מצא והחלף, בלי לייצר מחדש"
             style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 10px;cursor:pointer;font-size:0.8rem;color:var(--text-muted);">

@@ -2307,6 +2307,34 @@ async def dismiss_blog_candidate(
     return {"message": "dismissed"}
 
 
+async def get_product_view_counts(asins: list[str]) -> dict[str, int]:
+    """Read per-ASIN page-view counters written by the website (Upstash Redis)."""
+    url = os.environ.get("UPSTASH_REDIS_REST_URL")
+    token = os.environ.get("UPSTASH_REDIS_REST_TOKEN")
+    if not url or not token or not asins:
+        return {}
+
+    import httpx
+
+    commands = [["get", f"product_views:{asin}"] for asin in asins]
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                f"{url}/pipeline",
+                headers={"Authorization": f"Bearer {token}"},
+                json=commands,
+            )
+        results = resp.json()
+    except (httpx.HTTPError, ValueError):
+        return {}
+
+    counts = {}
+    for asin, entry in zip(asins, results):
+        value = entry.get("result") if isinstance(entry, dict) else None
+        counts[asin] = int(value) if value else 0
+    return counts
+
+
 @router.get("/blog-published")
 async def get_blog_published(
     admin: Annotated[User, Depends(get_current_admin)],
@@ -2314,6 +2342,7 @@ async def get_blog_published(
 ):
     result = await db.execute(select(BlogPublishedAsin).order_by(BlogPublishedAsin.marked_at.desc()))
     rows = result.scalars().all()
+    view_counts = await get_product_view_counts([r.asin for r in rows])
     return {
         "published": [
             {
@@ -2321,6 +2350,7 @@ async def get_blog_published(
                 "slug": r.slug,
                 "title": r.title,
                 "marked_at": r.marked_at.isoformat() if r.marked_at else None,
+                "views": view_counts.get(r.asin, 0),
             }
             for r in rows
         ]
