@@ -1410,6 +1410,8 @@ async def run_send_blog_social_queue():
                     )
                 except Exception as e:
                     logger.warning(f"[blog_social_queue] facebook send error for {row.slug}: {e}")
+            if row.telegram_sent and row.facebook_sent:
+                await db.delete(row)
             await db.commit()
 
 

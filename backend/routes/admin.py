@@ -2418,6 +2418,15 @@ async def get_blog_social_queue(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     from backend.models import BlogSocialQueue
+    sent_result = await db.execute(
+        select(BlogSocialQueue).where(
+            BlogSocialQueue.telegram_sent.is_(True), BlogSocialQueue.facebook_sent.is_(True)
+        )
+    )
+    for row in sent_result.scalars().all():
+        await db.delete(row)
+    await db.commit()
+
     result = await db.execute(select(BlogSocialQueue).order_by(BlogSocialQueue.scheduled_at.asc()))
     rows = result.scalars().all()
     return {
