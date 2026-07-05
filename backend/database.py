@@ -17,6 +17,11 @@ engine = create_async_engine(
     echo=False,
     pool_pre_ping=True,
     pool_recycle=1800,
+    # The admin panel fires ~18 endpoints in parallel, and some endpoints fan
+    # out into several concurrent sessions to hide DB round-trip latency. The
+    # default 5+10 pool would queue those; 10+20 (30 total) absorbs the burst.
+    pool_size=10,
+    max_overflow=20,
 )
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 

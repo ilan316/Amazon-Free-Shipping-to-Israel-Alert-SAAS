@@ -1,3 +1,4 @@
+import asyncio
 import io
 import logging
 import os
@@ -13,9 +14,27 @@ from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, delete, text, or_
+from sqlalchemy import select, func, delete, text, or_, and_
 
-from backend.database import get_db
+from backend.database import get_db, AsyncSessionLocal
+
+
+# --- Concurrency helpers: run independent statements on their own sessions ---
+# The DB sits in a different region (~215ms/round-trip), so collapsing many
+# sequential round-trips into a few concurrent ones is the dominant speedup.
+async def _one(stmt):
+    async with AsyncSessionLocal() as s:
+        return (await s.execute(stmt)).one()
+
+
+async def _scalar(stmt):
+    async with AsyncSessionLocal() as s:
+        return (await s.execute(stmt)).scalar()
+
+
+async def _all(stmt):
+    async with AsyncSessionLocal() as s:
+        return (await s.execute(stmt)).all()
 from sqlalchemy import cast, Date
 from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen, EmailSendLog, EmailSendRecipient, BlogPublishedAsin, BlogDismissedAsin, BlogDraft
 from backend.blog_utils import fetch_amazon_product, generate_with_claude, build_post_html, commit_to_github, publish_draft, add_to_prices_page, get_github_file
@@ -51,22 +70,26 @@ async def get_stats(
     admin: Annotated[User, Depends(get_current_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    total_users = (await db.execute(select(func.count()).select_from(User).where(User.is_admin == False, User.is_verified == True))).scalar()
-    total_admins = (await db.execute(select(func.count()).select_from(User).where(User.is_admin == True))).scalar()
-    total_products = (await db.execute(select(func.count()).select_from(Product).where(Product.source == "user"))).scalar()
     today = datetime.utcnow() - timedelta(hours=24)
-    notifs_today = (
-        await db.execute(
-            select(func.count()).select_from(NotificationLog).where(NotificationLog.sent_at >= today)
-        )
-    ).scalar()
-    unverified = (await db.execute(select(func.count()).select_from(User).where(User.is_admin == False, User.is_verified == False))).scalar()
+    # 3 User counts collapsed into one round-trip via conditional aggregation,
+    # then run concurrently with the Product / NotificationLog counts.
+    user_stmt = select(
+        func.count().filter(and_(User.is_admin == False, User.is_verified == True)).label("total_users"),
+        func.count().filter(User.is_admin == True).label("total_admins"),
+        func.count().filter(and_(User.is_admin == False, User.is_verified == False)).label("unverified"),
+    ).select_from(User)
+    prod_stmt = select(func.count()).select_from(Product).where(Product.source == "user")
+    notif_stmt = select(func.count()).select_from(NotificationLog).where(NotificationLog.sent_at >= today)
+
+    user_row, total_products, notifs_today = await asyncio.gather(
+        _one(user_stmt), _scalar(prod_stmt), _scalar(notif_stmt)
+    )
     return {
-        "total_users": total_users,
-        "total_admins": total_admins,
+        "total_users": user_row.total_users,
+        "total_admins": user_row.total_admins,
         "total_products": total_products,
         "notifications_24h": notifs_today,
-        "unverified_users": unverified,
+        "unverified_users": user_row.unverified,
     }
 
 
@@ -76,56 +99,55 @@ async def get_analytics(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     now = datetime.utcnow()
-    base_users = lambda *extra: select(func.count()).select_from(User).where(
-        User.is_admin == False, User.is_verified == True, *extra
-    )
+    V = User.is_verified == True
 
-    total_verified = (await db.execute(base_users())).scalar()
+    # All 9 User-table counts collapsed into a single round-trip via conditional
+    # aggregation (count(*) FILTER (WHERE ...)). total_registered has no filter
+    # since the query is already scoped to non-admin users.
+    user_stmt = select(
+        func.count().filter(V).label("total_verified"),
+        func.count().filter(and_(V, User.last_login_at >= now - timedelta(days=7))).label("active_7d"),
+        func.count().filter(and_(V, User.last_login_at >= now - timedelta(days=30))).label("active_30d"),
+        func.count().filter(and_(V, User.vacation_mode == True)).label("vacation_count"),
+        func.count().filter(and_(V, or_(User.last_login_at <= now - timedelta(days=14), User.last_login_at == None))).label("churn_14"),
+        func.count().filter(and_(V, or_(User.last_login_at <= now - timedelta(days=30), User.last_login_at == None))).label("churn_30"),
+        func.count().filter(and_(V, User.notify_email_bounced == True)).label("bounce_count"),
+        func.count().filter(and_(V, User.google_id != None)).label("google_users"),
+        func.count().label("total_registered"),
+    ).select_from(User).where(User.is_admin == False)
 
-    active_7d = (await db.execute(base_users(
-        User.last_login_at >= now - timedelta(days=7)
-    ))).scalar()
-
-    active_30d = (await db.execute(base_users(
-        User.last_login_at >= now - timedelta(days=30)
-    ))).scalar()
-
-    vacation_count = (await db.execute(base_users(User.vacation_mode == True))).scalar()
-
-    churn_risk_14d = (await db.execute(base_users(
-        (User.last_login_at <= now - timedelta(days=14)) | (User.last_login_at == None)
-    ))).scalar()
-
-    churn_risk_30d = (await db.execute(base_users(
-        (User.last_login_at <= now - timedelta(days=30)) | (User.last_login_at == None)
-    ))).scalar()
-
-    prod_dist_rows = (await db.execute(
-        select(UserProduct.user_id, func.count().label("cnt")).group_by(UserProduct.user_id)
-    )).all()
-    dist_one = sum(1 for r in prod_dist_rows if r.cnt == 1)
-    dist_two_five = sum(1 for r in prod_dist_rows if 2 <= r.cnt <= 5)
-    dist_six_plus = sum(1 for r in prod_dist_rows if r.cnt >= 6)
-
-    # Email stats
-    send_log_rows = (await db.execute(
+    prod_dist_stmt = select(UserProduct.user_id, func.count().label("cnt")).group_by(UserProduct.user_id)
+    send_log_stmt = (
         select(EmailSendLog.template_id, EmailSendLog.template_name,
                func.sum(EmailSendLog.sent_count).label("sent"))
         .group_by(EmailSendLog.template_id, EmailSendLog.template_name)
         .order_by(func.sum(EmailSendLog.sent_count).desc())
-    )).all()
-    total_sent = sum((r.sent or 0) for r in send_log_rows)
+    )
+    open_stmt = select(EmailOpen.template_id, func.count().label("opens")).group_by(EmailOpen.template_id)
+    clicks_stmt = select(func.count()).select_from(EmailClick)
 
-    open_rows = (await db.execute(
-        select(EmailOpen.template_id, func.count().label("opens"))
-        .group_by(EmailOpen.template_id)
-    )).all()
+    # 5 independent round-trips run concurrently instead of 13 sequential ones.
+    u, prod_dist_rows, send_log_rows, open_rows, total_clicks = await asyncio.gather(
+        _one(user_stmt), _all(prod_dist_stmt), _all(send_log_stmt), _all(open_stmt), _scalar(clicks_stmt)
+    )
+
+    total_verified = u.total_verified
+    active_7d = u.active_7d
+    active_30d = u.active_30d
+    vacation_count = u.vacation_count
+    churn_risk_14d = u.churn_14
+    churn_risk_30d = u.churn_30
+    bounce_count = u.bounce_count
+    google_users = u.google_users
+    total_registered = u.total_registered
+
+    dist_one = sum(1 for r in prod_dist_rows if r.cnt == 1)
+    dist_two_five = sum(1 for r in prod_dist_rows if 2 <= r.cnt <= 5)
+    dist_six_plus = sum(1 for r in prod_dist_rows if r.cnt >= 6)
+
+    total_sent = sum((r.sent or 0) for r in send_log_rows)
     total_opens = sum(r.opens for r in open_rows)
     open_by_tid = {r.template_id: r.opens for r in open_rows}
-
-    total_clicks = (await db.execute(select(func.count()).select_from(EmailClick))).scalar()
-
-    bounce_count = (await db.execute(base_users(User.notify_email_bounced == True))).scalar()
 
     by_template = []
     for r in send_log_rows:
@@ -139,13 +161,7 @@ async def get_analytics(
             "open_rate": open_rate,
         })
 
-    # Funnel
-    total_registered = (await db.execute(
-        select(func.count()).select_from(User).where(User.is_admin == False)
-    )).scalar()
-
-    google_users = (await db.execute(base_users(User.google_id != None))).scalar()
-
+    # Funnel — total_registered and google_users already computed above.
     return {
         "engagement": {
             "active_7d": active_7d,
