@@ -831,6 +831,76 @@ def _escape_md(text: str) -> str:
     return text
 
 
+# ---------------------------------------------------------------------------
+# Dynamic marketing hook — one Claude-generated opening line per product,
+# so social posts don't all look like the same rigid template (kills reach).
+# ---------------------------------------------------------------------------
+
+_anthropic_client = None
+_HOOK_CACHE: dict[str, str] = {}  # asin -> hook, so FB + Telegram reuse the same line
+
+_HOOK_SYSTEM = (
+    "אתה קופירייטר ישראלי שכותב שורת פתיח (hook) לפוסט מכירתי בפייסבוק/טלגרם. "
+    "מקבל שם מוצר בעברית, מחזיר שורה אחת קצרה שעוצרת את הגלילה.\n\n"
+    "כללים נוקשים:\n"
+    "- שורה אחת בלבד, עד 10 מילים, עברית טבעית של דובר-שפת-אם\n"
+    "- אמוג'י אחד בלבד בסוף השורה\n"
+    "- התבסס אך ורק על שם המוצר. אל תמציא נתונים\n"
+    "- אסור לחלוטין: מחירים, אחוזי הנחה, 'מבצע נגמר', דד-ליין, דירוגים, "
+    "'כולם קונים', 'הכי נמכר', כמויות שאזלו — כל טענה שלא נובעת מהשם\n"
+    "- זווית מותרת: תועלת/בעיה-פתרון/סקרנות שנגזרת ישירות מהמוצר\n"
+    "- בלי מרכאות, בלי הקדמות, בלי הסבר — רק שורת הפתיח\n"
+)
+
+
+def _get_anthropic_client():
+    global _anthropic_client
+    if _anthropic_client is None:
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if not api_key:
+            return None
+        try:
+            import anthropic
+            _anthropic_client = anthropic.Anthropic(api_key=api_key)
+        except Exception as e:
+            logger.warning(f"[hook] anthropic client error: {e}")
+    return _anthropic_client
+
+
+def _product_hook(product: Product) -> str:
+    """Generate a single dynamic opening line for a product. Non-blocking:
+    returns '' on any failure (caption then falls back to no hook)."""
+    asin = product.asin
+    if asin in _HOOK_CACHE:
+        return _HOOK_CACHE[asin]
+
+    name_he = product.name_he or product.name or ""
+    if not name_he:
+        return ""
+    client = _get_anthropic_client()
+    if not client:
+        return ""
+    try:
+        category = product.amazon_category or ""
+        msg = client.messages.create(
+            model="claude-sonnet-5",
+            max_tokens=60,
+            system=_HOOK_SYSTEM,
+            messages=[{"role": "user", "content": f"מוצר: {name_he}\nקטגוריה: {category}"}],
+        )
+        parts = [b.text for b in msg.content if getattr(b, "type", "") == "text"]
+        hook = "".join(parts).strip()
+        # QA — שורה אחת, בלי מרכאות עוטפות, אורך שפוי, חייב עברית
+        hook = hook.splitlines()[0].strip().strip('"').strip("'") if hook else ""
+        if len(hook) > 90 or not any('א' <= c <= 'ת' for c in hook):
+            hook = ""
+        _HOOK_CACHE[asin] = hook
+        return hook
+    except Exception as e:
+        logger.warning(f"[hook] generation failed for {asin}: {e}")
+        return ""
+
+
 def _telegram_caption(product: Product) -> str:
     tag = os.environ.get("AMAZON_AFFILIATE_TAG", "").strip()
     url = f"https://www.amazon.com/dp/{product.asin}?tag={tag}" if tag else f"https://www.amazon.com/dp/{product.asin}"
@@ -859,12 +929,11 @@ def _telegram_caption(product: Product) -> str:
         "",
         f"{_RTL}📢 @amzfreeil",
     ]
-    header_lines = [
-        f"{_RTL}✈️ משלוח חינם לישראל | {cat_emoji} {cat_he}",
-        "",
-        f"{_RTL}*{name_he}*",
-        "",
-    ]
+    hook = _product_hook(product)
+    header_lines = [f"{_RTL}✈️ משלוח חינם לישראל | {cat_emoji} {cat_he}", ""]
+    if hook:
+        header_lines += [f"{_RTL}{_escape_md(hook)}", ""]
+    header_lines += [f"{_RTL}*{name_he}*", ""]
 
     base = "\n".join(header_lines) + "\n".join(footer_lines)
     kept = []
@@ -986,12 +1055,11 @@ def _facebook_caption(product: Product) -> str:
     description = product.description or ""
     all_bullets = [f"{_RTL}• {b}" for b in description.splitlines() if b.strip()]
 
-    header_lines = [
-        f"{_RTL}✈️ משלוח חינם לישראל | {cat_emoji} {cat_he}",
-        "",
-        f"{_RTL}{name_he}",
-        "",
-    ]
+    hook = _product_hook(product)
+    header_lines = [f"{_RTL}✈️ משלוח חינם לישראל | {cat_emoji} {cat_he}", ""]
+    if hook:
+        header_lines += [f"{_RTL}{hook}", ""]
+    header_lines += [f"{_RTL}{name_he}", ""]
     footer_lines = [
         f"{_RTL}--",
         "",
