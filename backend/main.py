@@ -288,7 +288,7 @@ async def _get_category_he(db, english_name: str) -> str:
         import anthropic
         client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
         msg = client.messages.create(
-            model="claude-sonnet-4-6",
+            model="claude-sonnet-5",
             max_tokens=50,
             messages=[{
                 "role": "user",
