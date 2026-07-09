@@ -15,6 +15,20 @@ import anthropic
 logger = logging.getLogger(__name__)
 
 
+def claude_text(message) -> str:
+    """Extract the first text block from a Claude response.
+
+    Newer models (claude-sonnet-5) can prepend a ThinkingBlock to
+    message.content, so content[0] is no longer guaranteed to be text.
+    Iterate and return the first block that actually carries text.
+    """
+    for block in message.content:
+        text = getattr(block, "text", None)
+        if text is not None:
+            return text
+    raise ValueError("No text block in Claude response")
+
+
 MONTHS_HE = [
     "ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני",
     "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר",
@@ -179,7 +193,7 @@ ASIN: {product['asin']}
         messages=[{"role": "user", "content": prompt}],
     )
 
-    raw = message.content[0].text.strip()
+    raw = claude_text(message).strip()
     return await _parse_claude_json(raw, client)
 
 
@@ -229,7 +243,7 @@ async def _parse_claude_json(raw: str, client: "anthropic.AsyncAnthropic", _atte
                         ),
                     }],
                 )
-                current = _extract_json_block(repair.content[0].text.strip())
+                current = _extract_json_block(claude_text(repair).strip())
                 return json.loads(current)
             except json.JSONDecodeError as e:
                 last_err = e

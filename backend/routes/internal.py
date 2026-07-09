@@ -257,6 +257,7 @@ async def backfill_hebrew(db: Annotated[AsyncSession, Depends(get_db)]):
         raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY not set on server.")
 
     import anthropic
+    from backend.blog_utils import claude_text
     client = anthropic.Anthropic(api_key=api_key)
 
     result = await db.execute(
@@ -277,7 +278,7 @@ async def backfill_hebrew(db: Annotated[AsyncSession, Depends(get_db)]):
                 max_tokens=60,
                 messages=[{"role": "user", "content": f"תרגם לעברית קצרה ומובנת (עד 7 מילים, שמור את שם המותג, ללא מרכאות): {p.name}"}],
             )
-            p.name_he = msg.content[0].text.strip()
+            p.name_he = claude_text(msg).strip()
             updated += 1
         except Exception as e:
             logger.warning(f"[{p.asin}] Hebrew name generation failed: {e}")

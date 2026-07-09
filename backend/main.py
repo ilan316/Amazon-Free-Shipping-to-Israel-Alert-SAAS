@@ -286,6 +286,7 @@ async def _get_category_he(db, english_name: str) -> str:
     # avoid stalling the event loop of the single worker.
     def _translate_sync() -> str:
         import anthropic
+        from backend.blog_utils import claude_text
         client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
         msg = client.messages.create(
             model="claude-sonnet-5",
@@ -295,7 +296,7 @@ async def _get_category_he(db, english_name: str) -> str:
                 "content": f'תרגם את שם קטגוריית המוצר הזו מאמזון לעברית קצרה ומדויקת. ענה רק עם התרגום, ללא הסברים: "{english_name}"'
             }]
         )
-        return msg.content[0].text.strip().strip('"')
+        return claude_text(msg).strip().strip('"')
 
     hebrew_name = english_name  # fallback
     try:

@@ -1608,6 +1608,7 @@ async def run_hebrew_backfill():
         return
 
     logger.info(f"Hebrew backfill: generating name_he for {len(products)} user product(s).")
+    from backend.blog_utils import claude_text
     client = _anthropic.Anthropic(api_key=api_key)
     updated = 0
 
@@ -1628,7 +1629,7 @@ async def run_hebrew_backfill():
                     max_tokens=60,
                     messages=[{"role": "user", "content": f"תרגם לעברית קצרה ומובנת (עד 7 מילים, שמור את שם המותג, ללא מרכאות): {p.name}"}],
                 )
-                p.name_he = msg.content[0].text.strip()
+                p.name_he = claude_text(msg).strip()
                 updated += 1
             except Exception as e:
                 logger.warning(f"[{p.asin}] Hebrew name failed: {e}")
