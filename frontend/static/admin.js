@@ -1716,10 +1716,37 @@ const BLOG_CATEGORY_LABELS = {
 
 let blogAllCandidates = [];
 let blogActiveCategory = null;
+let blogMinPrice = 0;
+let blogMaxPrice = null;
 
 function blogCategoryFor(c) {
   const raw = c.amazon_category || '';
   return raw ? (BLOG_CATEGORY_MAP[raw] || raw) : '';
+}
+
+function blogPriceFiltered(candidates) {
+  return candidates.filter(c =>
+    c.price_ils >= blogMinPrice && (blogMaxPrice == null || c.price_ils <= blogMaxPrice)
+  );
+}
+
+function applyBlogFilters() {
+  const priceFiltered = blogPriceFiltered(blogAllCandidates);
+  buildBlogCategoryFilters(priceFiltered);
+  renderBlogCandidatesList(
+    blogActiveCategory ? priceFiltered.filter(c => blogCategoryFor(c) === blogActiveCategory) : priceFiltered
+  );
+}
+
+function applyBlogPriceFilter() {
+  const minEl = document.getElementById("blog-price-min");
+  const maxEl = document.getElementById("blog-price-max");
+  const minVal = parseFloat(minEl && minEl.value);
+  const maxVal = parseFloat(maxEl && maxEl.value);
+  blogMinPrice = Number.isFinite(minVal) && minVal >= 0 ? minVal : 0;
+  blogMaxPrice = Number.isFinite(maxVal) && maxVal >= 0 ? maxVal : null;
+  blogActiveCategory = null;
+  applyBlogFilters();
 }
 
 function buildBlogCategoryFilters(candidates) {
@@ -1748,8 +1775,7 @@ function buildBlogCategoryFilters(candidates) {
 
 function applyBlogCategoryFilter(cat) {
   blogActiveCategory = cat;
-  buildBlogCategoryFilters(blogAllCandidates);
-  renderBlogCandidatesList(cat ? blogAllCandidates.filter(c => blogCategoryFor(c) === cat) : blogAllCandidates);
+  applyBlogFilters();
 }
 
 async function loadBlogCandidates() {
@@ -1767,8 +1793,7 @@ async function loadBlogCandidates() {
   blogActiveCategory = null;
 
   statusEl.textContent = `${blogAllCandidates.length} מועמדים נמצאו (${data.published_count} פורסמו כבר)`;
-  buildBlogCategoryFilters(blogAllCandidates);
-  renderBlogCandidatesList(blogAllCandidates);
+  applyBlogFilters();
 }
 
 function renderBlogCandidatesList(candidates) {

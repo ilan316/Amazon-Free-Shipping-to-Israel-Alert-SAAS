@@ -2220,9 +2220,6 @@ async def serve_screenshot(filename: str):
     return FileResponse(path, media_type=media_type)
 
 
-BLOG_MIN_PRICE_ILS = 200
-
-
 def _parse_price(raw: str | None) -> float:
     import re
     try:
@@ -2264,8 +2261,6 @@ async def get_blog_candidates(
         if p.asin in published_asins or p.asin in dismissed_asins:
             continue
         price = _parse_price(p.last_price)
-        if price < BLOG_MIN_PRICE_ILS:
-            continue
         draft_info = drafts_map.get(p.asin)
         candidates.append({
             "asin": p.asin,
