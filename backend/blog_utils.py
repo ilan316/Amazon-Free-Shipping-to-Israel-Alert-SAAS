@@ -825,3 +825,57 @@ async def commit_to_github(path: str, content: str, message: str, sha: str | Non
         r = await client.put(url, json=payload, headers=headers)
         r.raise_for_status()
         return r.json()
+
+
+async def delete_github_file(path: str, message: str) -> bool:
+    """Delete a file from the repo. Returns True if deleted, False if it didn't exist."""
+    token = os.getenv("GITHUB_TOKEN")
+    repo = os.getenv("GITHUB_REPO")
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.get(url, headers=headers)
+        if r.status_code == 404:
+            return False
+        r.raise_for_status()
+        sha = r.json()["sha"]
+
+        req = client.build_request(
+            "DELETE", url, headers=headers, json={"message": message, "sha": sha}
+        )
+        r = await client.send(req)
+        r.raise_for_status()
+        return True
+
+
+async def remove_from_prices_page(slug: str) -> bool:
+    """Remove a product card from prices.html by its slug. Idempotent — returns
+    True if a card was removed, False if none matched."""
+    path = "prices.html"
+    try:
+        current, sha = await get_github_file(path)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            return False
+        raise
+
+    # Each card is wrapped as:  \n      <!-- title -->\n      <div class="price-card">...\n      </div>\n
+    # It contains anchors href="blog/{slug}.html". Match the whole card block that
+    # references this slug, anchored on the price-card open/close at 6-space indent.
+    pattern = re.compile(
+        r"\n[ ]{6}<!--[^\n]*-->\n[ ]{6}<div class=\"price-card\">"
+        r"(?:(?!<div class=\"price-card\">).)*?"
+        r"href=\"blog/" + re.escape(slug) + r"\.html\""
+        r".*?\n[ ]{6}</div>\n",
+        re.DOTALL,
+    )
+    updated, n = pattern.subn("\n", current)
+    if n == 0:
+        return False
+
+    await commit_to_github(path, updated, f"prices: remove {slug}", sha=sha)
+    return True

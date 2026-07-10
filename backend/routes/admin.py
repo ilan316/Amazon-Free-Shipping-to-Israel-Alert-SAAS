@@ -37,7 +37,7 @@ async def _all(stmt):
         return (await s.execute(stmt)).all()
 from sqlalchemy import cast, Date
 from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen, EmailSendLog, EmailSendRecipient, BlogPublishedAsin, BlogDismissedAsin, BlogDraft
-from backend.blog_utils import fetch_amazon_product, generate_with_claude, build_post_html, commit_to_github, publish_draft, add_to_prices_page, get_github_file
+from backend.blog_utils import fetch_amazon_product, generate_with_claude, build_post_html, commit_to_github, publish_draft, add_to_prices_page, get_github_file, delete_github_file, remove_from_prices_page
 from backend.scheduler import queue_blog_social_post
 from backend.auth import get_current_admin, hash_password, verify_password, SECRET_KEY, ALGORITHM
 
@@ -2365,6 +2365,69 @@ async def get_blog_published(
             }
             for r in rows
         ]
+    }
+
+
+@router.post("/blog-published/{asin}/unpublish")
+async def unpublish_blog_post(
+    asin: str,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Remove a published post from the blog entirely: delete the HTML file (→404),
+    remove its card from prices.html, drop the DB row, and dismiss the ASIN so it
+    won't return as a candidate."""
+    pub_row = (
+        await db.execute(select(BlogPublishedAsin).where(BlogPublishedAsin.asin == asin))
+    ).scalar_one_or_none()
+    if not pub_row:
+        raise HTTPException(404, "לא נמצא פוסט מפורסם עבור ASIN זה")
+
+    slug = pub_row.slug
+    deleted_file = False
+    removed_card = False
+    if slug:
+        try:
+            deleted_file = await delete_github_file(f"blog/{slug}.html", f"blog: unpublish {slug}")
+        except Exception as e:
+            logger.error("unpublish delete file error for %s: %s", slug, e, exc_info=True)
+            raise HTTPException(502, f"GitHub delete error: {e}")
+        try:
+            removed_card = await remove_from_prices_page(slug)
+        except Exception as e:
+            logger.error("unpublish prices.html error for %s: %s", slug, e, exc_info=True)
+            raise HTTPException(502, f"prices.html update error: {e}")
+
+    # Drop the published row
+    await db.execute(delete(BlogPublishedAsin).where(BlogPublishedAsin.asin == asin))
+
+    # Dismiss the ASIN so it won't resurface as a blog candidate
+    existing_dismiss = await db.execute(
+        select(BlogDismissedAsin).where(BlogDismissedAsin.asin == asin)
+    )
+    if not existing_dismiss.scalar_one_or_none():
+        db.add(BlogDismissedAsin(asin=asin))
+
+    # Remove any pending (unsent) social queue entry
+    try:
+        from backend.models import BlogSocialQueue
+        await db.execute(
+            delete(BlogSocialQueue).where(
+                BlogSocialQueue.asin == asin,
+                BlogSocialQueue.telegram_sent.is_(False),
+                BlogSocialQueue.facebook_sent.is_(False),
+            )
+        )
+    except Exception as e:
+        logger.warning("unpublish social-queue cleanup error for %s: %s", asin, e)
+
+    await db.commit()
+    return {
+        "message": "unpublished",
+        "asin": asin,
+        "slug": slug,
+        "file_deleted": deleted_file,
+        "card_removed": removed_card,
     }
 
 

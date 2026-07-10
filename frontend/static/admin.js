@@ -1942,10 +1942,30 @@ async function loadBlogPublished() {
             style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 10px;cursor:pointer;font-size:0.8rem;color:var(--text-muted);">
             🔄 עדכן
           </button>
+          <button onclick="unpublishBlogPost('${p.asin}','${titleEsc}')"
+            title="מחיקה מלאה: הפוסט יורד מהאתר (404) ומעמוד המחירים, וה-ASIN לא יחזור כמועמד"
+            style="background:none;border:1px solid #d9534f;border-radius:7px;padding:5px 10px;cursor:pointer;font-size:0.8rem;color:#d9534f;">
+            🗑️ הסר מהבלוג
+          </button>
           <span style="font-size:0.82rem;">📅 ${dt}</span>
         </div>
       </div>`;
   }).join("");
+}
+
+async function unpublishBlogPost(asin, title) {
+  const name = String(title || asin).replace(/&quot;/g, '"');
+  if (!confirm(`להסיר את "${name}" מהבלוג?\n\nהפעולה תמחק את הפוסט לצמיתות (העמוד יחזיר 404), תסיר אותו מעמוד המחירים, וה-ASIN לא יחזור כמועמד. אין ביטול.`)) return;
+  const res = await apiFetch(`/admin/blog-published/${asin}/unpublish`, { method: "POST" });
+  if (res && res.ok) {
+    await res.json().catch(() => ({}));
+    loadBlogPublished();
+    if (typeof loadBlogCandidates === "function") loadBlogCandidates();
+  } else {
+    let msg = "שגיאה בהסרה";
+    try { const d = await res.json(); if (d && d.detail) msg = d.detail; } catch (e) {}
+    alert(msg);
+  }
 }
 
 async function setBlogDismissed(asin, dismissed, row) {
