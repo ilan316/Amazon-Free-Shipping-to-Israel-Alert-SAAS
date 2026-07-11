@@ -1730,6 +1730,14 @@ function blogPriceFiltered(candidates) {
   );
 }
 
+// Candidates matching the currently active filters (price range + category).
+function blogCurrentFiltered() {
+  const priceFiltered = blogPriceFiltered(blogAllCandidates);
+  return blogActiveCategory
+    ? priceFiltered.filter(c => blogCategoryFor(c) === blogActiveCategory)
+    : priceFiltered;
+}
+
 function applyBlogFilters() {
   const priceFiltered = blogPriceFiltered(blogAllCandidates);
   buildBlogCategoryFilters(priceFiltered);
@@ -1866,9 +1874,10 @@ function switchBlogSubTab(name) {
 }
 
 function exportBlogCandidatesCsv() {
-  if (!blogAllCandidates || !blogAllCandidates.length) { alert("אין מועמדים לייצוא"); return; }
+  const candidates = blogCurrentFiltered();
+  if (!candidates.length) { alert("אין מועמדים לייצוא בסינון הנוכחי"); return; }
   const headers = ['שם המוצר', 'קישור למוצר', 'קטגוריה', 'מחיר', 'ASIN', 'קישור לתמונה'];
-  const rows = blogAllCandidates.map(c => [
+  const rows = candidates.map(c => [
     c.name_he || c.name || '',
     c.url || '',
     c.amazon_category || '',
