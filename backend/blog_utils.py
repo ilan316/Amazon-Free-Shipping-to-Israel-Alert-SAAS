@@ -391,7 +391,7 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{content.get('seo_title') or content['title_he']} | amzfreeil</title>
+  <title>{content.get('seo_title') or content['title_he']} | AMZ Free Ship Alert</title>
   <meta name="description" content="{content['description_he']}" />
 
   <meta property="og:title" content="{content['title_he']}" />
