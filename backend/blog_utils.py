@@ -146,10 +146,12 @@ ASIN: {product['asin']}
 תאריך: {today_display}
 זווית הפוסט: {angle}
 
+חשוב: seo_title חייב להיות עד 52 תווים כולל השנה — זו הכותרת שגוגל מציג בתוצאות החיפוש, וכותרת ארוכה נחתכת.
 החזר JSON בדיוק בפורמט הבא (ללא markdown, ללא טקסט לפני/אחרי):
 {{
   "slug": "שם-קובץ-קצר-באנגלית-amazon-israel",
   "title_he": "כותרת מלאה בעברית לפוסט — {'כדאי לקנות מאמזון לישראל?' if israel_price is not None else 'המוצר שלא תמצאו בישראל — רק באמזון'} (2026)",
+  "seo_title": "כותרת קצרה ל-<title> של גוגל — עד 52 תווים כולל השנה. שם המוצר + זווית קצרה מאוד, בלי 'כדאי לקנות מאמזון לישראל'. דוגמה: 'Samsung 990 PRO SSD 2TB — כדאי? (2026)'",
   "title_short": "שם קצר של המוצר (עברית+אנגלית)",
   "description_he": "תיאור SEO בעברית, עד 155 תווים",
   "eyebrow": "אייקון + קטגוריה (למשל: 💻 ביקורת מוצר)",
@@ -389,7 +391,7 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{content['title_he']} | amzfreeil</title>
+  <title>{content.get('seo_title') or content['title_he']} | amzfreeil</title>
   <meta name="description" content="{content['description_he']}" />
 
   <meta property="og:title" content="{content['title_he']}" />
