@@ -189,7 +189,7 @@ ASIN: {product['asin']}
     client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     message = await client.messages.create(
         model="claude-sonnet-5",
-        max_tokens=4096,
+        max_tokens=8192,
         messages=[{"role": "user", "content": prompt}],
     )
 
@@ -230,7 +230,7 @@ async def _parse_claude_json(raw: str, client: "anthropic.AsyncAnthropic", _atte
             try:
                 repair = await client.messages.create(
                     model="claude-sonnet-5",
-                    max_tokens=4096,
+                    max_tokens=8192,
                     messages=[{
                         "role": "user",
                         "content": (
