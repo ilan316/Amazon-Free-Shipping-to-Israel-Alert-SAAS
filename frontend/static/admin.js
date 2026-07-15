@@ -1711,15 +1711,7 @@ const BLOG_CATEGORY_LABELS = {
   'Baby Products': 'תינוקות',
   'Musical Instruments': 'כלי נגינה',
   'Appliances': 'מכשירי חשמל',
-  'Small Appliance Parts & Accessories': 'חלקים ואביזרים למכשירי חשמל',
-  'Arts, Crafts & Sewing': 'אמנות, יצירה ותפירה',
-  'Pet Supplies': 'ציוד לחיות מחמד',
-  'Camera & Photo': 'מצלמות ותמונות',
-  'Computers': 'מחשבים',
-  'Grocery & Gourmet Food': 'מכולת ומזון גורמה',
-  'Movies & TV': 'סרטים וטלוויזיה',
-  'Music': 'מוזיקה',
-  'Garden & Outdoor': 'גינה וחוץ'
+  'Small Appliance Parts & Accessories': 'חלקים ואביזרים למכשירי חשמל'
 };
 
 let blogAllCandidates = [];
@@ -1775,6 +1767,15 @@ function buildBlogCategoryFilters(candidates) {
     if (cat) counts[cat] = (counts[cat] || 0) + 1;
   });
 
+  // Hebrew labels from the DB translation table (via the API), keyed by the grouped
+  // category. Used as a fallback for any category missing from BLOG_CATEGORY_LABELS,
+  // so the long tail of categories doesn't leak English (e.g. "Arts, Crafts & Sewing").
+  const catHe = {};
+  candidates.forEach(c => {
+    const cat = blogCategoryFor(c);
+    if (cat && c.category_he && !catHe[cat]) catHe[cat] = c.category_he;
+  });
+
   const cats = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
   if (!cats.length) { wrap.innerHTML = ""; return; }
 
@@ -1782,7 +1783,7 @@ function buildBlogCategoryFilters(candidates) {
 
   const allBtn = `<button onclick="applyBlogCategoryFilter(null)" style="${btnStyle(blogActiveCategory === null)}">הכל (${candidates.length})</button>`;
   const catBtns = cats.map(cat => {
-    const label = BLOG_CATEGORY_LABELS[cat] || cat;
+    const label = BLOG_CATEGORY_LABELS[cat] || catHe[cat] || cat;
     return `<button onclick="applyBlogCategoryFilter('${cat.replace(/'/g, "\\'")}')" style="${btnStyle(blogActiveCategory === cat)}">${label} (${counts[cat]})</button>`;
   }).join("");
 

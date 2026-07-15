@@ -36,7 +36,7 @@ async def _all(stmt):
     async with AsyncSessionLocal() as s:
         return (await s.execute(stmt)).all()
 from sqlalchemy import cast, Date
-from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen, EmailSendLog, EmailSendRecipient, BlogPublishedAsin, BlogDismissedAsin, BlogDraft
+from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen, EmailSendLog, EmailSendRecipient, BlogPublishedAsin, BlogDismissedAsin, BlogDraft, CategoryTranslation
 from backend.blog_utils import fetch_amazon_product, generate_with_claude, build_post_html, commit_to_github, publish_draft, add_to_prices_page, get_github_file, delete_github_file, remove_from_prices_page
 from backend.scheduler import queue_blog_social_post
 from backend.auth import get_current_admin, hash_password, verify_password, SECRET_KEY, ALGORITHM
@@ -2256,6 +2256,16 @@ async def get_blog_candidates(
     )
     products = result.scalars().all()
 
+    # Hebrew category labels from the DB translation table (single source of truth,
+    # shared with the public free-products endpoint). Falls back to English if missing.
+    unique_cats = {p.amazon_category for p in products if p.amazon_category}
+    cat_he_map: dict[str, str] = {}
+    if unique_cats:
+        trans_rows = (await db.execute(
+            select(CategoryTranslation).where(CategoryTranslation.english_name.in_(unique_cats))
+        )).scalars().all()
+        cat_he_map = {row.english_name: row.hebrew_name for row in trans_rows}
+
     candidates = []
     for p in products:
         if p.asin in published_asins or p.asin in dismissed_asins:
@@ -2269,6 +2279,7 @@ async def get_blog_candidates(
             "last_price": p.last_price or "",
             "price_ils": price,
             "amazon_category": p.amazon_category or "",
+            "category_he": cat_he_map.get(p.amazon_category, "") if p.amazon_category else "",
             "image_url": p.image_url or "",
             "last_status": p.last_status or "",
             "url": p.url or f"https://www.amazon.com/dp/{p.asin}",
