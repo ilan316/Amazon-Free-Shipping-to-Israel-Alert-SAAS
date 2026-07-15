@@ -1711,7 +1711,15 @@ const BLOG_CATEGORY_LABELS = {
   'Baby Products': 'תינוקות',
   'Musical Instruments': 'כלי נגינה',
   'Appliances': 'מכשירי חשמל',
-  'Small Appliance Parts & Accessories': 'חלקים ואביזרים למכשירי חשמל'
+  'Small Appliance Parts & Accessories': 'חלקים ואביזרים למכשירי חשמל',
+  'Arts, Crafts & Sewing': 'אמנות, יצירה ותפירה',
+  'Pet Supplies': 'ציוד לחיות מחמד',
+  'Camera & Photo': 'מצלמות ותמונות',
+  'Computers': 'מחשבים',
+  'Grocery & Gourmet Food': 'מכולת ומזון גורמה',
+  'Movies & TV': 'סרטים וטלוויזיה',
+  'Music': 'מוזיקה',
+  'Garden & Outdoor': 'גינה וחוץ'
 };
 
 let blogAllCandidates = [];
