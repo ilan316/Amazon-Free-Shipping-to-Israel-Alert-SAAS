@@ -126,11 +126,11 @@ async def generate_with_claude(product: dict, israel_price: float | None, amazon
     if israel_price is not None:
         savings = round(israel_price - amazon_price)
         price_context = f"""מחיר בישראל: ₪{israel_price}
-מחיר באמזון (כולל מע"מ ייבוא + משלוח חינם): ₪{amazon_price}
+מחיר באמזון (מחיר סופי כולל מיסים ומשלוח): ₪{amazon_price}
 חיסכון: ~₪{savings}"""
         angle = "השוואת מחירים — המוצר נמכר בישראל אך זול יותר באמזון"
     else:
-        price_context = f"""מחיר באמזון (כולל מע"מ ייבוא + משלוח חינם): ₪{amazon_price}
+        price_context = f"""מחיר באמזון (מחיר סופי כולל מיסים ומשלוח): ₪{amazon_price}
 זמינות בישראל: המוצר אינו נמכר בחנויות בישראל — ניתן להשיגו רק דרך אמזון"""
         angle = "בלעדיות אמזון — המוצר אינו זמין בישראל"
 
@@ -502,7 +502,7 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
       <div class="blog-takeaway">
         <p class="blog-takeaway__title">✅ בקצרה — מה חשוב לדעת</p>
         <ul>
-          {"<li>נכון ל-" + today_display + ": בישראל ₪" + str(israel_price) + " | באמזון (כולל מע\"מ + משלוח חינם) ₪" + str(amazon_price) + " — חיסכון של ~₪" + str(savings) + "</li>" if israel_price is not None else "<li>המוצר <strong>אינו נמכר בישראל</strong> — ניתן להשיגו רק דרך אמזון</li><li>מחיר באמזון (כולל מע\"מ + משלוח חינם): ₪" + str(amazon_price) + " נכון ל-" + today_display + "</li>"}
+          {"<li>נכון ל-" + today_display + ": בישראל ₪" + str(israel_price) + " | באמזון (מחיר סופי כולל מיסים ומשלוח) ₪" + str(amazon_price) + " — חיסכון של ~₪" + str(savings) + "</li>" if israel_price is not None else "<li>המוצר <strong>אינו נמכר בישראל</strong> — ניתן להשיגו רק דרך אמזון</li><li>מחיר באמזון (מחיר סופי כולל מיסים ומשלוח): ₪" + str(amazon_price) + " נכון ל-" + today_display + "</li>"}
           <li>המשלוח החינם <strong>זמני ומשתנה</strong> — בדקו לפני רכישה</li>
         </ul>
       </div>
@@ -540,7 +540,7 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
           <tbody>
             {"" if israel_price is None else f'<tr style="border-bottom:1px solid rgba(23,32,51,.07);"><td style="padding:10px 14px;">בישראל (הזול ביותר)</td><td style="padding:10px 14px;font-weight:700;">₪' + str(israel_price) + '</td></tr>'}
             <tr style="background:rgba(22,125,70,.05);border-bottom:1px solid rgba(23,32,51,.07);">
-              <td style="padding:10px 14px;">אמזון <small style="color:#4d5a70;">(כולל מע"מ ייבוא + משלוח חינם)</small></td>
+              <td style="padding:10px 14px;">אמזון <small style="color:#4d5a70;">(מחיר סופי כולל מיסים ומשלוח)</small></td>
               <td style="padding:10px 14px;font-weight:700;color:#167d46;">₪{amazon_price}</td>
             </tr>
             {"" if savings is None else f'<tr style="border-bottom:1px solid rgba(23,32,51,.07);"><td style="padding:10px 14px;">חיסכון</td><td style="padding:10px 14px;font-weight:700;color:#167d46;">~₪' + str(savings) + '</td></tr>'}
@@ -746,11 +746,11 @@ async def add_to_prices_page(
         savings = round(israel_price - amazon_price)
         price_rows = f"""
               <tr><td>בישראל (הזול ביותר)</td><td>₪{israel_price}</td></tr>
-              <tr class="amazon-row"><td>אמזון <small style="font-weight:400;color:#4d5a70;">(כולל מע"מ + משלוח חינם)</small></td><td>₪{amazon_price}</td></tr>
+              <tr class="amazon-row"><td>אמזון</td><td>₪{amazon_price}</td></tr>
               <tr class="saving"><td>חיסכון</td><td>~₪{savings}</td></tr>"""
     else:
         price_rows = f"""
-              <tr class="amazon-row"><td>אמזון <small style="font-weight:400;color:#4d5a70;">(כולל מע"מ + משלוח חינם)</small></td><td>₪{amazon_price}</td></tr>
+              <tr class="amazon-row"><td>אמזון</td><td>₪{amazon_price}</td></tr>
               <tr><td>זמינות בישראל</td><td>לא נמכר בישראל</td></tr>"""
 
     card = f"""
