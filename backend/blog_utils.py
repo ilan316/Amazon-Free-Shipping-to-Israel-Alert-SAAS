@@ -447,7 +447,7 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
           <span class="nav-break"></span>
           <a href="../free-products.html">מוצרים בחינם 🚚</a>
           <a href="../search.html">חיפוש מוצרים 🔍</a>
-          <a href="../prices.html">אמזון מול ישראל 💰</a>
+          <a href="../prices.html">סקירות 📝</a>
           <a href="../about.html">אודות</a>
           <a href="../blog/" class="nav-active">בלוג</a>
           <a href="../index.html#contact">צרו קשר</a>
