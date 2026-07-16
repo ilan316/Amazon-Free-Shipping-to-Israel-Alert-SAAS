@@ -2011,7 +2011,7 @@ function openDraftModal(asin, name, imageUrl) {
   modal.id = "blog-draft-modal";
   modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;";
   modal.innerHTML = `
-    <div style="background:var(--bg,#fff);border-radius:14px;padding:28px 26px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);position:relative;" dir="rtl">
+    <div style="background:var(--bg,#fff);border-radius:14px;padding:28px 26px;max-width:420px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);position:relative;" dir="rtl">
       <button onclick="closeDraftModal()" style="position:absolute;top:12px;left:16px;background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--text-muted);">✕</button>
       ${imageUrl ? `<img src="${imageUrl}" alt="" style="width:56px;height:56px;object-fit:contain;border-radius:8px;border:1px solid var(--border);background:#fff;float:right;margin-left:12px;margin-bottom:6px;">` : ""}
       <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 2px;">צור דראפט עבור</p>
