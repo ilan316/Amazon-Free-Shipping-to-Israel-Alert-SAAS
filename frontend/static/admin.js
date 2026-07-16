@@ -2167,6 +2167,22 @@ async function submitBlogEdit(asin, replaceAll) {
   btn.disabled = false;
 }
 
+function draftProgressHTML() {
+  return `<div id="draft-progress-box" style="background:rgba(255,153,0,.12);border:1px solid rgba(255,153,0,.4);border-radius:10px;padding:16px;display:flex;align-items:center;gap:12px;margin-top:4px;">
+    <span style="width:24px;height:24px;border:3px solid rgba(255,153,0,.3);border-top-color:#ff9900;border-radius:50%;display:inline-block;animation:draftspin .8s linear infinite;flex-shrink:0;"></span>
+    <div>
+      <p style="margin:0 0 3px;font-weight:800;font-size:0.95rem;color:#b36b00;">⏳ מכין את הדראפט...</p>
+      <p style="margin:0;font-size:0.8rem;color:var(--text-muted);">מייצר תוכן עם Claude ומקמיט לגיטהאב — 30–60 שניות. אל תסגור את החלון.</p>
+    </div>
+    <style>@keyframes draftspin{to{transform:rotate(360deg)}}</style>
+  </div>`;
+}
+
+function showDraftProgress(statusEl) {
+  statusEl.innerHTML = draftProgressHTML();
+  document.getElementById("draft-progress-box")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
 async function generateBlogDraft(asin) {
   const israelPriceRaw = document.getElementById("draft-israel-price").value.trim();
   const israelPrice = israelPriceRaw !== "" ? parseFloat(israelPriceRaw) : null;
@@ -2185,7 +2201,7 @@ async function generateBlogDraft(asin) {
   const statusEl = document.getElementById("draft-status");
   btn.disabled = true;
   btn.textContent = "⏳ מייצר... (30-60 שניות)";
-  statusEl.innerHTML = '<span style="color:var(--text-muted);">שולח לאמזון API, מייצר תוכן עם Claude, מקמיט לגיטהאב...</span>';
+  showDraftProgress(statusEl);
 
   const res = await apiFetch("/admin/blog-draft", {
     method: "POST",
@@ -2329,7 +2345,7 @@ async function generateBlogDraftManual(asin) {
   const amazonPrice = parseFloat(document.getElementById("draft-amazon-price")?.value);
 
   const statusEl = document.getElementById("draft-status");
-  statusEl.innerHTML = '<span style="color:var(--text-muted);">שולח נתונים ידניים, מייצר תוכן עם Claude, מקמיט לגיטהאב...</span>';
+  showDraftProgress(statusEl);
 
   const res = await apiFetch("/admin/blog-draft", {
     method: "POST",
@@ -2378,7 +2394,7 @@ async function generateBlogDraftMissingFields(asin) {
   const amazonPrice = parseFloat(document.getElementById("draft-amazon-price")?.value);
 
   const statusEl = document.getElementById("draft-status");
-  statusEl.innerHTML = '<span style="color:var(--text-muted);">שולח נתונים ידניים, מייצר תוכן עם Claude, מקמיט לגיטהאב...</span>';
+  showDraftProgress(statusEl);
 
   const res = await apiFetch("/admin/blog-draft", {
     method: "POST",
