@@ -275,6 +275,11 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
     today_he = f"{today.day} ב{MONTHS_HE[today.month - 1]} {today.year}"
     today_iso = today.isoformat()
     today_display = today.strftime("%d/%m/%Y")
+    # הצג מחיר שלם בלי ".0" (91 במקום 91.0)
+    if amazon_price is not None and float(amazon_price).is_integer():
+        amazon_price = int(amazon_price)
+    if israel_price is not None and float(israel_price).is_integer():
+        israel_price = int(israel_price)
     savings = round(israel_price - amazon_price) if israel_price is not None else None
     # מוצר מתחת לסף $49: המחיר הוא מחיר המוצר בלבד, משלוח חינם רק בקנייה מעל $49
     amazon_price_small = "(מחיר המוצר בלבד)" if min_order_49 else "(מחיר סופי כולל מיסים ומשלוח)"
@@ -754,6 +759,11 @@ async def add_to_prices_page(
     partner_tag = os.getenv("AMAZON_AFFILIATE_TAG") or os.getenv("AMAZON_PARTNER_TAG", "amzfreeil-20")
     today_display = date.today().strftime("%d/%m/%Y")
     aff_url = f"https://www.amazon.com/dp/{asin}?tag={partner_tag}"
+    # הצג מחיר שלם בלי ".0" (91 במקום 91.0)
+    if amazon_price is not None and float(amazon_price).is_integer():
+        amazon_price = int(amazon_price)
+    if israel_price is not None and float(israel_price).is_integer():
+        israel_price = int(israel_price)
 
     if israel_price is not None:
         savings = round(israel_price - amazon_price)
