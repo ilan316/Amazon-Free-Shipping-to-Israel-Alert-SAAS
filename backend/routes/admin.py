@@ -60,6 +60,7 @@ class GenerateBlogDraftRequest(BaseModel):
     manual_features: list[str] | None = None
     manual_brand: str | None = None
     manual_category: str | None = None
+    manual_image: str | None = None
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -2555,7 +2556,10 @@ async def generate_blog_draft(
             "asin": asin,
             "title": body.manual_title.strip(),
             "features": [f.strip() for f in body.manual_features if f.strip()],
-            "image": f"https://images-na.ssl-images-amazon.com/images/P/{asin}.01.L.jpg",
+            # The ASIN-guess pattern (images/P/{asin}.01.L.jpg) returns a blank 1x1
+            # placeholder for many newer products — so prefer a real URL if provided.
+            "image": (body.manual_image or "").strip()
+                     or f"https://images-na.ssl-images-amazon.com/images/P/{asin}.01.L.jpg",
             "model": "",
             "brand": (body.manual_brand or "").strip(),
             "category": (body.manual_category or "").strip(),

@@ -2283,6 +2283,10 @@ async function generateBlogDraft(asin) {
           <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">נקודות מפרט (כל נקודה בשורה נפרדת)</label>
           <textarea id="manual-features" rows="6" placeholder="Studio Monitor Sound for Mixing &amp; Mastering&#10;Wide frequency response 5Hz–80 kHz&#10;Open Back Design with HD driver units&#10;..."
             style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;resize:vertical;margin-bottom:10px;"></textarea>
+          <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">קישור תמונה (image URL) <span style="font-weight:400;color:#c00;">— חשוב! בלי זה המוצר יעלה בלי תמונה</span></label>
+          <input id="manual-image" type="url" placeholder="https://m.media-amazon.com/images/I/....jpg"
+            style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;margin-bottom:4px;" />
+          <p style="margin:0 0 10px;font-size:0.76rem;color:var(--text-muted);">בדף המוצר באמזון — קליק ימני על התמונה הראשית → "העתק כתובת תמונה" (Copy image address).</p>
           <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">מותג (brand) <span style="font-weight:400;color:var(--text-muted);">— אופציונלי</span></label>
           <input id="manual-brand" type="text" placeholder="למשל: Samsung"
             style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;margin-bottom:10px;" />
@@ -2309,6 +2313,8 @@ async function generateBlogDraftManual(asin) {
   const features = featuresRaw.split("\n").map(l => l.trim()).filter(Boolean);
   const brand = document.getElementById("manual-brand")?.value.trim() || "";
   const category = document.getElementById("manual-category")?.value.trim() || "";
+  const image = document.getElementById("manual-image")?.value.trim() || "";
+  if (!image && !confirm("לא הוזן קישור תמונה — המוצר יעלה בלי תמונה. להמשיך בכל זאת?")) return;
 
   const israelPriceRaw = document.getElementById("draft-israel-price")?.value.trim();
   const israelPrice = israelPriceRaw !== "" ? parseFloat(israelPriceRaw) : null;
@@ -2320,7 +2326,7 @@ async function generateBlogDraftManual(asin) {
   const res = await apiFetch("/admin/blog-draft", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, manual_title: title, manual_features: features, manual_brand: brand, manual_category: category }),
+    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, manual_title: title, manual_features: features, manual_brand: brand, manual_category: category, manual_image: image }),
   });
 
   if (res && res.ok) {
