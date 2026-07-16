@@ -282,6 +282,14 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
     takeaway_price_suffix = ' — משלוח חינם בקנייה מעל <bdi>$49</bdi>' if min_order_49 else ''
     takeaway_price_label = 'מחיר המוצר' if min_order_49 else 'באמזון (מחיר סופי כולל מיסים ומשלוח)'
     takeaway_amazon_prefix = 'מחיר באמזון' if min_order_49 else 'מחיר באמזון (מחיר סופי כולל מיסים ומשלוח)'
+    # תיבת אזהרת מע"מ ייבוא — לא רלוונטית למוצרים מתחת ל-$49 (מתחת גם לסף הפטור $75; המחיר בלי משלוח)
+    import_vat_box = '' if min_order_49 else (
+        '<div style="background:rgba(255,153,0,.08);border:1.5px solid rgba(255,153,0,.4);border-radius:12px;padding:14px 18px;margin:16px 0;font-size:.9rem;line-height:1.7;">\n'
+        '          <strong>⚠️ חשוב: המחיר באמזון כולל כבר את מע"מ הייבוא</strong><br>\n'
+        '          אמזון מציג מחיר סופי לישראל כולל <bdi>"Import Fees Deposit"</bdi> — אין הפתעות במכס. '
+        '<a href="../mekhs-umaam-amazon-israel.html" style="color:var(--brand-deep, #ff6a00);">מדריך מלא על מכס ומע"מ ←</a>\n'
+        '        </div>'
+    )
     asin = product["asin"]
     image = product.get("image", "")
     aff_url = f"https://www.amazon.com/dp/{asin}?tag={partner_tag}"
@@ -556,10 +564,7 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
         </table>
         {"<p style=\"font-size:.8rem;color:#4d5a70;margin:0 0 16px;\">* נכון ל-" + today_display + ". המחירים משתנים — בדקו לפני רכישה." + ship_note_text + "</p>" if israel_price is not None else "<p style=\"font-size:.8rem;color:#4d5a70;margin:0 0 16px;\">* מחיר באמזון נכון ל-" + today_display + ". עשוי להשתנות — בדקו לפני רכישה." + ship_note_text + "</p>"}
 
-        <div style="background:rgba(255,153,0,.08);border:1.5px solid rgba(255,153,0,.4);border-radius:12px;padding:14px 18px;margin:16px 0;font-size:.9rem;line-height:1.7;">
-          <strong>⚠️ חשוב: המחיר באמזון כולל כבר את מע"מ הייבוא</strong><br>
-          אמזון מציג מחיר סופי לישראל כולל <bdi>"Import Fees Deposit"</bdi> — אין הפתעות במכס. <a href="../mekhs-umaam-amazon-israel.html" style="color:var(--brand-deep, #ff6a00);">מדריך מלא על מכס ומע"מ ←</a>
-        </div>
+        {import_vat_box}
 
         <div style="text-align:center;margin:24px 0;">
           <a href="{aff_url}" target="_blank" rel="noopener sponsored"
