@@ -2,6 +2,7 @@
 Blog draft generation utilities.
 Amazon API → Claude → build HTML → commit to GitHub.
 """
+import asyncio
 import json
 import logging
 import re
@@ -55,31 +56,46 @@ async def fetch_amazon_product(asin: str) -> dict:
         token_resp.raise_for_status()
         token = token_resp.json()["access_token"]
 
-        product_resp = await client.post(
-            "https://creatorsapi.amazon/catalog/v1/getItems",
-            json={
-                "itemIds": [asin],
-                "itemIdType": "ASIN",
-                "partnerTag": partner_tag,
-                "partnerType": "Associates",
-                "marketplace": marketplace,
-                "resources": [
-                    "images.primary.large",
-                    "images.primary.medium",
-                    "images.primary.small",
-                    "itemInfo.title",
-                    "itemInfo.features",
-                    "itemInfo.manufactureInfo",
-                    "itemInfo.byLineInfo",
-                    "browseNodeInfo.browseNodes",
-                ],
-            },
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json",
-                "x-marketplace": marketplace,
-            },
-        )
+        # Retry on 429/ThrottleException with exponential backoff.
+        # These are transient rate-limit errors (not ItemNotAccessible), so
+        # a short wait + retry usually succeeds.
+        max_attempts = 3
+        for attempt in range(1, max_attempts + 1):
+            product_resp = await client.post(
+                "https://creatorsapi.amazon/catalog/v1/getItems",
+                json={
+                    "itemIds": [asin],
+                    "itemIdType": "ASIN",
+                    "partnerTag": partner_tag,
+                    "partnerType": "Associates",
+                    "marketplace": marketplace,
+                    "resources": [
+                        "images.primary.large",
+                        "images.primary.medium",
+                        "images.primary.small",
+                        "itemInfo.title",
+                        "itemInfo.features",
+                        "itemInfo.manufactureInfo",
+                        "itemInfo.byLineInfo",
+                        "browseNodeInfo.browseNodes",
+                    ],
+                },
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                    "x-marketplace": marketplace,
+                },
+            )
+            if product_resp.status_code == 429 and attempt < max_attempts:
+                wait = 2 ** attempt  # 2s, 4s
+                logger.warning(
+                    "fetch_amazon_product: 429 throttled for ASIN %s — retry %d/%d in %ds",
+                    asin, attempt, max_attempts, wait,
+                )
+                await asyncio.sleep(wait)
+                continue
+            break
+
         product_resp.raise_for_status()
         data = product_resp.json()
 
