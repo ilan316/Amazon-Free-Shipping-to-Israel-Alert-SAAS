@@ -2031,8 +2031,8 @@ function openDraftModal(asin, name, imageUrl) {
       <div style="margin-bottom:20px;">
         <label style="font-size:0.85rem;font-weight:600;display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
           <input id="draft-min-order-49" type="checkbox" style="margin-top:3px;flex-shrink:0;">
-          <span>משלוח חינם רק בקנייה מעל $49<br>
-            <span style="font-weight:400;color:var(--text-muted);font-size:0.75rem;">סמן אם המוצר מתחת לסף $49 — אז הזן את מחיר המוצר בלבד (בלי משלוח), ותתווסף הערה</span>
+          <span>האם המשלוח מתחת לסף ה־$49<br>
+            <span style="font-weight:400;color:var(--text-muted);font-size:0.75rem;">סמן אם המוצר מתחת לסף $49</span>
           </span>
         </label>
       </div>
