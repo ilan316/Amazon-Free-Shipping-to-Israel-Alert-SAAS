@@ -510,7 +510,7 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
       alt="{product['title']}"
       class="blog-hero-img"
       loading="eager"
-      style="object-fit:contain;background:#f5f5f5;width:auto;max-width:min(500px,100%);aspect-ratio:unset;"
+      style="object-fit:contain;background:#f5f5f5;width:auto;max-width:min(500px,100%);max-height:360px;aspect-ratio:unset;"
     />
 
     <article class="blog-body">
