@@ -2028,6 +2028,14 @@ function openDraftModal(asin, name, imageUrl) {
           style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.95rem;box-sizing:border-box;">
         <p style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 0;">כולל Import Fees Deposit + משלוח</p>
       </div>
+      <div style="margin-bottom:20px;">
+        <label style="font-size:0.85rem;font-weight:600;display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
+          <input id="draft-min-order-49" type="checkbox" style="margin-top:3px;flex-shrink:0;">
+          <span>משלוח חינם רק בקנייה מעל $49<br>
+            <span style="font-weight:400;color:var(--text-muted);font-size:0.75rem;">סמן אם המוצר מתחת לסף $49 — אז הזן את מחיר המוצר בלבד (בלי משלוח), ותתווסף הערה</span>
+          </span>
+        </label>
+      </div>
       <button id="draft-submit-btn" onclick="generateBlogDraft('${asin}')"
         style="width:100%;background:var(--brand,#ff9900);color:#111;border:none;padding:12px;border-radius:10px;font-weight:700;font-size:1rem;cursor:pointer;">
         ✍️ צור דראפט
@@ -2182,7 +2190,7 @@ async function generateBlogDraft(asin) {
   const res = await apiFetch("/admin/blog-draft", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice }),
+    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, min_order_49: !!document.getElementById("draft-min-order-49")?.checked }),
   });
 
   if (res && res.ok) {
@@ -2326,7 +2334,7 @@ async function generateBlogDraftManual(asin) {
   const res = await apiFetch("/admin/blog-draft", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, manual_title: title, manual_features: features, manual_brand: brand, manual_category: category, manual_image: image }),
+    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, manual_title: title, manual_features: features, manual_brand: brand, manual_category: category, manual_image: image, min_order_49: !!document.getElementById("draft-min-order-49")?.checked }),
   });
 
   if (res && res.ok) {
@@ -2375,7 +2383,7 @@ async function generateBlogDraftMissingFields(asin) {
   const res = await apiFetch("/admin/blog-draft", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, manual_brand: brand, manual_category: category }),
+    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, manual_brand: brand, manual_category: category, min_order_49: !!document.getElementById("draft-min-order-49")?.checked }),
   });
 
   if (res && res.ok) {

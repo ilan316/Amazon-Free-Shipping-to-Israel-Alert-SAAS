@@ -119,18 +119,20 @@ async def fetch_amazon_product(asin: str) -> dict:
     }
 
 
-async def generate_with_claude(product: dict, israel_price: float | None, amazon_price: float) -> dict:
+async def generate_with_claude(product: dict, israel_price: float | None, amazon_price: float, min_order_49: bool = False) -> dict:
     today_display = date.today().strftime("%d/%m/%Y")
     features_text = "\n".join(f"- {f}" for f in product.get("features", []))
+
+    amazon_price_label = "מחיר המוצר בלבד — משלוח חינם רק בקנייה מעל $49" if min_order_49 else "מחיר סופי כולל מיסים ומשלוח"
 
     if israel_price is not None:
         savings = round(israel_price - amazon_price)
         price_context = f"""מחיר בישראל: ₪{israel_price}
-מחיר באמזון (מחיר סופי כולל מיסים ומשלוח): ₪{amazon_price}
+מחיר באמזון ({amazon_price_label}): ₪{amazon_price}
 חיסכון: ~₪{savings}"""
         angle = "השוואת מחירים — המוצר נמכר בישראל אך זול יותר באמזון"
     else:
-        price_context = f"""מחיר באמזון (מחיר סופי כולל מיסים ומשלוח): ₪{amazon_price}
+        price_context = f"""מחיר באמזון ({amazon_price_label}): ₪{amazon_price}
 זמינות בישראל: המוצר אינו נמכר בחנויות בישראל — ניתן להשיגו רק דרך אמזון"""
         angle = "בלעדיות אמזון — המוצר אינו זמין בישראל"
 
@@ -267,13 +269,19 @@ def _is_electronic_product(product: dict) -> bool:
     return any(keyword in text for keyword in ELECTRONICS_KEYWORDS)
 
 
-def build_post_html(product: dict, content: dict, israel_price: float | None, amazon_price: float) -> str:
+def build_post_html(product: dict, content: dict, israel_price: float | None, amazon_price: float, min_order_49: bool = False) -> str:
     partner_tag = os.getenv("AMAZON_AFFILIATE_TAG") or os.getenv("AMAZON_PARTNER_TAG", "amzfreeil-20")
     today = date.today()
     today_he = f"{today.day} ב{MONTHS_HE[today.month - 1]} {today.year}"
     today_iso = today.isoformat()
     today_display = today.strftime("%d/%m/%Y")
     savings = round(israel_price - amazon_price) if israel_price is not None else None
+    # מוצר מתחת לסף $49: המחיר הוא מחיר המוצר בלבד, משלוח חינם רק בקנייה מעל $49
+    amazon_price_small = "(מחיר המוצר בלבד)" if min_order_49 else "(מחיר סופי כולל מיסים ומשלוח)"
+    ship_note_text = ' משלוח חינם בקנייה מעל <bdi>$49</bdi>.' if min_order_49 else ''
+    takeaway_price_suffix = ' — משלוח חינם בקנייה מעל <bdi>$49</bdi>' if min_order_49 else ''
+    takeaway_price_label = 'מחיר המוצר' if min_order_49 else 'באמזון (מחיר סופי כולל מיסים ומשלוח)'
+    takeaway_amazon_prefix = 'מחיר באמזון' if min_order_49 else 'מחיר באמזון (מחיר סופי כולל מיסים ומשלוח)'
     asin = product["asin"]
     image = product.get("image", "")
     aff_url = f"https://www.amazon.com/dp/{asin}?tag={partner_tag}"
@@ -502,7 +510,7 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
       <div class="blog-takeaway">
         <p class="blog-takeaway__title">✅ בקצרה — מה חשוב לדעת</p>
         <ul>
-          {"<li>נכון ל-" + today_display + ": בישראל ₪" + str(israel_price) + " | באמזון (מחיר סופי כולל מיסים ומשלוח) ₪" + str(amazon_price) + " — חיסכון של ~₪" + str(savings) + "</li>" if israel_price is not None else "<li>המוצר <strong>אינו נמכר בישראל</strong> — ניתן להשיגו רק דרך אמזון</li><li>מחיר באמזון (מחיר סופי כולל מיסים ומשלוח): ₪" + str(amazon_price) + " נכון ל-" + today_display + "</li>"}
+          {"<li>נכון ל-" + today_display + ": בישראל ₪" + str(israel_price) + " | " + takeaway_price_label + " ₪" + str(amazon_price) + " — חיסכון של ~₪" + str(savings) + takeaway_price_suffix + "</li>" if israel_price is not None else "<li>המוצר <strong>אינו נמכר בישראל</strong> — ניתן להשיגו רק דרך אמזון</li><li>" + takeaway_amazon_prefix + ": ₪" + str(amazon_price) + " נכון ל-" + today_display + takeaway_price_suffix + "</li>"}
           <li>המשלוח החינם <strong>זמני ומשתנה</strong> — בדקו לפני רכישה</li>
         </ul>
       </div>
@@ -540,13 +548,13 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
           <tbody>
             {"" if israel_price is None else f'<tr style="border-bottom:1px solid rgba(23,32,51,.07);"><td style="padding:10px 14px;">בישראל (הזול ביותר)</td><td style="padding:10px 14px;font-weight:700;">₪' + str(israel_price) + '</td></tr>'}
             <tr style="background:rgba(22,125,70,.05);border-bottom:1px solid rgba(23,32,51,.07);">
-              <td style="padding:10px 14px;">אמזון <small style="color:#4d5a70;">(מחיר סופי כולל מיסים ומשלוח)</small></td>
+              <td style="padding:10px 14px;">אמזון <small style="color:#4d5a70;">{amazon_price_small}</small></td>
               <td style="padding:10px 14px;font-weight:700;color:#167d46;">₪{amazon_price}</td>
             </tr>
             {"" if savings is None else f'<tr style="border-bottom:1px solid rgba(23,32,51,.07);"><td style="padding:10px 14px;">חיסכון</td><td style="padding:10px 14px;font-weight:700;color:#167d46;">~₪' + str(savings) + '</td></tr>'}
           </tbody>
         </table>
-        {"<p style=\"font-size:.8rem;color:#4d5a70;margin:0 0 16px;\">* נכון ל-" + today_display + ". המחירים משתנים — בדקו לפני רכישה.</p>" if israel_price is not None else "<p style=\"font-size:.8rem;color:#4d5a70;margin:0 0 16px;\">* מחיר באמזון נכון ל-" + today_display + ". עשוי להשתנות — בדקו לפני רכישה.</p>"}
+        {"<p style=\"font-size:.8rem;color:#4d5a70;margin:0 0 16px;\">* נכון ל-" + today_display + ". המחירים משתנים — בדקו לפני רכישה." + ship_note_text + "</p>" if israel_price is not None else "<p style=\"font-size:.8rem;color:#4d5a70;margin:0 0 16px;\">* מחיר באמזון נכון ל-" + today_display + ". עשוי להשתנות — בדקו לפני רכישה." + ship_note_text + "</p>"}
 
         <div style="background:rgba(255,153,0,.08);border:1.5px solid rgba(255,153,0,.4);border-radius:12px;padding:14px 18px;margin:16px 0;font-size:.9rem;line-height:1.7;">
           <strong>⚠️ חשוב: המחיר באמזון כולל כבר את מע"מ הייבוא</strong><br>
