@@ -280,8 +280,8 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
     amazon_price_small = "(מחיר המוצר בלבד)" if min_order_49 else "(מחיר סופי כולל מיסים ומשלוח)"
     ship_note_text = ' משלוח חינם בקנייה מעל <bdi>$49</bdi>.' if min_order_49 else ''
     takeaway_price_suffix = ' — מותנה במשלוח חינם בקנייה מעל <bdi>$49</bdi>' if min_order_49 else ''
-    takeaway_price_label = 'מחיר המוצר' if min_order_49 else 'באמזון (מחיר סופי כולל מיסים ומשלוח)'
-    takeaway_amazon_prefix = 'מחיר באמזון' if min_order_49 else 'מחיר באמזון (מחיר סופי כולל מיסים ומשלוח)'
+    takeaway_price_label = 'מחיר המוצר' if min_order_49 else 'באמזון (סופי כולל מיסים ומשלוח)'
+    takeaway_amazon_prefix = 'מחיר באמזון' if min_order_49 else 'מחיר באמזון (סופי כולל מיסים ומשלוח)'
     # תיבת אזהרת מע"מ ייבוא — לא רלוונטית למוצרים מתחת ל-$49 (מתחת גם לסף הפטור $75; המחיר בלי משלוח)
     import_vat_box = '' if min_order_49 else (
         '<div style="background:rgba(255,153,0,.08);border:1.5px solid rgba(255,153,0,.4);border-radius:12px;padding:14px 18px;margin:16px 0;font-size:.9rem;line-height:1.7;">\n'
