@@ -519,8 +519,6 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
         <div class="blog-meta">
           <span>{today_he}</span>
           <span class="blog-meta-sep">·</span>
-          <span>זמן קריאה: {content['reading_time']}</span>
-          <span class="blog-meta-sep">·</span>
           <span>כתב: <a href="https://www.amzfreeil.com/about.html" style="color:inherit">אילן</a></span>
         </div>
       </div>
