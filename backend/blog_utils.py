@@ -270,21 +270,7 @@ async def _parse_claude_json(raw: str, client: "anthropic.AsyncAnthropic", _atte
         raise last_err
 
 
-ELECTRONICS_KEYWORDS = [
-    "electronic", "computer", "cell phone", "smartphone", "camera",
-    "video game", "audio", "headphone", "speaker", "wearable", "tv",
-    "television", "charger", "adapter", "laptop", "tablet", "appliance",
-    "vacuum", "hair dryer", "shaver", "power tool", "smart home",
-    "router", "monitor",
-]
-
-
-def _is_electronic_product(product: dict) -> bool:
-    text = f"{product.get('category', '')} {product.get('title', '')}".lower()
-    return any(keyword in text for keyword in ELECTRONICS_KEYWORDS)
-
-
-def build_post_html(product: dict, content: dict, israel_price: float | None, amazon_price: float, min_order_49: bool = False) -> str:
+def build_post_html(product: dict, content: dict, israel_price: float | None, amazon_price: float, min_order_49: bool = False, voltage_warning: bool = False) -> str:
     partner_tag = os.getenv("AMAZON_AFFILIATE_TAG") or os.getenv("AMAZON_PARTNER_TAG", "amzfreeil-20")
     today = date.today()
     today_he = f"{today.day} ב{MONTHS_HE[today.month - 1]} {today.year}"
@@ -334,7 +320,7 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
         )
 
     voltage_warning_html = ""
-    if _is_electronic_product(product):
+    if voltage_warning:
         voltage_warning_html = """
       <div style="background:rgba(255,153,0,.08);border:1.5px solid rgba(255,153,0,.4);border-radius:12px;padding:14px 18px;margin:16px 0;font-size:.9rem;line-height:1.7;">
         <strong>⚠️ התאמת חשמל לישראל:</strong><br>

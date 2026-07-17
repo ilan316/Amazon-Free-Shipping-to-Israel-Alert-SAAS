@@ -211,6 +211,7 @@ class BlogDraft(Base):
     amazon_price: Mapped[float] = mapped_column(nullable=True)
     image_url: Mapped[str] = mapped_column(String(512), nullable=True)
     min_order_49: Mapped[bool] = mapped_column(default=False, nullable=False)
+    voltage_warning: Mapped[bool] = mapped_column(default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 

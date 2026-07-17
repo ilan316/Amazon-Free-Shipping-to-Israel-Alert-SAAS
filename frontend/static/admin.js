@@ -2036,6 +2036,14 @@ function openDraftModal(asin, name, imageUrl) {
           </span>
         </label>
       </div>
+      <div style="margin-bottom:20px;">
+        <label style="font-size:0.85rem;font-weight:600;display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
+          <input id="draft-voltage-warning" type="checkbox" style="margin-top:3px;flex-shrink:0;">
+          <span>אזהרת חשמל / תקע 110V<br>
+            <span style="font-weight:400;color:var(--text-muted);font-size:0.75rem;">סמן אם המוצר מתחבר לחשמל או מגיע עם מטען אמריקאי</span>
+          </span>
+        </label>
+      </div>
       <button id="draft-submit-btn" onclick="generateBlogDraft('${asin}')"
         style="width:100%;background:var(--brand,#ff9900);color:#111;border:none;padding:12px;border-radius:10px;font-weight:700;font-size:1rem;cursor:pointer;">
         ✍️ צור דראפט
@@ -2211,7 +2219,7 @@ async function generateBlogDraft(asin) {
   const res = await apiFetch("/admin/blog-draft", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, min_order_49: !!document.getElementById("draft-min-order-49")?.checked }),
+    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, min_order_49: !!document.getElementById("draft-min-order-49")?.checked, voltage_warning: !!document.getElementById("draft-voltage-warning")?.checked }),
   });
 
   if (res && res.ok) {
@@ -2355,7 +2363,7 @@ async function generateBlogDraftManual(asin) {
   const res = await apiFetch("/admin/blog-draft", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, manual_title: title, manual_features: features, manual_brand: brand, manual_category: category, manual_image: image, min_order_49: !!document.getElementById("draft-min-order-49")?.checked }),
+    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, manual_title: title, manual_features: features, manual_brand: brand, manual_category: category, manual_image: image, min_order_49: !!document.getElementById("draft-min-order-49")?.checked, voltage_warning: !!document.getElementById("draft-voltage-warning")?.checked }),
   });
 
   if (res && res.ok) {
@@ -2404,7 +2412,7 @@ async function generateBlogDraftMissingFields(asin) {
   const res = await apiFetch("/admin/blog-draft", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, manual_brand: brand, manual_category: category, min_order_49: !!document.getElementById("draft-min-order-49")?.checked }),
+    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, manual_brand: brand, manual_category: category, min_order_49: !!document.getElementById("draft-min-order-49")?.checked, voltage_warning: !!document.getElementById("draft-voltage-warning")?.checked }),
   });
 
   if (res && res.ok) {

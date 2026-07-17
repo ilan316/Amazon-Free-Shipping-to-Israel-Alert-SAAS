@@ -62,6 +62,7 @@ class GenerateBlogDraftRequest(BaseModel):
     manual_category: str | None = None
     manual_image: str | None = None
     min_order_49: bool = False
+    voltage_warning: bool = False
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -2619,7 +2620,7 @@ async def generate_blog_draft(
         content["slug"] = pub_row.slug
 
     try:
-        html = build_post_html(product, content, body.israel_price, body.amazon_price, body.min_order_49)
+        html = build_post_html(product, content, body.israel_price, body.amazon_price, body.min_order_49, body.voltage_warning)
     except Exception as e:
         logger.error("blog-draft build_post_html error for %s: %s", asin, e, exc_info=True)
         raise HTTPException(502, f"Build HTML error: {e}")
@@ -2673,6 +2674,7 @@ async def generate_blog_draft(
         draft_row.amazon_price = body.amazon_price
         draft_row.image_url = product.get("image", "")
         draft_row.min_order_49 = body.min_order_49
+        draft_row.voltage_warning = body.voltage_warning
     else:
         db.add(BlogDraft(
             asin=asin,
@@ -2683,6 +2685,7 @@ async def generate_blog_draft(
             amazon_price=body.amazon_price,
             image_url=product.get("image", ""),
             min_order_49=body.min_order_49,
+            voltage_warning=body.voltage_warning,
         ))
     await db.commit()
 

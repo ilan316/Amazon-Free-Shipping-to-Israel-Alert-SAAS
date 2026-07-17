@@ -293,6 +293,11 @@ async def create_tables():
             )
         )
         await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE blog_drafts ADD COLUMN IF NOT EXISTS voltage_warning BOOLEAN NOT NULL DEFAULT FALSE"
+            )
+        )
+        await conn.execute(
             __import__("sqlalchemy").text("""
                 CREATE TABLE IF NOT EXISTS category_translations (
                     english_name VARCHAR(200) PRIMARY KEY,
