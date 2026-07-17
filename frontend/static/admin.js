@@ -2026,7 +2026,7 @@ function openDraftModal(asin, name, imageUrl) {
         <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:4px;">מחיר באמזון (₪) <span style="color:var(--error,#c00);font-size:0.8rem;">*חובה</span></label>
         <input id="draft-amazon-price" type="number" min="0" step="0.01" placeholder="למשל: 1234.50"
           style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.95rem;box-sizing:border-box;">
-        <p style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 0;">כולל Import Fees Deposit + משלוח</p>
+        <p id="draft-amazon-price-hint" style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 0;">כולל Import Fees Deposit + משלוח</p>
       </div>
       <div style="margin-bottom:20px;">
         <label style="font-size:0.85rem;font-weight:600;display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
@@ -2045,6 +2045,11 @@ function openDraftModal(asin, name, imageUrl) {
 
   modal.addEventListener("click", e => { if (e.target === modal) closeDraftModal(); });
   document.body.appendChild(modal);
+  const minOrderCb = document.getElementById("draft-min-order-49");
+  const priceHint = document.getElementById("draft-amazon-price-hint");
+  minOrderCb.addEventListener("change", () => {
+    priceHint.style.display = minOrderCb.checked ? "none" : "";
+  });
   document.getElementById("draft-israel-price").focus();
   // focus moves to amazon-price after israel-price if left empty
 }
