@@ -197,12 +197,12 @@ async def lifespan(app: FastAPI):
         trigger="cron", hour=8, minute=10, timezone="Asia/Jerusalem", misfire_grace_time=600
     ))
     _upsert_job(run_send_telegram_product, "telegram_product", dict(
-        trigger="interval", minutes=45, misfire_grace_time=300
+        trigger="interval", minutes=45, misfire_grace_time=1800
     ))
     # Facebook: 5 posts/day at 08:00, 10:30, 13:00, 16:00, 19:00 IL time
     for _fb_hour, _fb_minute in [(8, 0), (10, 30), (13, 0), (16, 0), (19, 0)]:
         _upsert_job(run_send_facebook_product, f"facebook_product_{_fb_hour:02d}{_fb_minute:02d}", dict(
-            trigger="cron", hour=_fb_hour, minute=_fb_minute, timezone="Asia/Jerusalem", misfire_grace_time=300
+            trigger="cron", hour=_fb_hour, minute=_fb_minute, timezone="Asia/Jerusalem", misfire_grace_time=1800
         ))
 
     _upsert_job(cleanup_old_screenshots, "screenshot_cleanup", dict(
