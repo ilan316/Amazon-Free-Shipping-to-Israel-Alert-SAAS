@@ -1939,6 +1939,14 @@ async function loadBlogPublished() {
   listEl.innerHTML = published.map(p => {
     const dt = p.marked_at ? new Date(p.marked_at).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' }) : '';
     const link = p.slug ? `https://www.amzfreeil.com/blog/${p.slug}.html` : null;
+    const socialBadge = (label, iso) => {
+      if (iso) {
+        const when = new Date(iso).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' });
+        return `<span title="נשלח ב-${when}" style="font-size:0.72rem;padding:2px 7px;border-radius:999px;background:rgba(40,167,69,0.14);color:#28a745;border:1px solid rgba(40,167,69,0.35);white-space:nowrap;">${label} ✓</span>`;
+      }
+      return `<span title="לא נרשם שידור" style="font-size:0.72rem;padding:2px 7px;border-radius:999px;background:var(--surface);color:var(--text-muted);border:1px solid var(--border);white-space:nowrap;">${label} –</span>`;
+    };
+    const social = `<span style="display:inline-flex;gap:5px;">${socialBadge('טלגרם', p.telegram_sent_at)}${socialBadge('פייסבוק', p.facebook_sent_at)}</span>`;
     const titleEsc = String(p.title || p.asin).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, "&quot;");
     return `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--surface);">
@@ -1949,6 +1957,7 @@ async function loadBlogPublished() {
           <div style="font-size:0.76rem;color:var(--text-muted);"><span dir="ltr">${p.asin}</span></div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;white-space:nowrap;">
+          ${social}
           <span style="font-size:0.82rem;" title="צפיות בעמוד ההשוואת מחירים">👁️ ${(p.views ?? 0).toLocaleString('he-IL')}</span>
           <button onclick="openEditModal('${p.asin}','${p.slug || ''}')"
             title="תיקון ידני קל של טקסט/תרגום — מצא והחלף, בלי לייצר מחדש"

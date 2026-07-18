@@ -59,6 +59,17 @@ async def create_tables():
                 "CREATE TABLE IF NOT EXISTS system_settings (key VARCHAR(100) PRIMARY KEY, value TEXT NOT NULL DEFAULT '')"
             )
         )
+        # Track when a published blog post was broadcast to each social network (NULL = not sent / not tracked)
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE blog_published_asins ADD COLUMN IF NOT EXISTS telegram_sent_at TIMESTAMP WITH TIME ZONE"
+            )
+        )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE blog_published_asins ADD COLUMN IF NOT EXISTS facebook_sent_at TIMESTAMP WITH TIME ZONE"
+            )
+        )
         await conn.execute(
             __import__("sqlalchemy").text(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS vacation_mode BOOLEAN NOT NULL DEFAULT FALSE"

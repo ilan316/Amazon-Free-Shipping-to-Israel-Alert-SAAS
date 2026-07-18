@@ -189,6 +189,9 @@ class BlogPublishedAsin(Base):
     slug: Mapped[str] = mapped_column(String(200), nullable=True)
     title: Mapped[str] = mapped_column(String(500), nullable=True)
     marked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    # Set by the blog-social drain when the post is actually broadcast (NULL = not sent / not tracked)
+    telegram_sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    facebook_sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class BlogDismissedAsin(Base):

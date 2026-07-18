@@ -1448,7 +1448,24 @@ async def queue_blog_social_post(
 
 async def run_send_blog_social_queue():
     """Send any due blog-post announcements. Runs every few minutes."""
-    from backend.models import BlogSocialQueue
+    from backend.models import BlogSocialQueue, BlogPublishedAsin
+
+    async def _stamp_published(db, asin: str, *, telegram: bool = False, facebook: bool = False):
+        """Record on the published-post row when it was actually broadcast, so the
+        'פורסמו' tab can show the social status even after the queue row is deleted."""
+        try:
+            pub = (
+                await db.execute(select(BlogPublishedAsin).where(BlogPublishedAsin.asin == asin))
+            ).scalar_one_or_none()
+            if not pub:
+                return
+            stamp = datetime.now(timezone.utc)
+            if telegram and pub.telegram_sent_at is None:
+                pub.telegram_sent_at = stamp
+            if facebook and pub.facebook_sent_at is None:
+                pub.facebook_sent_at = stamp
+        except Exception as e:
+            logger.warning(f"[blog_social_queue] could not stamp published row for {asin}: {e}")
 
     now = datetime.now(timezone.utc)
     async with AsyncSessionLocal() as db:
@@ -1469,6 +1486,8 @@ async def run_send_blog_social_queue():
                     row.telegram_sent = await send_blog_post_to_telegram(
                         row.title, row.slug, row.image_url, row.amazon_price, row.israel_price
                     )
+                    if row.telegram_sent:
+                        await _stamp_published(db, row.asin, telegram=True)
                 except Exception as e:
                     logger.warning(f"[blog_social_queue] telegram send error for {row.slug}: {e}")
             if not row.facebook_sent:
@@ -1476,6 +1495,8 @@ async def run_send_blog_social_queue():
                     row.facebook_sent = await send_blog_post_to_facebook(
                         row.title, row.slug, row.image_url, row.amazon_price, row.israel_price
                     )
+                    if row.facebook_sent:
+                        await _stamp_published(db, row.asin, facebook=True)
                 except Exception as e:
                     logger.warning(f"[blog_social_queue] facebook send error for {row.slug}: {e}")
             if row.telegram_sent and row.facebook_sent:

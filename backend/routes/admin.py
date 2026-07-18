@@ -2375,6 +2375,8 @@ async def get_blog_published(
                 "slug": r.slug,
                 "title": r.title,
                 "marked_at": r.marked_at.isoformat() if r.marked_at else None,
+                "telegram_sent_at": r.telegram_sent_at.isoformat() if r.telegram_sent_at else None,
+                "facebook_sent_at": r.facebook_sent_at.isoformat() if r.facebook_sent_at else None,
                 "views": view_counts.get(r.asin, 0),
             }
             for r in rows
