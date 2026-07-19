@@ -1369,11 +1369,17 @@ _BLOG_SOCIAL_WINDOW_START_HOUR = 6
 _BLOG_SOCIAL_WINDOW_END_HOUR = 22
 _BLOG_SOCIAL_MIN_GAP_MINUTES = 60
 _BLOG_SOCIAL_MAX_GAP_MINUTES = 120
+_BLOG_SOCIAL_MAX_LOOKAHEAD_DAYS = 7
 
 
-def _blog_social_window_bounds() -> tuple[datetime, datetime]:
-    """Return (window_start, window_end) in IL time for the active blog-social
-    window, rolling to tomorrow if today's 06:00-22:00 window already closed."""
+def _blog_social_window_bounds(day_offset: int = 0) -> tuple[datetime, datetime]:
+    """Return (window_start, window_end) in IL time for a blog-social window.
+
+    day_offset=0 is the active window: today's 06:00-22:00, rolled to tomorrow
+    if it already closed and clamped to "now" if it is already underway.
+    day_offset>0 is the full 06:00-22:00 window that many days later, used when
+    the active window is too packed to fit another post.
+    """
     import pytz
 
     il_tz = pytz.timezone("Asia/Jerusalem")
@@ -1384,18 +1390,27 @@ def _blog_social_window_bounds() -> tuple[datetime, datetime]:
     if now_il >= window_end:
         window_start += timedelta(days=1)
         window_end += timedelta(days=1)
-    elif now_il > window_start:
+    elif now_il > window_start and day_offset == 0:
         window_start = now_il
+
+    if day_offset:
+        window_start = window_start.replace(
+            hour=_BLOG_SOCIAL_WINDOW_START_HOUR, minute=0, second=0, microsecond=0
+        ) + timedelta(days=day_offset)
+        window_end += timedelta(days=day_offset)
 
     return window_start, window_end
 
 
 def _random_blog_social_time(
     window_start: datetime, window_end: datetime, existing_times_utc: list[datetime],
-) -> datetime:
+) -> datetime | None:
     """Pick a random UTC datetime within [window_start, window_end] (IL time),
     kept at least 60-120 (random) minutes away from any already-queued blog post
     that day, so consecutive publishes don't cluster minutes apart.
+
+    Returns None when the window is too packed to honour that gap — the caller
+    then tries the next day's window rather than spilling past 22:00.
 
     Only other blog-queue entries are considered here — this is intentionally
     independent of the separate scanner "product post" cron jobs.
@@ -1411,38 +1426,57 @@ def _random_blog_social_time(
         if all(abs((candidate - t).total_seconds()) >= min_gap.total_seconds() for t in existing_times_utc):
             return candidate.astimezone(timezone.utc)
 
-    # Window is packed (many posts queued for the same day) — fall back to
-    # placing it right after the last existing slot, even if that spills past 22:00.
-    reference = max(existing_times_utc, default=window_start)
-    return (reference + min_gap).astimezone(timezone.utc)
+    return None
 
 
 async def queue_blog_social_post(
     asin: str, slug: str, title: str, image_url: str | None,
     amazon_price: float | None = None, israel_price: float | None = None,
 ) -> datetime:
-    """Queue a blog post's Telegram/Facebook announcement for a random time today
+    """Queue a blog post's Telegram/Facebook announcement for a random time
     (within the 06:00-22:00 IL active window, spaced 60-120 min apart from other
-    queued blog posts) instead of sending immediately."""
+    queued blog posts) instead of sending immediately. When today's window is
+    already packed the post rolls over to the next day's window."""
     from backend.models import BlogSocialQueue
 
-    window_start, window_end = _blog_social_window_bounds()
+    windows = [_blog_social_window_bounds(d) for d in range(_BLOG_SOCIAL_MAX_LOOKAHEAD_DAYS)]
+    horizon_start = windows[0][0].astimezone(timezone.utc)
+    horizon_end = windows[-1][1].astimezone(timezone.utc)
+
     async with AsyncSessionLocal() as db:
         existing = (await db.execute(
             select(BlogSocialQueue.scheduled_at).where(
-                BlogSocialQueue.scheduled_at >= window_start.astimezone(timezone.utc),
-                BlogSocialQueue.scheduled_at <= window_end.astimezone(timezone.utc),
+                BlogSocialQueue.scheduled_at >= horizon_start,
+                BlogSocialQueue.scheduled_at <= horizon_end,
             )
         )).scalars().all()
 
-        scheduled_at = _random_blog_social_time(window_start, window_end, list(existing))
+        scheduled_at = None
+        for day_offset, (window_start, window_end) in enumerate(windows):
+            same_day = [
+                t for t in existing
+                if window_start.astimezone(timezone.utc) <= t <= window_end.astimezone(timezone.utc)
+            ]
+            scheduled_at = _random_blog_social_time(window_start, window_end, same_day)
+            if scheduled_at:
+                break
+
+        if scheduled_at is None:
+            # Every window in the lookahead is packed — shouldn't happen in practice.
+            day_offset = _BLOG_SOCIAL_MAX_LOOKAHEAD_DAYS - 1
+            scheduled_at = windows[-1][0].astimezone(timezone.utc)
+            logger.warning(
+                f"[blog_social_queue] no free slot in {_BLOG_SOCIAL_MAX_LOOKAHEAD_DAYS} days for {slug}"
+            )
+
         db.add(BlogSocialQueue(
             asin=asin, slug=slug, title=title, image_url=image_url,
             amazon_price=amazon_price, israel_price=israel_price,
             scheduled_at=scheduled_at,
         ))
         await db.commit()
-    logger.info(f"[blog_social_queue] queued {slug} for {scheduled_at.isoformat()}")
+    rolled = f" (rolled +{day_offset}d, today's window full)" if day_offset else ""
+    logger.info(f"[blog_social_queue] queued {slug} for {scheduled_at.isoformat()}{rolled}")
     return scheduled_at
 
 
