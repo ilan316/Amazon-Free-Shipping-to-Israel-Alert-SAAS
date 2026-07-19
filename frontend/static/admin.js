@@ -2416,14 +2416,20 @@ async function handleDraftFailure(asin, statusEl, btn, res, startedAt, showManua
   // cases the draft may well have been created.
   if (!res || (res.status >= 500 && !detail)) {
     errMsg = "לא התקבלה תגובה מהשרת (ייתכן timeout).";
+    // The blip that ate the POST response usually eats this lookup too, so retry
+    // a few times before concluding the draft was never created.
     let found = null;
-    try {
-      const check = await apiFetch(`/admin/blog-draft/${asin}`, { rawServerErrors: true });
-      if (check && check.ok) {
-        const d = await check.json();
-        if (d.exists) found = d;
-      }
-    } catch (_) {}
+    for (let attempt = 0; attempt < 3 && !found; attempt++) {
+      if (attempt) await new Promise(r => setTimeout(r, 2500));
+      try {
+        const check = await apiFetch(`/admin/blog-draft/${asin}`, { rawServerErrors: true });
+        if (check && check.ok) {
+          const d = await check.json();
+          if (d.exists) found = d;
+          else break;  // server answered clearly: no draft, no point retrying
+        }
+      } catch (_) {}
+    }
 
     if (found && found.created_at && new Date(found.created_at) >= new Date(startedAt)) {
       statusEl.innerHTML = draftSuccessHTML(asin, found, "התגובה מהשרת לא הגיעה, אבל הדראפט אכן נוצר — אין צורך לנסות שוב.");
