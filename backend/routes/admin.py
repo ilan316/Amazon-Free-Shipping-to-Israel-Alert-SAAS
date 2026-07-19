@@ -2588,6 +2588,35 @@ async def undismiss_blog_candidate(
     return {"message": "undismissed"}
 
 
+@router.get("/blog-draft/{asin}")
+async def get_blog_draft(
+    asin: str,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Look up a single draft by ASIN.
+
+    Used by the admin UI to recover from a lost response: draft generation takes
+    45-70s and the connection sometimes drops after the work already succeeded,
+    which used to show a false "failed" and tempt a retry that re-runs Claude and
+    re-commits to GitHub.
+    """
+    row = (await db.execute(
+        select(BlogDraft).where(BlogDraft.asin == asin.strip().upper())
+    )).scalar_one_or_none()
+    if not row:
+        return {"exists": False}
+    repo = os.getenv("GITHUB_REPO", "")
+    return {
+        "exists": True,
+        "slug": row.slug,
+        "title": row.title or "",
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+        "github_url": f"https://github.com/{repo}/blob/main/blog/{row.slug}.html",
+        "preview_url": f"https://www.amzfreeil.com/blog/{row.slug}.html",
+    }
+
+
 @router.post("/blog-draft")
 async def generate_blog_draft(
     body: GenerateBlogDraftRequest,

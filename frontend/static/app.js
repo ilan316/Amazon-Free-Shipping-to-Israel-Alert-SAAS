@@ -7,7 +7,7 @@ function setToken(t) { localStorage.setItem("jwt", t); }
 function clearToken() { localStorage.removeItem("jwt"); }
 
 async function apiFetch(path, options = {}) {
-  const { skipAuthRedirect, ...fetchOptions } = options;
+  const { skipAuthRedirect, rawServerErrors, ...fetchOptions } = options;
   const token = getToken();
   const headers = {
     "Content-Type": "application/json",
@@ -24,7 +24,9 @@ async function apiFetch(path, options = {}) {
     showToast("יותר מדי ניסיונות — נסה שוב עוד דקה", "error");
     return null;
   }
-  if (res.status >= 500) {
+  // rawServerErrors: the caller wants to read the 5xx body itself (e.g. to show
+  // the real `detail`, or to check whether the work actually completed server-side).
+  if (res.status >= 500 && !rawServerErrors) {
     showToast("שגיאת שרת — נסה שוב מאוחר יותר", "error");
     return null;
   }

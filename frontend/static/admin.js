@@ -2285,6 +2285,165 @@ function showDraftProgress(statusEl) {
   document.getElementById("draft-progress-box")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
+// ── Shared draft result rendering ────────────────────────────────────────────
+// The three draft entry points (auto / manual / missing-fields) render the same
+// outcomes, so the markup and the failure handling live here once.
+
+function draftRepublishedHTML(data) {
+  return `
+    <div style="background:rgba(22,125,70,.08);border:1px solid rgba(22,125,70,.25);border-radius:8px;padding:12px 14px;">
+      <p style="margin:0 0 6px;font-weight:700;color:#167d46;">✅ הפוסט המפורסם עודכן ופורסם מחדש!</p>
+      <p style="margin:0 0 8px;font-size:0.82rem;">${data.title || ""}</p>
+      <a href="${data.preview_url}" target="_blank" rel="noopener" style="font-size:0.82rem;color:var(--brand-deep,#ff6a00);">צפה בפוסט ←</a>
+    </div>`;
+}
+
+function draftSuccessHTML(asin, data, note = "") {
+  return `
+    <div style="background:rgba(22,125,70,.08);border:1px solid rgba(22,125,70,.25);border-radius:8px;padding:12px 14px;">
+      <p style="margin:0 0 6px;font-weight:700;color:#167d46;">✅ דראפט נוצר בהצלחה!</p>
+      ${note ? `<p style="margin:0 0 8px;font-size:0.78rem;color:var(--text-muted);">${note}</p>` : ""}
+      <p style="margin:0 0 8px;font-size:0.82rem;">${data.title || ""}</p>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+        <button id="modal-publish-btn" onclick="publishBlogDraft('${asin}','${data.slug}',this)"
+          style="background:#167d46;color:#fff;border:none;padding:7px 18px;border-radius:7px;cursor:pointer;font-weight:700;font-size:0.85rem;">
+          🚀 פרסם עכשיו
+        </button>
+        <a href="${data.preview_url}" target="_blank" rel="noopener" style="font-size:0.82rem;color:var(--text-muted);">preview ←</a>
+      </div>
+      ${data.github_url ? `<p style="margin:0;font-size:0.78rem;">
+        <a href="${data.github_url}" target="_blank" rel="noopener" style="color:var(--brand-deep,#ff6a00);">GitHub ←</a>
+      </p>` : ""}
+    </div>`;
+}
+
+// Swap a candidate card's actions to the "draft ready" state.
+function markCardAsDrafted(asin, data) {
+  const row = document.querySelector(`[data-asin="${asin}"]`);
+  const actionsEl = row?.querySelector(".blog-card-actions");
+  if (!actionsEl) return;
+  actionsEl.innerHTML = `
+    <button onclick="publishBlogDraft('${asin}','${data.slug}',this)"
+      style="background:#167d46;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.82rem;white-space:nowrap;">
+      🚀 פרסם
+    </button>
+    <a href="${data.preview_url}" target="_blank" rel="noopener"
+      style="font-size:0.76rem;color:var(--text-muted);text-align:center;">preview ←</a>
+    <label style="display:flex;align-items:center;gap:5px;font-size:0.78rem;color:var(--text-muted);cursor:pointer;white-space:nowrap;">
+      <input type="checkbox" onchange="setBlogDismissed('${asin}', this.checked, this.closest('[data-asin]'))" style="cursor:pointer;" />
+      בטל מועמדות
+    </label>`;
+}
+
+function renderMissingFieldsForm(asin, statusEl, detail) {
+  statusEl.innerHTML = `
+    <div style="background:rgba(200,0,0,.06);border:1px solid rgba(200,0,0,.2);border-radius:8px;padding:14px 16px;">
+      <p style="margin:0 0 10px;font-weight:700;color:#c00;">⚠️ חסרים מותג/קטגוריה ב-Amazon API</p>
+      <p style="margin:0 0 12px;font-size:0.83rem;color:var(--text-muted);">כותרת ומפרט נשלפו בהצלחה — נא להשלים ידנית רק את השדות החסרים:</p>
+      ${detail.missing_brand ? `
+      <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">מותג (brand)</label>
+      <input id="manual-brand" type="text" placeholder="למשל: Samsung"
+        style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;margin-bottom:10px;" />` : ""}
+      ${detail.missing_category ? `
+      <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">קטגוריה (category)</label>
+      <input id="manual-category" type="text" placeholder="למשל: Electronics"
+        style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;margin-bottom:10px;" />` : ""}
+      <button onclick="generateBlogDraftMissingFields('${asin}')"
+        style="background:var(--brand);color:#111;border:none;padding:8px 18px;border-radius:7px;cursor:pointer;font-weight:700;font-size:0.85rem;">
+        ✍️ צור דראפט עם נתונים ידניים
+      </button>
+    </div>`;
+}
+
+function renderBlockedForm(asin, statusEl) {
+  statusEl.innerHTML = `
+    <div style="background:rgba(200,0,0,.06);border:1px solid rgba(200,0,0,.2);border-radius:8px;padding:14px 16px;">
+      <p style="margin:0 0 10px;font-weight:700;color:#c00;">⚠️ ASIN חסום ב-Amazon API</p>
+      <p style="margin:0 0 12px;font-size:0.83rem;color:var(--text-muted);">העתק את הכותרת ונקודות המפרט מדף המוצר באמזון והדבק כאן:</p>
+      <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">כותרת המוצר (title)</label>
+      <input id="manual-title" type="text" placeholder="Sony MDR-MV1 Open Back Reference Monitor Headphones"
+        style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;margin-bottom:10px;" />
+      <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">נקודות מפרט (כל נקודה בשורה נפרדת)</label>
+      <textarea id="manual-features" rows="6" placeholder="Studio Monitor Sound for Mixing &amp; Mastering&#10;Wide frequency response 5Hz–80 kHz&#10;Open Back Design with HD driver units&#10;..."
+        style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;resize:vertical;margin-bottom:10px;"></textarea>
+      <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">קישור תמונה (image URL) <span style="font-weight:400;color:#c00;">— חשוב! בלי זה המוצר יעלה בלי תמונה</span></label>
+      <input id="manual-image" type="url" placeholder="https://m.media-amazon.com/images/I/....jpg"
+        style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;margin-bottom:4px;" />
+      <p style="margin:0 0 10px;font-size:0.76rem;color:var(--text-muted);">בדף המוצר באמזון — קליק ימני על התמונה הראשית → "העתק כתובת תמונה" (Copy image address).</p>
+      <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">מותג (brand) <span style="font-weight:400;color:var(--text-muted);">— אופציונלי</span></label>
+      <input id="manual-brand" type="text" placeholder="למשל: Samsung"
+        style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;margin-bottom:10px;" />
+      <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">קטגוריה (category) <span style="font-weight:400;color:var(--text-muted);">— אופציונלי</span></label>
+      <input id="manual-category" type="text" placeholder="למשל: Electronics"
+        style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;margin-bottom:10px;" />
+      <button onclick="generateBlogDraftManual('${asin}')"
+        style="background:var(--brand);color:#111;border:none;padding:8px 18px;border-radius:7px;cursor:pointer;font-weight:700;font-size:0.85rem;">
+        ✍️ צור דראפט עם נתונים ידניים
+      </button>
+    </div>`;
+}
+
+function resetDraftBtn(btn, label) {
+  if (btn) { btn.disabled = false; btn.textContent = label; }
+}
+
+/**
+ * Render a failed draft attempt.
+ *
+ * `res` is null when the response never arrived (connection dropped, edge
+ * timeout). The work often finished server-side anyway, so before crying wolf we
+ * ask the backend whether a draft row appeared after `startedAt`.
+ *
+ * `showManualForm` lets the primary entry point offer its blocked/missing-fields
+ * recovery forms; the manual entry points pass false and just show the message.
+ */
+async function handleDraftFailure(asin, statusEl, btn, res, startedAt, showManualForm = false) {
+  let errMsg = "שגיאה בייצור הדראפט.";
+  let detail = null;
+  if (res) {
+    try { detail = (await res.json()).detail; } catch (_) {}
+    if (typeof detail === "string") errMsg = detail;
+  }
+
+  if (showManualForm && detail && typeof detail === "object") {
+    if (detail.missing_fields) { renderMissingFieldsForm(asin, statusEl, detail); resetDraftBtn(btn, "✍️ נסה שוב"); return; }
+    if (detail.blocked) { renderBlockedForm(asin, statusEl); resetDraftBtn(btn, "✍️ נסה שוב"); return; }
+  }
+
+  if (!res) {
+    // No response at all — check whether the draft was created regardless.
+    errMsg = "לא התקבלה תגובה מהשרת (ייתכן timeout).";
+    let found = null;
+    try {
+      const check = await apiFetch(`/admin/blog-draft/${asin}`, { rawServerErrors: true });
+      if (check && check.ok) {
+        const d = await check.json();
+        if (d.exists) found = d;
+      }
+    } catch (_) {}
+
+    if (found && found.created_at && new Date(found.created_at) >= new Date(startedAt)) {
+      statusEl.innerHTML = draftSuccessHTML(asin, found, "התגובה מהשרת לא הגיעה, אבל הדראפט אכן נוצר — אין צורך לנסות שוב.");
+      markCardAsDrafted(asin, found);
+      resetDraftBtn(btn, "✍️ צור דראפט נוסף");
+      return;
+    }
+    if (found) {
+      statusEl.innerHTML = `
+        <div style="background:rgba(255,153,0,.08);border:1px solid rgba(255,153,0,.35);border-radius:8px;padding:12px 14px;">
+          <p style="margin:0 0 6px;font-weight:700;color:#a86400;">⚠️ ${errMsg}</p>
+          <p style="margin:0 0 8px;font-size:0.82rem;">קיים דראפט קודם למוצר הזה — בדוק אותו לפני שאתה מייצר מחדש:</p>
+          <a href="${found.preview_url}" target="_blank" rel="noopener" style="font-size:0.82rem;color:var(--brand-deep,#ff6a00);">preview ←</a>
+        </div>`;
+      resetDraftBtn(btn, "✍️ צור מחדש");
+      return;
+    }
+  }
+
+  statusEl.innerHTML = `<span style="color:var(--error,#c00);">❌ ${errMsg}</span>`;
+  resetDraftBtn(btn, "✍️ נסה שוב");
+}
+
 async function generateBlogDraft(asin) {
   const israelPriceRaw = document.getElementById("draft-israel-price").value.trim();
   const israelPrice = israelPriceRaw !== "" ? parseFloat(israelPriceRaw) : null;
@@ -2305,130 +2464,30 @@ async function generateBlogDraft(asin) {
   btn.textContent = "⏳ מייצר... (30-60 שניות)";
   showDraftProgress(statusEl);
 
-  const res = await apiFetch("/admin/blog-draft", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, min_order_49: !!document.getElementById("draft-min-order-49")?.checked, voltage_warning: !!document.getElementById("draft-voltage-warning")?.checked }),
-  });
+  const startedAt = new Date().toISOString();
+  let res = null;
+  try {
+    res = await apiFetch("/admin/blog-draft", {
+      method: "POST",
+      rawServerErrors: true,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, min_order_49: !!document.getElementById("draft-min-order-49")?.checked, voltage_warning: !!document.getElementById("draft-voltage-warning")?.checked }),
+    });
+  } catch (_) {}
 
   if (res && res.ok) {
     const data = await res.json();
     if (data.republished) {
-      statusEl.innerHTML = `
-        <div style="background:rgba(22,125,70,.08);border:1px solid rgba(22,125,70,.25);border-radius:8px;padding:12px 14px;">
-          <p style="margin:0 0 6px;font-weight:700;color:#167d46;">✅ הפוסט המפורסם עודכן ופורסם מחדש!</p>
-          <p style="margin:0 0 8px;font-size:0.82rem;">${data.title || ""}</p>
-          <a href="${data.preview_url}" target="_blank" rel="noopener" style="font-size:0.82rem;color:var(--brand-deep,#ff6a00);">צפה בפוסט ←</a>
-        </div>`;
-      if (typeof btn !== "undefined" && btn) { btn.textContent = "✍️ עדכן שוב"; btn.disabled = false; }
+      statusEl.innerHTML = draftRepublishedHTML(data);
+      resetDraftBtn(btn, "✍️ עדכן שוב");
       loadBlogPublished();
       return;
     }
-    statusEl.innerHTML = `
-      <div style="background:rgba(22,125,70,.08);border:1px solid rgba(22,125,70,.25);border-radius:8px;padding:12px 14px;">
-        <p style="margin:0 0 6px;font-weight:700;color:#167d46;">✅ דראפט נוצר בהצלחה!</p>
-        <p style="margin:0 0 8px;font-size:0.82rem;">${data.title || ""}</p>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
-          <button id="modal-publish-btn"
-            onclick="publishBlogDraft('${asin}','${data.slug}',this)"
-            style="background:#167d46;color:#fff;border:none;padding:7px 18px;border-radius:7px;cursor:pointer;font-weight:700;font-size:0.85rem;">
-            🚀 פרסם עכשיו
-          </button>
-          <a href="${data.preview_url}" target="_blank" rel="noopener" style="font-size:0.82rem;color:var(--text-muted);">preview ←</a>
-        </div>
-        <p style="margin:0;font-size:0.78rem;">
-          <a href="${data.github_url}" target="_blank" rel="noopener" style="color:var(--brand-deep,#ff6a00);">GitHub ←</a>
-        </p>
-      </div>`;
-    btn.textContent = "✍️ צור דראפט נוסף";
-    btn.disabled = false;
-
-    const row = document.querySelector(`[data-asin="${asin}"]`);
-    if (row) {
-      const actionsEl = row.querySelector(".blog-card-actions");
-      if (actionsEl) {
-        actionsEl.innerHTML = `
-          <button onclick="publishBlogDraft('${asin}','${data.slug}',this)"
-            style="background:#167d46;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.82rem;white-space:nowrap;">
-            🚀 פרסם
-          </button>
-          <a href="${data.preview_url}" target="_blank" rel="noopener"
-            style="font-size:0.76rem;color:var(--text-muted);text-align:center;">preview ←</a>
-          <label style="display:flex;align-items:center;gap:5px;font-size:0.78rem;color:var(--text-muted);cursor:pointer;white-space:nowrap;">
-            <input type="checkbox" onchange="setBlogDismissed('${asin}', this.checked, this.closest('[data-asin]'))" style="cursor:pointer;" />
-            בטל מועמדות
-          </label>`;
-      }
-    }
+    statusEl.innerHTML = draftSuccessHTML(asin, data);
+    resetDraftBtn(btn, "✍️ צור דראפט נוסף");
+    markCardAsDrafted(asin, data);
   } else {
-    let errMsg = "שגיאה בייצור הדראפט.";
-    let blocked = false;
-    let missingFields = null;
-    try {
-      const d = await res.json();
-      if (d.detail && typeof d.detail === "object" && d.detail.blocked) {
-        blocked = true;
-      } else if (d.detail && typeof d.detail === "object" && d.detail.missing_fields) {
-        missingFields = d.detail;
-      } else {
-        errMsg = (typeof d.detail === "string" ? d.detail : null) || errMsg;
-      }
-    } catch (_) {}
-
-    if (missingFields) {
-      statusEl.innerHTML = `
-        <div style="background:rgba(200,0,0,.06);border:1px solid rgba(200,0,0,.2);border-radius:8px;padding:14px 16px;">
-          <p style="margin:0 0 10px;font-weight:700;color:#c00;">⚠️ חסרים מותג/קטגוריה ב-Amazon API</p>
-          <p style="margin:0 0 12px;font-size:0.83rem;color:var(--text-muted);">כותרת ומפרט נשלפו בהצלחה — נא להשלים ידנית רק את השדות החסרים:</p>
-          ${missingFields.missing_brand ? `
-          <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">מותג (brand)</label>
-          <input id="manual-brand" type="text" placeholder="למשל: Samsung"
-            style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;margin-bottom:10px;" />` : ""}
-          ${missingFields.missing_category ? `
-          <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">קטגוריה (category)</label>
-          <input id="manual-category" type="text" placeholder="למשל: Electronics"
-            style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;margin-bottom:10px;" />` : ""}
-          <button onclick="generateBlogDraftMissingFields('${asin}')"
-            style="background:var(--brand);color:#111;border:none;padding:8px 18px;border-radius:7px;cursor:pointer;font-weight:700;font-size:0.85rem;">
-            ✍️ צור דראפט עם נתונים ידניים
-          </button>
-        </div>`;
-      btn.disabled = false;
-      btn.textContent = "✍️ נסה שוב";
-      return;
-    }
-
-    if (blocked) {
-      statusEl.innerHTML = `
-        <div style="background:rgba(200,0,0,.06);border:1px solid rgba(200,0,0,.2);border-radius:8px;padding:14px 16px;">
-          <p style="margin:0 0 10px;font-weight:700;color:#c00;">⚠️ ASIN חסום ב-Amazon API</p>
-          <p style="margin:0 0 12px;font-size:0.83rem;color:var(--text-muted);">העתק את הכותרת ונקודות המפרט מדף המוצר באמזון והדבק כאן:</p>
-          <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">כותרת המוצר (title)</label>
-          <input id="manual-title" type="text" placeholder="Sony MDR-MV1 Open Back Reference Monitor Headphones"
-            style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;margin-bottom:10px;" />
-          <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">נקודות מפרט (כל נקודה בשורה נפרדת)</label>
-          <textarea id="manual-features" rows="6" placeholder="Studio Monitor Sound for Mixing &amp; Mastering&#10;Wide frequency response 5Hz–80 kHz&#10;Open Back Design with HD driver units&#10;..."
-            style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;resize:vertical;margin-bottom:10px;"></textarea>
-          <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">קישור תמונה (image URL) <span style="font-weight:400;color:#c00;">— חשוב! בלי זה המוצר יעלה בלי תמונה</span></label>
-          <input id="manual-image" type="url" placeholder="https://m.media-amazon.com/images/I/....jpg"
-            style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;margin-bottom:4px;" />
-          <p style="margin:0 0 10px;font-size:0.76rem;color:var(--text-muted);">בדף המוצר באמזון — קליק ימני על התמונה הראשית → "העתק כתובת תמונה" (Copy image address).</p>
-          <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">מותג (brand) <span style="font-weight:400;color:var(--text-muted);">— אופציונלי</span></label>
-          <input id="manual-brand" type="text" placeholder="למשל: Samsung"
-            style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;margin-bottom:10px;" />
-          <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">קטגוריה (category) <span style="font-weight:400;color:var(--text-muted);">— אופציונלי</span></label>
-          <input id="manual-category" type="text" placeholder="למשל: Electronics"
-            style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;margin-bottom:10px;" />
-          <button onclick="generateBlogDraftManual('${asin}')"
-            style="background:var(--brand);color:#111;border:none;padding:8px 18px;border-radius:7px;cursor:pointer;font-weight:700;font-size:0.85rem;">
-            ✍️ צור דראפט עם נתונים ידניים
-          </button>
-        </div>`;
-    } else {
-      statusEl.innerHTML = `<span style="color:var(--error,#c00);">❌ ${errMsg}</span>`;
-    }
-    btn.disabled = false;
-    btn.textContent = "✍️ נסה שוב";
+    await handleDraftFailure(asin, statusEl, btn, res, startedAt, true);
   }
 }
 
@@ -2449,41 +2508,28 @@ async function generateBlogDraftManual(asin) {
   const statusEl = document.getElementById("draft-status");
   showDraftProgress(statusEl);
 
-  const res = await apiFetch("/admin/blog-draft", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, manual_title: title, manual_features: features, manual_brand: brand, manual_category: category, manual_image: image, min_order_49: !!document.getElementById("draft-min-order-49")?.checked, voltage_warning: !!document.getElementById("draft-voltage-warning")?.checked }),
-  });
+  const startedAt = new Date().toISOString();
+  let res = null;
+  try {
+    res = await apiFetch("/admin/blog-draft", {
+      method: "POST",
+      rawServerErrors: true,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, manual_title: title, manual_features: features, manual_brand: brand, manual_category: category, manual_image: image, min_order_49: !!document.getElementById("draft-min-order-49")?.checked, voltage_warning: !!document.getElementById("draft-voltage-warning")?.checked }),
+    });
+  } catch (_) {}
 
   if (res && res.ok) {
     const data = await res.json();
     if (data.republished) {
-      statusEl.innerHTML = `
-        <div style="background:rgba(22,125,70,.08);border:1px solid rgba(22,125,70,.25);border-radius:8px;padding:12px 14px;">
-          <p style="margin:0 0 6px;font-weight:700;color:#167d46;">✅ הפוסט המפורסם עודכן ופורסם מחדש!</p>
-          <p style="margin:0 0 8px;font-size:0.82rem;">${data.title || ""}</p>
-          <a href="${data.preview_url}" target="_blank" rel="noopener" style="font-size:0.82rem;color:var(--brand-deep,#ff6a00);">צפה בפוסט ←</a>
-        </div>`;
-      if (typeof btn !== "undefined" && btn) { btn.textContent = "✍️ עדכן שוב"; btn.disabled = false; }
+      statusEl.innerHTML = draftRepublishedHTML(data);
       loadBlogPublished();
       return;
     }
-    statusEl.innerHTML = `
-      <div style="background:rgba(22,125,70,.08);border:1px solid rgba(22,125,70,.25);border-radius:8px;padding:12px 14px;">
-        <p style="margin:0 0 6px;font-weight:700;color:#167d46;">✅ דראפט נוצר בהצלחה!</p>
-        <p style="margin:0 0 8px;font-size:0.82rem;">${data.title || ""}</p>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
-          <button id="modal-publish-btn" onclick="publishBlogDraft('${asin}','${data.slug}',this)"
-            style="background:#167d46;color:#fff;border:none;padding:7px 18px;border-radius:7px;cursor:pointer;font-weight:700;font-size:0.85rem;">
-            🚀 פרסם עכשיו
-          </button>
-          <a href="${data.preview_url}" target="_blank" rel="noopener" style="font-size:0.82rem;color:var(--text-muted);">preview ←</a>
-        </div>
-      </div>`;
+    statusEl.innerHTML = draftSuccessHTML(asin, data);
+    markCardAsDrafted(asin, data);
   } else {
-    let errMsg = "שגיאה בייצור הדראפט.";
-    try { const d = await res.json(); errMsg = (typeof d.detail === "string" ? d.detail : null) || errMsg; } catch (_) {}
-    statusEl.innerHTML = `<span style="color:var(--error,#c00);">❌ ${errMsg}</span>`;
+    await handleDraftFailure(asin, statusEl, null, res, startedAt);
   }
 }
 
@@ -2498,41 +2544,28 @@ async function generateBlogDraftMissingFields(asin) {
   const statusEl = document.getElementById("draft-status");
   showDraftProgress(statusEl);
 
-  const res = await apiFetch("/admin/blog-draft", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, manual_brand: brand, manual_category: category, min_order_49: !!document.getElementById("draft-min-order-49")?.checked, voltage_warning: !!document.getElementById("draft-voltage-warning")?.checked }),
-  });
+  const startedAt = new Date().toISOString();
+  let res = null;
+  try {
+    res = await apiFetch("/admin/blog-draft", {
+      method: "POST",
+      rawServerErrors: true,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ asin, israel_price: israelPrice, amazon_price: amazonPrice, manual_brand: brand, manual_category: category, min_order_49: !!document.getElementById("draft-min-order-49")?.checked, voltage_warning: !!document.getElementById("draft-voltage-warning")?.checked }),
+    });
+  } catch (_) {}
 
   if (res && res.ok) {
     const data = await res.json();
     if (data.republished) {
-      statusEl.innerHTML = `
-        <div style="background:rgba(22,125,70,.08);border:1px solid rgba(22,125,70,.25);border-radius:8px;padding:12px 14px;">
-          <p style="margin:0 0 6px;font-weight:700;color:#167d46;">✅ הפוסט המפורסם עודכן ופורסם מחדש!</p>
-          <p style="margin:0 0 8px;font-size:0.82rem;">${data.title || ""}</p>
-          <a href="${data.preview_url}" target="_blank" rel="noopener" style="font-size:0.82rem;color:var(--brand-deep,#ff6a00);">צפה בפוסט ←</a>
-        </div>`;
-      if (typeof btn !== "undefined" && btn) { btn.textContent = "✍️ עדכן שוב"; btn.disabled = false; }
+      statusEl.innerHTML = draftRepublishedHTML(data);
       loadBlogPublished();
       return;
     }
-    statusEl.innerHTML = `
-      <div style="background:rgba(22,125,70,.08);border:1px solid rgba(22,125,70,.25);border-radius:8px;padding:12px 14px;">
-        <p style="margin:0 0 6px;font-weight:700;color:#167d46;">✅ דראפט נוצר בהצלחה!</p>
-        <p style="margin:0 0 8px;font-size:0.82rem;">${data.title || ""}</p>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
-          <button id="modal-publish-btn" onclick="publishBlogDraft('${asin}','${data.slug}',this)"
-            style="background:#167d46;color:#fff;border:none;padding:7px 18px;border-radius:7px;cursor:pointer;font-weight:700;font-size:0.85rem;">
-            🚀 פרסם עכשיו
-          </button>
-          <a href="${data.preview_url}" target="_blank" rel="noopener" style="font-size:0.82rem;color:var(--text-muted);">preview ←</a>
-        </div>
-      </div>`;
+    statusEl.innerHTML = draftSuccessHTML(asin, data);
+    markCardAsDrafted(asin, data);
   } else {
-    let errMsg = "שגיאה בייצור הדראפט.";
-    try { const d = await res.json(); errMsg = (typeof d.detail === "string" ? d.detail : null) || errMsg; } catch (_) {}
-    statusEl.innerHTML = `<span style="color:var(--error,#c00);">❌ ${errMsg}</span>`;
+    await handleDraftFailure(asin, statusEl, null, res, startedAt);
   }
 }
 
