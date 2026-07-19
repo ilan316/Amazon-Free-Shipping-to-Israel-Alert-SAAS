@@ -2410,8 +2410,11 @@ async function handleDraftFailure(asin, statusEl, btn, res, startedAt, showManua
     if (detail.blocked) { renderBlockedForm(asin, statusEl); resetDraftBtn(btn, "✍️ נסה שוב"); return; }
   }
 
-  if (!res) {
-    // No response at all — check whether the draft was created regardless.
+  // Recover when the response carries no usable error: either it never arrived
+  // (connection dropped) or it is an edge-generated 5xx page (Railway returns an
+  // HTML "Application failed to respond" while our worker keeps going). In both
+  // cases the draft may well have been created.
+  if (!res || (res.status >= 500 && !detail)) {
     errMsg = "לא התקבלה תגובה מהשרת (ייתכן timeout).";
     let found = null;
     try {
