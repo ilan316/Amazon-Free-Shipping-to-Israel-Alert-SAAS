@@ -1913,16 +1913,96 @@ async function loadBlogSocialQueue() {
     const status = (q.telegram_sent && q.facebook_sent)
       ? '<span style="color:var(--success);font-weight:600;">✅ שודר</span>'
       : `<span style="color:var(--text-muted);">${q.telegram_sent ? '📨 טלגרם ✓' : ''} ${q.facebook_sent ? '📘 פייסבוק ✓' : ''}</span>`;
+    const manualMark = q.manual ? '<span title="תוזמן ידנית">✋</span> ' : '';
     return `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--surface);">
         <div style="min-width:0;flex:1;">
           <a href="https://www.amzfreeil.com/blog/${q.slug}.html" target="_blank" rel="noopener" style="font-weight:600;color:inherit;text-decoration:none;">${q.title || q.slug}</a>
           <div style="font-size:0.76rem;color:var(--text-muted);"><span dir="ltr">${q.asin}</span></div>
         </div>
-        <div style="font-size:0.82rem;white-space:nowrap;">🕒 ${dt}</div>
+        <div style="font-size:0.82rem;white-space:nowrap;">${manualMark}🕒 ${dt}</div>
+        <button onclick="showSocialScheduleDialog('${q.asin}','${q.scheduled_at || ''}')" title="שנה זמן שידור"
+          style="background:none;border:none;cursor:pointer;font-size:0.95rem;padding:2px 4px;">✏️</button>
         <div style="font-size:0.8rem;white-space:nowrap;">${status}</div>
       </div>`;
   }).join("");
+}
+
+// Format a Date for a <input type="datetime-local"> value (local time, no seconds)
+function toDatetimeLocalValue(d) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * Shared datetime picker for blog broadcast times, modelled on showPauseDialog()
+ * in dashboard.js. Used both to reschedule a queued post and to pick a time when
+ * publish it. onConfirm receives the raw datetime-local string ("" when left empty).
+ */
+function showScheduleDialog({ title, hint, label, value, optional, confirmText, onConfirm }) {
+  document.getElementById('social-schedule-dialog')?.remove();
+
+  const dialog = document.createElement('div');
+  dialog.id = 'social-schedule-dialog';
+  dialog.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;
+    display:flex;align-items:center;justify-content:center;`;
+  dialog.innerHTML = `
+    <div style="background:#fff;border-radius:12px;padding:28px 24px;max-width:360px;width:90%;
+                box-shadow:0 8px 32px rgba(0,0,0,0.18);text-align:right;direction:rtl;">
+      <h3 style="margin:0 0 6px;font-size:16px;">${title}</h3>
+      <p style="margin:0 0 18px;font-size:13px;color:#555;">${hint}</p>
+      <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">${label}</label>
+      <input type="datetime-local" id="social-schedule-input" min="${toDatetimeLocalValue(new Date())}"
+        value="${value || ''}"
+        style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;
+               font-size:14px;box-sizing:border-box;margin-bottom:18px;direction:ltr;text-align:right;">
+      <div style="display:flex;gap:10px;justify-content:flex-start;">
+        <button id="social-schedule-confirm"
+          style="background:#FF9900;color:#111;border:none;border-radius:7px;
+                 padding:9px 20px;font-size:14px;font-weight:bold;cursor:pointer;">${confirmText}</button>
+        <button onclick="document.getElementById('social-schedule-dialog').remove()"
+          style="background:#f0f0f0;color:#333;border:none;border-radius:7px;
+                 padding:9px 16px;font-size:14px;cursor:pointer;">ביטול</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(dialog);
+  dialog.addEventListener('click', e => { if (e.target === dialog) dialog.remove(); });
+
+  document.getElementById('social-schedule-confirm').addEventListener('click', () => {
+    const val = document.getElementById('social-schedule-input').value;
+    if (!val && !optional) { alert('יש לבחור תאריך ושעה.'); return; }
+    dialog.remove();
+    onConfirm(val);
+  });
+}
+
+async function showSocialScheduleDialog(asin, currentIso) {
+  showScheduleDialog({
+    title: '🕒 שינוי זמן שידור',
+    hint: 'הזמן נשמר לפי שעון ישראל. מחוץ ל-06:00-22:00 אפשרי, אך תוצג אזהרה.',
+    label: 'תאריך ושעה',
+    value: currentIso ? toDatetimeLocalValue(new Date(currentIso)) : '',
+    optional: false,
+    confirmText: 'שמור',
+    onConfirm: async (val) => {
+      const res = await apiFetch(`/admin/blog-social-queue/${asin}/schedule`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduled_at: val }),
+      });
+      if (res && res.ok) {
+        const data = await res.json();
+        if (data.warnings && data.warnings.length) alert(`⚠️ ${data.warnings.join("\n⚠️ ")}`);
+        loadBlogSocialQueue();
+      } else {
+        let errMsg = "שגיאה בעדכון הזמן.";
+        try { const d = await res.json(); errMsg = d.detail || errMsg; } catch (_) {}
+        alert(`❌ ${errMsg}`);
+      }
+    },
+  });
 }
 
 async function loadBlogPublished() {
@@ -2456,8 +2536,19 @@ async function generateBlogDraftMissingFields(asin) {
   }
 }
 
-async function publishBlogDraft(asin, slug, btn) {
-  if (!confirm(`לפרסם את הפוסט? (noindex יוסר, הפוסט יהיה גלוי לגוגל)`)) return;
+function publishBlogDraft(asin, slug, btn) {
+  showScheduleDialog({
+    title: '🚀 פרסום פוסט',
+    hint: 'noindex יוסר והפוסט יהיה גלוי לגוגל. אפשר לקבוע זמן שידור לטלגרם/פייסבוק — השאר ריק לתזמון אוטומטי.',
+    label: 'זמן שידור (אופציונלי)',
+    value: '',
+    optional: true,
+    confirmText: 'פרסם',
+    onConfirm: (val) => doPublishBlogDraft(asin, slug, btn, val),
+  });
+}
+
+async function doPublishBlogDraft(asin, slug, btn, scheduledAt) {
   const origText = btn.textContent;
   btn.disabled = true;
   btn.textContent = "⏳ מפרסם...";
@@ -2465,11 +2556,14 @@ async function publishBlogDraft(asin, slug, btn) {
   const res = await apiFetch("/admin/blog-publish", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ asin, slug }),
+    body: JSON.stringify({ asin, slug, scheduled_at: scheduledAt || null }),
   });
 
   if (res && res.ok) {
     const data = await res.json();
+    if (data.social_warnings && data.social_warnings.length) {
+      alert(`⚠️ ${data.social_warnings.join("\n⚠️ ")}`);
+    }
     closeDraftModal();
     const row = document.querySelector(`[data-asin="${asin}"]`);
     if (row) {

@@ -2526,11 +2526,54 @@ async def get_blog_social_queue(
                 "slug": r.slug,
                 "title": r.title,
                 "scheduled_at": r.scheduled_at.isoformat() if r.scheduled_at else None,
+                "manual": bool(r.manual),
                 "telegram_sent": r.telegram_sent,
                 "facebook_sent": r.facebook_sent,
             }
             for r in rows
         ]
+    }
+
+
+class RescheduleBlogSocialRequest(BaseModel):
+    scheduled_at: str
+
+
+@router.patch("/blog-social-queue/{asin}/schedule")
+async def reschedule_blog_social_post(
+    asin: str,
+    body: RescheduleBlogSocialRequest,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Set the broadcast time of a queued post by hand. Times outside the
+    06:00-22:00 window (or too close to another post) are allowed but warned about."""
+    from backend.models import BlogSocialQueue
+    from backend.scheduler import blog_social_time_warnings, parse_manual_blog_social_time
+
+    row = (
+        await db.execute(select(BlogSocialQueue).where(BlogSocialQueue.asin == asin))
+    ).scalar_one_or_none()
+    if not row:
+        raise HTTPException(404, "הפוסט לא נמצא בתור השידור")
+
+    try:
+        scheduled_at = parse_manual_blog_social_time(body.scheduled_at)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    others = (await db.execute(
+        select(BlogSocialQueue.scheduled_at).where(BlogSocialQueue.asin != asin)
+    )).scalars().all()
+
+    row.scheduled_at = scheduled_at
+    row.manual = True
+    await db.commit()
+
+    logger.info(f"[blog_social_queue] admin rescheduled {row.slug} to {scheduled_at.isoformat()}")
+    return {
+        "scheduled_at": scheduled_at.isoformat(),
+        "warnings": blog_social_time_warnings(scheduled_at, list(others)),
     }
 
 
@@ -2703,6 +2746,9 @@ async def generate_blog_draft(
 class PublishBlogDraftRequest(BaseModel):
     asin: str
     slug: str
+    # Optional admin-chosen broadcast time ("2026-07-20T09:30", IL time).
+    # Empty/None = the scheduler draws a random slot as usual.
+    scheduled_at: str | None = None
 
 
 @router.post("/blog-publish")
@@ -2715,6 +2761,16 @@ async def publish_blog_draft(
     slug = body.slug
 
     draft_row = (await db.execute(select(BlogDraft).where(BlogDraft.asin == asin))).scalar_one_or_none()
+
+    # Validate the manual time before touching GitHub, so a bad time can't leave
+    # a post published with no queue entry.
+    manual_at = None
+    if body.scheduled_at:
+        from backend.scheduler import parse_manual_blog_social_time
+        try:
+            manual_at = parse_manual_blog_social_time(body.scheduled_at)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
 
     try:
         await publish_draft(slug)
@@ -2735,11 +2791,13 @@ async def publish_blog_draft(
             raise HTTPException(502, f"prices.html update error: {e}")
 
     scheduled_at = None
+    social_warnings: list[str] = []
     if draft_row:
         title = draft_row.title_short or draft_row.title
         try:
-            scheduled_at = await queue_blog_social_post(
-                asin, slug, title, draft_row.image_url, draft_row.amazon_price, draft_row.israel_price
+            scheduled_at, social_warnings = await queue_blog_social_post(
+                asin, slug, title, draft_row.image_url, draft_row.amazon_price,
+                draft_row.israel_price, manual_at=manual_at,
             )
         except Exception as e:
             logger.warning(f"blog-publish queue error: {e}")
@@ -2762,6 +2820,7 @@ async def publish_blog_draft(
         "url": f"https://www.amzfreeil.com/blog/{slug}.html",
         "github_url": f"https://github.com/{repo}/blob/main/blog/{slug}.html",
         "social_scheduled_at": scheduled_at.isoformat() if scheduled_at else None,
+        "social_warnings": social_warnings,
     }
 
 

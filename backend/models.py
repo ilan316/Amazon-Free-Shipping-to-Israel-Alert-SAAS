@@ -229,6 +229,7 @@ class BlogSocialQueue(Base):
     amazon_price: Mapped[float] = mapped_column(nullable=True)
     image_url: Mapped[str] = mapped_column(String(512), nullable=True)
     scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    manual: Mapped[bool] = mapped_column(Boolean, default=False)
     telegram_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     facebook_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)

@@ -1402,6 +1402,55 @@ def _blog_social_window_bounds(day_offset: int = 0) -> tuple[datetime, datetime]
     return window_start, window_end
 
 
+def parse_manual_blog_social_time(value: str) -> datetime:
+    """Parse an admin-entered datetime-local string ("2026-07-20T09:30") as
+    Israel local time and return it in UTC.
+
+    Deliberately not the browser's timezone — the broadcast window is defined in
+    IL time, so an admin travelling abroad still means "09:30 in Israel".
+    Raises ValueError on a bad format or a time in the past.
+    """
+    import pytz
+
+    il_tz = pytz.timezone("Asia/Jerusalem")
+    try:
+        naive = datetime.fromisoformat(value.strip())
+    except (ValueError, AttributeError):
+        raise ValueError("פורמט תאריך לא תקין")
+    if naive.tzinfo is not None:
+        naive = naive.astimezone(il_tz).replace(tzinfo=None)
+
+    local = il_tz.localize(naive)
+    if local <= datetime.now(il_tz):
+        raise ValueError("הזמן שנבחר כבר עבר")
+    return local.astimezone(timezone.utc)
+
+
+def blog_social_time_warnings(dt_utc: datetime, existing_times_utc: list[datetime]) -> list[str]:
+    """Non-blocking warnings for a manually chosen broadcast time: outside the
+    06:00-22:00 IL window, or too close to another queued post."""
+    import pytz
+
+    local = dt_utc.astimezone(pytz.timezone("Asia/Jerusalem"))
+    warnings = []
+    if not (_BLOG_SOCIAL_WINDOW_START_HOUR <= local.hour < _BLOG_SOCIAL_WINDOW_END_HOUR):
+        warnings.append(
+            f"השעה {local:%H:%M} מחוץ לחלון "
+            f"{_BLOG_SOCIAL_WINDOW_START_HOUR:02d}:00-{_BLOG_SOCIAL_WINDOW_END_HOUR:02d}:00"
+        )
+
+    gap_seconds = _BLOG_SOCIAL_MIN_GAP_MINUTES * 60
+    closest = min(
+        (abs((dt_utc - t).total_seconds()) for t in existing_times_utc),
+        default=None,
+    )
+    if closest is not None and closest < gap_seconds:
+        warnings.append(
+            f"רק {int(closest // 60)} דקות מפוסט אחר בתור (מומלץ לפחות {_BLOG_SOCIAL_MIN_GAP_MINUTES})"
+        )
+    return warnings
+
+
 def _random_blog_social_time(
     window_start: datetime, window_end: datetime, existing_times_utc: list[datetime],
 ) -> datetime | None:
@@ -1432,17 +1481,24 @@ def _random_blog_social_time(
 async def queue_blog_social_post(
     asin: str, slug: str, title: str, image_url: str | None,
     amazon_price: float | None = None, israel_price: float | None = None,
-) -> datetime:
+    manual_at: datetime | None = None,
+) -> tuple[datetime, list[str]]:
     """Queue a blog post's Telegram/Facebook announcement for a random time
     (within the 06:00-22:00 IL active window, spaced 60-120 min apart from other
     queued blog posts) instead of sending immediately. When today's window is
-    already packed the post rolls over to the next day's window."""
+    already packed the post rolls over to the next day's window.
+
+    An admin-supplied `manual_at` (UTC) overrides the draw entirely; the returned
+    warnings then describe how it deviates from the usual window/gap rules.
+    """
     from backend.models import BlogSocialQueue
 
     windows = [_blog_social_window_bounds(d) for d in range(_BLOG_SOCIAL_MAX_LOOKAHEAD_DAYS)]
     horizon_start = windows[0][0].astimezone(timezone.utc)
     horizon_end = windows[-1][1].astimezone(timezone.utc)
 
+    warnings: list[str] = []
+    day_offset = 0
     async with AsyncSessionLocal() as db:
         existing = (await db.execute(
             select(BlogSocialQueue.scheduled_at).where(
@@ -1451,33 +1507,40 @@ async def queue_blog_social_post(
             )
         )).scalars().all()
 
-        scheduled_at = None
-        for day_offset, (window_start, window_end) in enumerate(windows):
-            same_day = [
-                t for t in existing
-                if window_start.astimezone(timezone.utc) <= t <= window_end.astimezone(timezone.utc)
-            ]
-            scheduled_at = _random_blog_social_time(window_start, window_end, same_day)
-            if scheduled_at:
-                break
+        if manual_at is not None:
+            scheduled_at = manual_at
+            warnings = blog_social_time_warnings(manual_at, list(existing))
+        else:
+            scheduled_at = None
+            for day_offset, (window_start, window_end) in enumerate(windows):
+                same_day = [
+                    t for t in existing
+                    if window_start.astimezone(timezone.utc) <= t <= window_end.astimezone(timezone.utc)
+                ]
+                scheduled_at = _random_blog_social_time(window_start, window_end, same_day)
+                if scheduled_at:
+                    break
 
-        if scheduled_at is None:
-            # Every window in the lookahead is packed — shouldn't happen in practice.
-            day_offset = _BLOG_SOCIAL_MAX_LOOKAHEAD_DAYS - 1
-            scheduled_at = windows[-1][0].astimezone(timezone.utc)
-            logger.warning(
-                f"[blog_social_queue] no free slot in {_BLOG_SOCIAL_MAX_LOOKAHEAD_DAYS} days for {slug}"
-            )
+            if scheduled_at is None:
+                # Every window in the lookahead is packed — shouldn't happen in practice.
+                day_offset = _BLOG_SOCIAL_MAX_LOOKAHEAD_DAYS - 1
+                scheduled_at = windows[-1][0].astimezone(timezone.utc)
+                logger.warning(
+                    f"[blog_social_queue] no free slot in {_BLOG_SOCIAL_MAX_LOOKAHEAD_DAYS} days for {slug}"
+                )
 
         db.add(BlogSocialQueue(
             asin=asin, slug=slug, title=title, image_url=image_url,
             amazon_price=amazon_price, israel_price=israel_price,
-            scheduled_at=scheduled_at,
+            scheduled_at=scheduled_at, manual=manual_at is not None,
         ))
         await db.commit()
-    rolled = f" (rolled +{day_offset}d, today's window full)" if day_offset else ""
-    logger.info(f"[blog_social_queue] queued {slug} for {scheduled_at.isoformat()}{rolled}")
-    return scheduled_at
+    if manual_at is not None:
+        note = " (manual)"
+    else:
+        note = f" (rolled +{day_offset}d, today's window full)" if day_offset else ""
+    logger.info(f"[blog_social_queue] queued {slug} for {scheduled_at.isoformat()}{note}")
+    return scheduled_at, warnings
 
 
 async def run_send_blog_social_queue():
