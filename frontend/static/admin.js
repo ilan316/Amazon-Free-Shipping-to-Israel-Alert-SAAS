@@ -1830,8 +1830,15 @@ function renderBlogCandidatesList(candidates) {
     const img = rawImg
       ? `<img src="${largeImg}" alt="" style="width:52px;height:52px;object-fit:contain;border-radius:6px;border:1px solid var(--border);background:#fff;flex-shrink:0;">`
       : `<div style="width:52px;height:52px;border-radius:6px;border:1px solid var(--border);background:var(--surface);flex-shrink:0;"></div>`;
+    // Selection is offered only for candidates without a draft — the batch flow
+    // creates new drafts; regenerating an existing one stays a deliberate click.
+    const selectBox = c.has_draft ? "" : `
+        <input type="checkbox" class="blog-batch-select" data-asin="${c.asin}" data-name="${nameEsc}"
+          data-img="${c.image_url || ''}" onchange="updateBatchBar()" title="בחר לאצווה"
+          style="cursor:pointer;flex-shrink:0;width:16px;height:16px;">`;
     return `
       <div data-asin="${c.asin}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--surface);transition:opacity .2s;">
+        ${selectBox}
         ${img}
         <div style="flex:1;min-width:0;">
           <div style="font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${nameEsc}">
@@ -1869,6 +1876,244 @@ function renderBlogCandidatesList(candidates) {
         </div>
       </div>`;
   }).join("");
+
+  updateBatchBar();
+}
+
+/* ---------- Batch draft generation ---------- */
+
+// Selection lives in the DOM (the checkboxes), so re-rendering the list on a
+// filter change naturally resets it — same as every other card control here.
+function selectedBatchCards() {
+  return Array.from(document.querySelectorAll(".blog-batch-select:checked")).map(cb => ({
+    asin: cb.dataset.asin,
+    name: cb.dataset.name || cb.dataset.asin,
+    img: cb.dataset.img || "",
+  }));
+}
+
+function updateBatchBar() {
+  const listEl = document.getElementById("blog-candidates-list");
+  if (!listEl) return;
+  let bar = document.getElementById("blog-batch-bar");
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "blog-batch-bar";
+    bar.style.cssText = "display:none;align-items:center;gap:12px;padding:10px 14px;margin-bottom:10px;border-radius:8px;background:rgba(255,153,0,.1);border:1px solid rgba(255,153,0,.4);";
+    listEl.parentNode.insertBefore(bar, listEl);
+  }
+  const selected = selectedBatchCards();
+  if (!selected.length) { bar.style.display = "none"; bar.innerHTML = ""; return; }
+  bar.style.display = "flex";
+  bar.innerHTML = `
+    <span style="font-weight:700;font-size:0.88rem;">נבחרו ${selected.length} מוצרים</span>
+    <button onclick="openBatchDraftModal()"
+      style="background:var(--brand);color:#111;border:none;padding:7px 16px;border-radius:7px;cursor:pointer;font-weight:700;font-size:0.85rem;">
+      ✍️ צור דראפטים
+    </button>
+    <button onclick="clearBatchSelection()"
+      style="background:none;border:none;color:var(--text-muted);font-size:0.8rem;cursor:pointer;text-decoration:underline;">
+      נקה בחירה
+    </button>`;
+}
+
+function clearBatchSelection() {
+  document.querySelectorAll(".blog-batch-select:checked").forEach(cb => { cb.checked = false; });
+  updateBatchBar();
+}
+
+function openBatchDraftModal() {
+  if (document.getElementById("blog-batch-modal")) return;
+  const items = selectedBatchCards();
+  if (!items.length) return;
+
+  const rows = items.map(it => `
+    <div data-batch-row="${it.asin}" style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;background:var(--surface);">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        ${it.img ? `<img src="${it.img}" alt="" style="width:40px;height:40px;object-fit:contain;border-radius:6px;border:1px solid var(--border);background:#fff;flex-shrink:0;">` : ""}
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;font-size:0.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${it.name}">${it.name}</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);" dir="ltr">${it.asin}</div>
+        </div>
+        <div id="bd-status-${it.asin}" style="font-size:0.8rem;white-space:nowrap;"></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:8px;">
+        <div style="flex:1;">
+          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:3px;">מחיר בישראל (₪)</label>
+          <input id="bd-israel-${it.asin}" type="number" min="0" step="1" placeholder="ריק = לא נמכר בישראל"
+            style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.85rem;box-sizing:border-box;">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:3px;">מחיר באמזון (₪) <span style="color:var(--error,#c00);">*</span></label>
+          <input id="bd-amazon-${it.asin}" type="number" min="0" step="0.01" placeholder="כולל מיסים ומשלוח"
+            style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.85rem;box-sizing:border-box;">
+        </div>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        <label style="font-size:0.78rem;display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input id="bd-min49-${it.asin}" type="checkbox"> מתחת לסף $49
+        </label>
+        <label style="font-size:0.78rem;display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input id="bd-volt-${it.asin}" type="checkbox"> אזהרת חשמל / תקע 110V
+        </label>
+      </div>
+    </div>`).join("");
+
+  const modal = document.createElement("div");
+  modal.id = "blog-batch-modal";
+  modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;";
+  modal.innerHTML = `
+    <div style="background:var(--bg,#fff);border-radius:14px;padding:24px 22px;max-width:620px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);position:relative;" dir="rtl">
+      <button onclick="closeBatchModal()" style="position:absolute;top:12px;left:16px;background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--text-muted);">✕</button>
+      <p style="font-weight:700;font-size:1rem;margin:0 0 4px;">✍️ יצירת דראפטים באצווה</p>
+      <p style="font-size:0.78rem;color:var(--text-muted);margin:0 0 16px;">
+        מלא מחירים לכל מוצר. הדראפטים ייווצרו ברקע — אפשר לסגור את החלון, העבודה ממשיכה בשרת.
+      </p>
+      ${rows}
+      <button id="batch-submit-btn" onclick="submitBatchDrafts()"
+        style="width:100%;background:var(--brand,#ff9900);color:#111;border:none;padding:12px;border-radius:10px;font-weight:700;font-size:0.95rem;cursor:pointer;">
+        ✍️ צור ${items.length} דראפטים
+      </button>
+      <div id="batch-status" style="margin-top:12px;font-size:0.85rem;min-height:18px;"></div>
+    </div>`;
+  modal.addEventListener("click", e => { if (e.target === modal) closeBatchModal(); });
+  document.body.appendChild(modal);
+}
+
+function closeBatchModal() {
+  const m = document.getElementById("blog-batch-modal");
+  if (m) m.remove();
+}
+
+async function submitBatchDrafts() {
+  const items = selectedBatchCards();
+  const payload = [];
+  let firstError = null;
+
+  // Same validation as the single-draft form: Amazon price required, and an
+  // Israel price only makes sense when it is higher than the Amazon one.
+  for (const it of items) {
+    const statusEl = document.getElementById(`bd-status-${it.asin}`);
+    const israelRaw = document.getElementById(`bd-israel-${it.asin}`).value.trim();
+    const israelPrice = israelRaw !== "" ? parseFloat(israelRaw) : null;
+    const amazonPrice = parseFloat(document.getElementById(`bd-amazon-${it.asin}`).value);
+
+    if (!amazonPrice) {
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--error,#c00);">חסר מחיר אמזון</span>';
+      firstError = firstError || "יש למלא מחיר אמזון לכל המוצרים.";
+      continue;
+    }
+    if (israelPrice !== null && amazonPrice >= israelPrice) {
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--error,#c00);">מחיר ישראל חייב להיות גבוה</span>';
+      firstError = firstError || "מחיר ישראל חייב להיות גבוה ממחיר אמזון.";
+      continue;
+    }
+    if (statusEl) statusEl.innerHTML = "";
+    payload.push({
+      asin: it.asin,
+      israel_price: israelPrice,
+      amazon_price: amazonPrice,
+      min_order_49: !!document.getElementById(`bd-min49-${it.asin}`).checked,
+      voltage_warning: !!document.getElementById(`bd-volt-${it.asin}`).checked,
+    });
+  }
+
+  const statusBox = document.getElementById("batch-status");
+  if (firstError) {
+    statusBox.innerHTML = `<span style="color:var(--error,#c00);">${firstError}</span>`;
+    return;
+  }
+
+  const btn = document.getElementById("batch-submit-btn");
+  btn.disabled = true;
+  btn.textContent = "⏳ נשלח...";
+
+  const res = await apiFetch("/admin/blog-draft/batch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items: payload }),
+  });
+  if (!res || !res.ok) {
+    statusBox.innerHTML = '<span style="color:var(--error,#c00);">❌ שגיאה בשליחת האצווה</span>';
+    btn.disabled = false;
+    btn.textContent = "✍️ נסה שוב";
+    return;
+  }
+
+  const { batch_id } = await res.json();
+  btn.style.display = "none";
+  statusBox.innerHTML = `<span style="color:var(--text-muted);">האצווה רצה ברקע (${payload.length} מוצרים)...</span>`;
+  payload.forEach(p => {
+    const el = document.getElementById(`bd-status-${p.asin}`);
+    if (el) el.innerHTML = '<span style="color:var(--text-muted);">⏳ בתור</span>';
+  });
+  pollBatch(batch_id);
+}
+
+const BATCH_STATUS_LABEL = {
+  pending: '<span style="color:var(--text-muted);">⏳ בתור</span>',
+  running: '<span style="color:var(--brand-deep,#ff6a00);">✍️ נכתב...</span>',
+  done: '<span style="color:var(--success,#167d46);font-weight:600;">✅ מוכן</span>',
+};
+
+function pollBatch(batchId) {
+  // A batch runs for minutes, so a single blip must not kill the poll — the
+  // work keeps going server-side either way. Give up only after several in a row.
+  let consecutiveErrors = 0;
+
+  const tick = async () => {
+    const res = await apiFetch(`/admin/blog-draft/batch/${batchId}`, { rawServerErrors: true });
+    if (!res || !res.ok) {
+      if (++consecutiveErrors < 5) return false;
+      const box = document.getElementById("batch-status");
+      if (box) box.innerHTML = '<span style="color:#a86400;">איבדנו קשר עם השרת — האצווה כנראה ממשיכה. רענן את הדף כדי לראות את התוצאה.</span>';
+      return true;
+    }
+    consecutiveErrors = 0;
+    const data = await res.json();
+
+    for (const item of data.items) {
+      const el = document.getElementById(`bd-status-${item.asin}`);
+      if (el) {
+        if (item.status === "failed") {
+          el.innerHTML = `<span style="color:var(--error,#c00);" title="${(item.error || "").replace(/"/g, "&quot;")}">❌ נכשל</span>`;
+        } else if (item.status === "done") {
+          el.innerHTML = `${BATCH_STATUS_LABEL.done} <a href="${item.preview_url}" target="_blank" rel="noopener" style="font-size:0.76rem;">preview ←</a>`;
+        } else {
+          el.innerHTML = BATCH_STATUS_LABEL[item.status] || "";
+        }
+      }
+      // Flip the candidate card to "ready to publish" (markCardAsDrafted also
+      // drops its selection checkbox, so the batch bar stays accurate).
+      if (item.status === "done" && item.slug) {
+        const card = document.querySelector(`[data-asin="${item.asin}"]`);
+        if (card && !card.dataset.batchApplied) {
+          card.dataset.batchApplied = "1";
+          markCardAsDrafted(item.asin, item);
+        }
+      }
+    }
+
+    if (data.done) {
+      const failed = data.items.filter(i => i.status === "failed").length;
+      const ok = data.items.length - failed;
+      const box = document.getElementById("batch-status");
+      if (box) {
+        box.innerHTML = failed
+          ? `<span style="color:#a86400;">הסתיים: ${ok} הצליחו, ${failed} נכשלו. את הכושלים אפשר לנסות שוב בטופס הבודד.</span>`
+          : `<span style="color:var(--success,#167d46);font-weight:600;">✅ כל ${ok} הדראפטים מוכנים.</span>`;
+      }
+      return true;
+    }
+    return false;
+  };
+
+  const interval = setInterval(async () => {
+    let stop = false;
+    try { stop = await tick(); } catch (_) {}
+    if (stop) clearInterval(interval);
+  }, 3000);
+  tick();
 }
 
 function switchBlogSubTab(name) {
@@ -2322,6 +2567,9 @@ function markCardAsDrafted(asin, data) {
   const row = document.querySelector(`[data-asin="${asin}"]`);
   const actionsEl = row?.querySelector(".blog-card-actions");
   if (!actionsEl) return;
+  // The card now has a draft, so it is no longer a batch candidate.
+  const selectBox = row.querySelector(".blog-batch-select");
+  if (selectBox) { selectBox.remove(); updateBatchBar(); }
   actionsEl.innerHTML = `
     <button onclick="publishBlogDraft('${asin}','${data.slug}',this)"
       style="background:#167d46;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.82rem;white-space:nowrap;">

@@ -218,6 +218,30 @@ class BlogDraft(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 
+class BlogDraftJob(Base):
+    """One queued draft inside a batch run.
+
+    A batch POST creates these rows as `pending` and returns immediately; a
+    background worker flips each to `running` and then `done`/`failed`. The admin
+    UI polls by `batch_id` instead of holding a 1-3 minute request open.
+    """
+    __tablename__ = "blog_draft_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    batch_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    asin: Mapped[str] = mapped_column(String(10), nullable=False)
+    israel_price: Mapped[float] = mapped_column(nullable=True)
+    amazon_price: Mapped[float] = mapped_column(nullable=True)
+    min_order_49: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    voltage_warning: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    status: Mapped[str] = mapped_column(String(10), nullable=False, default="pending")
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    slug: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    title: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class BlogSocialQueue(Base):
     __tablename__ = "blog_social_queue"
 

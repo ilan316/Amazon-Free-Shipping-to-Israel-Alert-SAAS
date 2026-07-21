@@ -2,6 +2,7 @@ import asyncio
 import io
 import logging
 import os
+import uuid
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
@@ -36,7 +37,7 @@ async def _all(stmt):
     async with AsyncSessionLocal() as s:
         return (await s.execute(stmt)).all()
 from sqlalchemy import cast, Date
-from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen, EmailSendLog, EmailSendRecipient, BlogPublishedAsin, BlogDismissedAsin, BlogDraft, CategoryTranslation
+from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen, EmailSendLog, EmailSendRecipient, BlogPublishedAsin, BlogDismissedAsin, BlogDraft, BlogDraftJob, CategoryTranslation
 from backend.blog_utils import fetch_amazon_product, generate_with_claude, build_post_html, commit_to_github, publish_draft, add_to_prices_page, get_github_file, delete_github_file, remove_from_prices_page
 from backend.scheduler import queue_blog_social_post
 from backend.auth import get_current_admin, hash_password, verify_password, SECRET_KEY, ALGORITHM
@@ -2617,12 +2618,13 @@ async def get_blog_draft(
     }
 
 
-@router.post("/blog-draft")
-async def generate_blog_draft(
-    body: GenerateBlogDraftRequest,
-    admin: Annotated[User, Depends(get_current_admin)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
+async def _run_blog_draft(body: GenerateBlogDraftRequest, db: AsyncSession) -> dict:
+    """Fetch → generate → build → commit for one ASIN.
+
+    Shared by the synchronous single-draft endpoint and the batch worker, so both
+    paths stay byte-identical in what they produce. Raises HTTPException; the
+    batch worker turns those into a `failed` job row.
+    """
     asin = body.asin.strip().upper()
 
     if body.manual_title and body.manual_features is not None:
@@ -2769,6 +2771,146 @@ async def generate_blog_draft(
         "title": content.get("title_he", ""),
         "github_url": f"https://github.com/{repo}/blob/main/blog/{slug}.html",
         "preview_url": f"https://www.amzfreeil.com/blog/{slug}.html",
+    }
+
+
+@router.post("/blog-draft")
+async def generate_blog_draft(
+    body: GenerateBlogDraftRequest,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    return await _run_blog_draft(body, db)
+
+
+class BatchBlogDraftRequest(BaseModel):
+    items: list[GenerateBlogDraftRequest]
+
+
+# A stuck `running` row means the container restarted mid-draft (Railway kills
+# in-flight asyncio tasks); nothing will ever finish it, so surface it as failed.
+BLOG_DRAFT_JOB_TIMEOUT_MIN = 15
+
+
+async def _run_batch(batch_id: str) -> None:
+    """Background worker: generate every pending draft in a batch, N at a time.
+
+    Drafts are independent — each commits its own blog/{slug}.html — so the only
+    reason to cap concurrency is upstream rate limits (Anthropic, Amazon PA-API).
+    """
+    concurrency = int(os.getenv("BLOG_DRAFT_CONCURRENCY", "3"))
+    sem = asyncio.Semaphore(concurrency)
+
+    async with AsyncSessionLocal() as db:
+        jobs = (await db.execute(
+            select(BlogDraftJob).where(BlogDraftJob.batch_id == batch_id)
+        )).scalars().all()
+        job_ids = [j.id for j in jobs]
+
+    async def run_one(job_id: int) -> None:
+        async with sem:
+            # A session per job: a failure rolls back only its own row, and the
+            # concurrent drafts don't share a connection.
+            async with AsyncSessionLocal() as db:
+                job = await db.get(BlogDraftJob, job_id)
+                if not job or job.status != "pending":
+                    return
+                job.status = "running"
+                await db.commit()
+
+                body = GenerateBlogDraftRequest(
+                    asin=job.asin,
+                    israel_price=job.israel_price,
+                    amazon_price=job.amazon_price,
+                    min_order_49=job.min_order_49,
+                    voltage_warning=job.voltage_warning,
+                )
+                try:
+                    result = await _run_blog_draft(body, db)
+                    job.status = "done"
+                    job.slug = result.get("slug")
+                    job.title = result.get("title") or ""
+                except HTTPException as e:
+                    detail = e.detail
+                    if isinstance(detail, dict):
+                        detail = detail.get("message") or str(detail)
+                    job.status = "failed"
+                    job.error = str(detail)[:1000]
+                    logger.error("batch draft failed for %s: %s", job.asin, detail)
+                except Exception as e:
+                    job.status = "failed"
+                    job.error = str(e)[:1000]
+                    logger.error("batch draft failed for %s: %s", job.asin, e, exc_info=True)
+
+                job.finished_at = datetime.utcnow()
+                await db.commit()
+
+    await asyncio.gather(*(run_one(jid) for jid in job_ids), return_exceptions=True)
+    logger.info("batch %s finished (%d jobs)", batch_id, len(job_ids))
+
+
+@router.post("/blog-draft/batch")
+async def generate_blog_drafts_batch(
+    body: BatchBlogDraftRequest,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Queue N drafts and return immediately — the admin polls for status."""
+    if not body.items:
+        raise HTTPException(400, "no items")
+
+    batch_id = str(uuid.uuid4())
+    for item in body.items:
+        db.add(BlogDraftJob(
+            batch_id=batch_id,
+            asin=item.asin.strip().upper(),
+            israel_price=item.israel_price,
+            amazon_price=item.amazon_price,
+            min_order_49=item.min_order_49,
+            voltage_warning=item.voltage_warning,
+        ))
+    await db.commit()
+
+    asyncio.create_task(_run_batch(batch_id))
+    return {"batch_id": batch_id, "count": len(body.items)}
+
+
+@router.get("/blog-draft/batch/{batch_id}")
+async def get_blog_draft_batch(
+    batch_id: str,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    jobs = (await db.execute(
+        select(BlogDraftJob).where(BlogDraftJob.batch_id == batch_id).order_by(BlogDraftJob.id)
+    )).scalars().all()
+    if not jobs:
+        raise HTTPException(404, "batch not found")
+
+    cutoff = datetime.utcnow() - timedelta(minutes=BLOG_DRAFT_JOB_TIMEOUT_MIN)
+    stale = False
+    for job in jobs:
+        if job.status == "running" and job.created_at and job.created_at.replace(tzinfo=None) < cutoff:
+            job.status = "failed"
+            job.error = "העבודה נקטעה (ככל הנראה אתחול שרת) — נסה שוב"
+            job.finished_at = datetime.utcnow()
+            stale = True
+    if stale:
+        await db.commit()
+
+    repo = os.getenv("GITHUB_REPO", "")
+    return {
+        "batch_id": batch_id,
+        "done": all(j.status in ("done", "failed") for j in jobs),
+        "items": [{
+            "asin": j.asin,
+            "status": j.status,
+            "error": j.error,
+            "slug": j.slug,
+            "title": j.title,
+            "github_url": f"https://github.com/{repo}/blob/main/blog/{j.slug}.html" if j.slug else None,
+            "preview_url": f"https://www.amzfreeil.com/blog/{j.slug}.html" if j.slug else None,
+        } for j in jobs],
     }
 
 
