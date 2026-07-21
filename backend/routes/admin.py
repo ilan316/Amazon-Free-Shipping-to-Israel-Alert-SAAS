@@ -2834,10 +2834,16 @@ async def _run_batch(batch_id: str) -> None:
                     detail = e.detail
                     if isinstance(detail, dict):
                         detail = detail.get("message") or str(detail)
+                    # Drop whatever the aborted pipeline left pending, so only the
+                    # job's own failure status gets committed below.
+                    await db.rollback()
+                    job = await db.get(BlogDraftJob, job_id)
                     job.status = "failed"
                     job.error = str(detail)[:1000]
                     logger.error("batch draft failed for %s: %s", job.asin, detail)
                 except Exception as e:
+                    await db.rollback()
+                    job = await db.get(BlogDraftJob, job_id)
                     job.status = "failed"
                     job.error = str(e)[:1000]
                     logger.error("batch draft failed for %s: %s", job.asin, e, exc_info=True)
