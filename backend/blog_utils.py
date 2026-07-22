@@ -9,6 +9,7 @@ import re
 import base64
 import os
 from datetime import date
+from html import escape, unescape
 
 import httpx
 import anthropic
@@ -28,6 +29,21 @@ def claude_text(message) -> str:
         if text is not None:
             return text
     raise ValueError("No text block in Claude response")
+
+
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def strip_tags(text: str) -> str:
+    """Plain-text form of a generated blog title.
+
+    Drafts are written with English terms wrapped in <bdi> so the blog HTML
+    renders correctly inside RTL Hebrew. Anywhere the title is consumed as plain
+    text — Telegram/Facebook captions, an img alt — that markup would show up
+    verbatim, so it is stripped at those boundaries rather than in the prompt
+    (the <h2> headings genuinely need it).
+    """
+    return unescape(_TAG_RE.sub("", text or "")).strip()
 
 
 MONTHS_HE = [
@@ -780,7 +796,7 @@ async def add_to_prices_page(
       <div class="price-card">
         <div class="price-card-img">
           <a href="blog/{slug}.html">
-            <img src="{image_url}" alt="{title_short}" width="110" height="110" loading="lazy" />
+            <img src="{image_url}" alt="{escape(strip_tags(title_short), quote=True)}" width="110" height="110" loading="lazy" />
           </a>
         </div>
         <div class="price-card-body">

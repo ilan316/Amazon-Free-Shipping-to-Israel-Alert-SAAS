@@ -1223,8 +1223,10 @@ async def run_send_facebook_product():
 
 
 def _blog_telegram_caption(title: str, slug: str, amazon_price: float | None, israel_price: float | None) -> str:
+    from backend.blog_utils import strip_tags
+
     url = f"https://www.amzfreeil.com/blog/{slug}.html"
-    name_he = _escape_md(title)
+    name_he = _escape_md(strip_tags(title))
     price = _format_price(str(amazon_price)) if amazon_price else ""
     today = datetime.now().strftime("%d/%m/%Y")
 
@@ -1255,7 +1257,10 @@ def _blog_telegram_caption(title: str, slug: str, amazon_price: float | None, is
 
 
 def _blog_facebook_caption(title: str, slug: str, amazon_price: float | None, israel_price: float | None) -> str:
+    from backend.blog_utils import strip_tags
+
     url = f"https://www.amzfreeil.com/blog/{slug}.html"
+    title = strip_tags(title)
     price = _format_price(str(amazon_price)) if amazon_price else ""
     today = datetime.now().strftime("%d/%m/%Y")
 
