@@ -983,7 +983,11 @@ async def _send_telegram_product_message(product: Product) -> bool:
 
 
 async def run_send_telegram_product():
-    """Send one free product to the Telegram channel. Skips ASINs sent in the last 7 days."""
+    """Send one free product to the Telegram channel.
+
+    Runs on the fixed cron times in TELEGRAM_PRODUCT_POST_TIMES (IL). Skips
+    ASINs sent in the last 7 days.
+    """
     if os.environ.get("TELEGRAM_PRODUCT_ENABLED", "true").lower() == "false":
         logger.info("[telegram_product] disabled via TELEGRAM_PRODUCT_ENABLED=false — skipping")
         return
@@ -1375,14 +1379,19 @@ async def send_blog_post_to_facebook(
 # draw below keeps its distance from these same times.
 FACEBOOK_PRODUCT_POST_TIMES = [(8, 0), (10, 30), (13, 0), (16, 0), (19, 0)]
 
+# Same idea for the Telegram channel. Mostly aligned with the Facebook times on
+# purpose: the blog-social draw keeps its distance from the union of both lists,
+# and spreading these out evenly would leave the window with almost no free slots.
+TELEGRAM_PRODUCT_POST_TIMES = [(7, 0), (8, 0), (10, 30), (13, 0), (14, 30), (16, 0), (19, 0), (20, 30)]
+
 _BLOG_SOCIAL_WINDOW_START_HOUR = 6
 _BLOG_SOCIAL_WINDOW_END_HOUR = 22
 _BLOG_SOCIAL_MIN_GAP_MINUTES = 60
 _BLOG_SOCIAL_MAX_GAP_MINUTES = 120
 _BLOG_SOCIAL_MAX_LOOKAHEAD_DAYS = 7
-# Deliberately smaller than the blog-to-blog gap: the five product posts are
-# fixed points, and a 60-120 min buffer around each would leave almost no room
-# in the window.
+# Deliberately smaller than the blog-to-blog gap: the product posts are fixed
+# points, and a 60-120 min buffer around each would leave almost no room in the
+# window.
 _BLOG_SOCIAL_PRODUCT_GAP_MINUTES = 45
 _BLOG_SOCIAL_MAX_PER_DAY = 3
 
@@ -1417,15 +1426,25 @@ def _blog_social_window_bounds(day_offset: int = 0) -> tuple[datetime, datetime]
     return window_start, window_end
 
 
+def _all_product_post_times() -> list[tuple[int, int]]:
+    """The union of the Facebook and Telegram fixed product-post times (IL).
+
+    Both channels are announced from the same blog-social queue row, so a blog
+    slot has to keep its distance from either channel's product posts. Times
+    shared by both lists are deduped so they only count once.
+    """
+    return sorted(set(FACEBOOK_PRODUCT_POST_TIMES) | set(TELEGRAM_PRODUCT_POST_TIMES))
+
+
 def _product_post_times_utc(window_start: datetime, window_end: datetime) -> list[datetime]:
-    """The day's fixed Facebook product-post times (IL) as UTC datetimes.
+    """The day's fixed product-post times (IL, both channels) as UTC datetimes.
 
     Only times falling inside [window_start, window_end] are returned, so a
     window that was clamped to "now" mid-day does not reserve slots around
     product posts that already went out.
     """
     times = []
-    for hour, minute in FACEBOOK_PRODUCT_POST_TIMES:
+    for hour, minute in _all_product_post_times():
         t = window_start.replace(hour=hour, minute=minute, second=0, microsecond=0)
         if window_start <= t <= window_end:
             times.append(t.astimezone(timezone.utc))
@@ -1484,7 +1503,7 @@ def blog_social_time_warnings(dt_utc: datetime, existing_times_utc: list[datetim
             f"רק {int(closest // 60)} דקות מפוסט אחר בתור (מומלץ לפחות {_BLOG_SOCIAL_MIN_GAP_MINUTES})"
         )
 
-    for hour, minute in FACEBOOK_PRODUCT_POST_TIMES:
+    for hour, minute in _all_product_post_times():
         product_local = local.replace(hour=hour, minute=minute, second=0, microsecond=0)
         delta = abs((dt_utc - product_local.astimezone(timezone.utc)).total_seconds())
         if delta < _BLOG_SOCIAL_PRODUCT_GAP_MINUTES * 60:

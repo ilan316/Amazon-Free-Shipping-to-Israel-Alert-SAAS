@@ -153,7 +153,7 @@ async def lifespan(app: FastAPI):
     daily_hour = int(os.environ.get("DAILY_SUMMARY_HOUR", "8"))
 
     # Clean up stale APScheduler job references before loading from DB
-    _stale_job_ids = ["no_click_automation"]
+    _stale_job_ids = ["no_click_automation", "telegram_product"]
     if _db_url and _stale_job_ids:
         try:
             from sqlalchemy import create_engine, text as _sql_text
@@ -170,7 +170,7 @@ async def lifespan(app: FastAPI):
 
     scheduler.start()
 
-    from backend.scheduler import run_inactivity_check, run_automation_emails, check_decodo_quota, run_telegram_report, run_hebrew_backfill, run_send_telegram_product, run_send_facebook_product, run_cleanup_orphans, cleanup_old_screenshots, run_send_blog_social_queue, FACEBOOK_PRODUCT_POST_TIMES
+    from backend.scheduler import run_inactivity_check, run_automation_emails, check_decodo_quota, run_telegram_report, run_hebrew_backfill, run_send_telegram_product, run_send_facebook_product, run_cleanup_orphans, cleanup_old_screenshots, run_send_blog_social_queue, FACEBOOK_PRODUCT_POST_TIMES, TELEGRAM_PRODUCT_POST_TIMES
 
     telegram_hour = int(os.environ.get("TELEGRAM_REPORT_HOUR", "8"))
     telegram_minute = int(os.environ.get("TELEGRAM_REPORT_MINUTE", "0"))
@@ -196,9 +196,14 @@ async def lifespan(app: FastAPI):
     _upsert_job(run_hebrew_backfill, "hebrew_backfill", dict(
         trigger="cron", hour=8, minute=10, timezone="Asia/Jerusalem", misfire_grace_time=600
     ))
-    _upsert_job(run_send_telegram_product, "telegram_product", dict(
-        trigger="interval", minutes=45, misfire_grace_time=1800
-    ))
+    # Telegram product posts — times live in scheduler.TELEGRAM_PRODUCT_POST_TIMES.
+    # Was an every-45-min interval job, which flooded the channel with ~21 posts
+    # a day and gave the blog-social draw no predictable times to avoid; the old
+    # "telegram_product" job id is dropped in _stale_job_ids above.
+    for _tg_hour, _tg_minute in TELEGRAM_PRODUCT_POST_TIMES:
+        _upsert_job(run_send_telegram_product, f"telegram_product_{_tg_hour:02d}{_tg_minute:02d}", dict(
+            trigger="cron", hour=_tg_hour, minute=_tg_minute, timezone="Asia/Jerusalem", misfire_grace_time=1800
+        ))
     # Facebook product posts — times live in scheduler.FACEBOOK_PRODUCT_POST_TIMES,
     # which the blog-social queue also reads to keep its distance from them.
     for _fb_hour, _fb_minute in FACEBOOK_PRODUCT_POST_TIMES:
