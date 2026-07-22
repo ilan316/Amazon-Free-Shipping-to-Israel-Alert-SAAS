@@ -1173,8 +1173,8 @@ async def _send_facebook_product_message(product: Product) -> bool:
 
 
 async def run_send_facebook_product():
-    """Send one free product to the Facebook Page. Runs twice daily (08:00 and 13:00 IL).
-    Skips ASINs sent in the last 7 days."""
+    """Send one free product to the Facebook Page. Runs once per entry in
+    FACEBOOK_PRODUCT_POST_TIMES (IL). Skips ASINs sent in the last 7 days."""
     if os.environ.get("FACEBOOK_PRODUCT_ENABLED", "true").lower() == "false":
         logger.info("[facebook] disabled via FACEBOOK_PRODUCT_ENABLED=false — skipping")
         return
@@ -1365,11 +1365,21 @@ async def send_blog_post_to_facebook(
         return False
 
 
+# Fixed IL times of the scanner "product post" Facebook cron jobs. Single source
+# of truth — main.py registers the cron jobs from this list, and the blog-social
+# draw below keeps its distance from these same times.
+FACEBOOK_PRODUCT_POST_TIMES = [(8, 0), (10, 30), (13, 0), (16, 0), (19, 0)]
+
 _BLOG_SOCIAL_WINDOW_START_HOUR = 6
 _BLOG_SOCIAL_WINDOW_END_HOUR = 22
 _BLOG_SOCIAL_MIN_GAP_MINUTES = 60
 _BLOG_SOCIAL_MAX_GAP_MINUTES = 120
 _BLOG_SOCIAL_MAX_LOOKAHEAD_DAYS = 7
+# Deliberately smaller than the blog-to-blog gap: the five product posts are
+# fixed points, and a 60-120 min buffer around each would leave almost no room
+# in the window.
+_BLOG_SOCIAL_PRODUCT_GAP_MINUTES = 45
+_BLOG_SOCIAL_MAX_PER_DAY = 3
 
 
 def _blog_social_window_bounds(day_offset: int = 0) -> tuple[datetime, datetime]:
@@ -1402,6 +1412,21 @@ def _blog_social_window_bounds(day_offset: int = 0) -> tuple[datetime, datetime]
     return window_start, window_end
 
 
+def _product_post_times_utc(window_start: datetime, window_end: datetime) -> list[datetime]:
+    """The day's fixed Facebook product-post times (IL) as UTC datetimes.
+
+    Only times falling inside [window_start, window_end] are returned, so a
+    window that was clamped to "now" mid-day does not reserve slots around
+    product posts that already went out.
+    """
+    times = []
+    for hour, minute in FACEBOOK_PRODUCT_POST_TIMES:
+        t = window_start.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if window_start <= t <= window_end:
+            times.append(t.astimezone(timezone.utc))
+    return times
+
+
 def parse_manual_blog_social_time(value: str) -> datetime:
     """Parse an admin-entered datetime-local string ("2026-07-20T09:30") as
     Israel local time and return it in UTC.
@@ -1428,10 +1453,15 @@ def parse_manual_blog_social_time(value: str) -> datetime:
 
 def blog_social_time_warnings(dt_utc: datetime, existing_times_utc: list[datetime]) -> list[str]:
     """Non-blocking warnings for a manually chosen broadcast time: outside the
-    06:00-22:00 IL window, or too close to another queued post."""
+    06:00-22:00 IL window, too close to another queued post or to a fixed
+    product post, or on a day that already hit the blog-post cap.
+
+    Warnings only — an admin-picked time is always honoured as-is.
+    """
     import pytz
 
-    local = dt_utc.astimezone(pytz.timezone("Asia/Jerusalem"))
+    il_tz = pytz.timezone("Asia/Jerusalem")
+    local = dt_utc.astimezone(il_tz)
     warnings = []
     if not (_BLOG_SOCIAL_WINDOW_START_HOUR <= local.hour < _BLOG_SOCIAL_WINDOW_END_HOUR):
         warnings.append(
@@ -1448,32 +1478,59 @@ def blog_social_time_warnings(dt_utc: datetime, existing_times_utc: list[datetim
         warnings.append(
             f"רק {int(closest // 60)} דקות מפוסט אחר בתור (מומלץ לפחות {_BLOG_SOCIAL_MIN_GAP_MINUTES})"
         )
+
+    for hour, minute in FACEBOOK_PRODUCT_POST_TIMES:
+        product_local = local.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        delta = abs((dt_utc - product_local.astimezone(timezone.utc)).total_seconds())
+        if delta < _BLOG_SOCIAL_PRODUCT_GAP_MINUTES * 60:
+            warnings.append(
+                f"רק {int(delta // 60)} דקות מפוסט מוצר קבוע ב-{hour:02d}:{minute:02d} "
+                f"(מומלץ לפחות {_BLOG_SOCIAL_PRODUCT_GAP_MINUTES})"
+            )
+
+    same_day = sum(
+        1 for t in existing_times_utc if t.astimezone(il_tz).date() == local.date()
+    )
+    if same_day >= _BLOG_SOCIAL_MAX_PER_DAY:
+        warnings.append(
+            f"ביום {local:%d/%m} כבר מתוכננים {same_day} פוסטי בלוג "
+            f"(התקרה היומית היא {_BLOG_SOCIAL_MAX_PER_DAY})"
+        )
     return warnings
 
 
 def _random_blog_social_time(
     window_start: datetime, window_end: datetime, existing_times_utc: list[datetime],
+    product_times_utc: list[datetime] | None = None,
 ) -> datetime | None:
     """Pick a random UTC datetime within [window_start, window_end] (IL time),
     kept at least 60-120 (random) minutes away from any already-queued blog post
     that day, so consecutive publishes don't cluster minutes apart.
 
-    Returns None when the window is too packed to honour that gap — the caller
-    then tries the next day's window rather than spilling past 22:00.
+    `product_times_utc` are the day's fixed scanner "product post" times; the
+    candidate is additionally kept _BLOG_SOCIAL_PRODUCT_GAP_MINUTES away from
+    each so the two independent schedules don't land back-to-back on the page.
+    That gap is deliberately a separate, smaller constant — reusing the random
+    60-120 min blog gap here would block nearly the whole window.
 
-    Only other blog-queue entries are considered here — this is intentionally
-    independent of the separate scanner "product post" cron jobs.
+    Returns None when the window is too packed to honour those gaps — the caller
+    then tries the next day's window rather than spilling past 22:00.
     """
     import random
 
     span_seconds = int((window_end - window_start).total_seconds())
+    product_gap = timedelta(minutes=_BLOG_SOCIAL_PRODUCT_GAP_MINUTES)
+    product_times_utc = product_times_utc or []
 
     min_gap = timedelta(minutes=random.randint(_BLOG_SOCIAL_MIN_GAP_MINUTES, _BLOG_SOCIAL_MAX_GAP_MINUTES))
     for _ in range(200):
         offset = random.randint(0, max(span_seconds, 0))
         candidate = window_start + timedelta(seconds=offset)
-        if all(abs((candidate - t).total_seconds()) >= min_gap.total_seconds() for t in existing_times_utc):
-            return candidate.astimezone(timezone.utc)
+        if not all(abs((candidate - t).total_seconds()) >= min_gap.total_seconds() for t in existing_times_utc):
+            continue
+        if not all(abs((candidate - t).total_seconds()) >= product_gap.total_seconds() for t in product_times_utc):
+            continue
+        return candidate.astimezone(timezone.utc)
 
     return None
 
@@ -1485,8 +1542,9 @@ async def queue_blog_social_post(
 ) -> tuple[datetime, list[str]]:
     """Queue a blog post's Telegram/Facebook announcement for a random time
     (within the 06:00-22:00 IL active window, spaced 60-120 min apart from other
-    queued blog posts) instead of sending immediately. When today's window is
-    already packed the post rolls over to the next day's window.
+    queued blog posts and 45 min from the fixed product-post times) instead of
+    sending immediately. At most _BLOG_SOCIAL_MAX_PER_DAY blog posts go out per
+    day; when today's window is full or capped the post rolls to the next day.
 
     An admin-supplied `manual_at` (UTC) overrides the draw entirely; the returned
     warnings then describe how it deviates from the usual window/gap rules.
@@ -1517,7 +1575,12 @@ async def queue_blog_social_post(
                     t for t in existing
                     if window_start.astimezone(timezone.utc) <= t <= window_end.astimezone(timezone.utc)
                 ]
-                scheduled_at = _random_blog_social_time(window_start, window_end, same_day)
+                if len(same_day) >= _BLOG_SOCIAL_MAX_PER_DAY:
+                    continue
+                scheduled_at = _random_blog_social_time(
+                    window_start, window_end, same_day,
+                    _product_post_times_utc(window_start, window_end),
+                )
                 if scheduled_at:
                     break
 
