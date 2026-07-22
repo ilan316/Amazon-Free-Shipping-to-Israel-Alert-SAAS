@@ -913,7 +913,7 @@ def _telegram_caption(product: Product) -> str:
     )
     today = datetime.now().strftime("%d/%m/%Y")
     description = product.description or ""
-    all_bullets = [f"{_RTL}• {b}" for b in description.splitlines() if b.strip()]
+    all_bullets = [f"{_RTL}• {_escape_md(b)}" for b in description.splitlines() if b.strip()]
 
     footer_lines = [
         f"{_RTL}--",
