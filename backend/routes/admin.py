@@ -2695,6 +2695,16 @@ async def _run_blog_draft(body: GenerateBlogDraftRequest, db: AsyncSession) -> d
     if pub_row and pub_row.slug:
         content["slug"] = pub_row.slug
 
+    # Same story for a draft that hasn't been published yet: without this, every
+    # regeneration minted a fresh slug and left blog/{old-slug}.html orphaned on
+    # GitHub — noindex, unlinked, never cleaned up. Reuse the draft's own slug so
+    # the same file is overwritten instead.
+    draft_row = (await db.execute(
+        select(BlogDraft).where(BlogDraft.asin == asin)
+    )).scalar_one_or_none()
+    if draft_row and draft_row.slug and not pub_row:
+        content["slug"] = draft_row.slug
+
     try:
         html = build_post_html(product, content, body.israel_price, body.amazon_price, body.min_order_49, body.voltage_warning)
     except Exception as e:
@@ -2740,8 +2750,7 @@ async def _run_blog_draft(body: GenerateBlogDraftRequest, db: AsyncSession) -> d
             "preview_url": f"https://www.amzfreeil.com/blog/{slug}.html",
         }
 
-    existing_draft = await db.execute(select(BlogDraft).where(BlogDraft.asin == asin))
-    draft_row = existing_draft.scalar_one_or_none()
+    # draft_row was already looked up above, to pin the slug before the build.
     if draft_row:
         draft_row.slug = slug
         draft_row.title = content.get("title_he", "")
