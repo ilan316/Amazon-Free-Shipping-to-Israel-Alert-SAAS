@@ -309,7 +309,8 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
         '<div style="background:rgba(255,153,0,.08);border:1.5px solid rgba(255,153,0,.4);border-radius:12px;padding:14px 18px;margin:16px 0;font-size:.9rem;line-height:1.7;">\n'
         '          <strong>⚠️ חשוב: המחיר באמזון כולל כבר את מע"מ הייבוא</strong><br>\n'
         '          אמזון מציג מחיר סופי לישראל כולל <bdi>"Import Fees Deposit"</bdi> — אין הפתעות במכס. '
-        '<a href="../mekhs-umaam-amazon-israel.html" style="color:var(--brand-deep, #ff6a00);">מדריך מלא על מכס ומע"מ ←</a>\n'
+        # הקובץ הזה כבר יושב תחת /blog/ — "../" היה מוביל ל-404 בשורש
+        '<a href="mekhs-umaam-amazon-israel.html" style="color:var(--brand-deep, #ff6a00);">מדריך מלא על מכס ומע"מ ←</a>\n'
         '        </div>'
     )
     asin = product["asin"]
@@ -416,9 +417,11 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
         {
             "@context": "https://schema.org",
             "@type": "BreadcrumbList",
+            # tools/build-internal-links.js באתר מזריק כאן פריט קטגוריה רביעי
+            # (prices.html#cat-x) אחרי הפוש, כדי שהסכמה תתאים לפירורי הלחם הגלויים.
             "itemListElement": [
                 {"@type": "ListItem", "position": 1, "name": "דף הבית", "item": "https://www.amzfreeil.com/"},
-                {"@type": "ListItem", "position": 2, "name": "בלוג", "item": "https://www.amzfreeil.com/blog/"},
+                {"@type": "ListItem", "position": 2, "name": "סקירות מוצרים", "item": "https://www.amzfreeil.com/prices.html"},
                 {"@type": "ListItem", "position": 3, "name": content["breadcrumb_label"], "item": blog_url},
             ],
         },
@@ -508,12 +511,12 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
 
     <section class="blog-hero">
       <div class="blog-hero-inner">
-        <nav class="blog-breadcrumb" aria-label="ניווט קווי">
+        <nav class="blog-breadcrumb" aria-label="פירורי לחם">
           <a href="../index.html">דף הבית</a>
           <span aria-hidden="true">›</span>
-          <a href="../blog/">בלוג</a>
+          <a href="../prices.html">סקירות מוצרים</a>
           <span aria-hidden="true">›</span>
-          <span>{content['breadcrumb_label']}</span>
+          <span aria-current="page">{content['breadcrumb_label']}</span>
         </nav>
         <p class="eyebrow">{content['eyebrow']}</p>
         <h1>{content['title_he']}</h1>
@@ -659,6 +662,9 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
         </div>
       </div>
     </article>
+
+    <!-- RELATED:START -->
+    <!-- RELATED:END -->
 
     <section class="section" style="max-width:860px;margin:0 auto 64px;">
       <h2 style="font-family:Rubik,sans-serif;font-size:1.25rem;margin-bottom:24px;">מאמרים קשורים</h2>
