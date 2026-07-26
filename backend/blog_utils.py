@@ -825,6 +825,14 @@ async def add_to_prices_page(
     if marker not in current:
         raise ValueError("prices.html: insertion marker not found")
 
+    # A card for this slug may already exist — either this ASIN is being
+    # refreshed, or a *different* ASIN was given the same slug by Claude and
+    # overwrote its review file. Either way a second card would point at the
+    # same review, so drop the old one and let the fresh card replace it.
+    current, dropped = strip_price_cards(current, slug)
+    if dropped:
+        logger.info("prices: replacing %d existing card(s) for slug %s (asin %s)", dropped, slug, asin)
+
     # Insert newest card at the top of the grid (newest → oldest)
     updated = current.replace(marker, marker + card, 1)
     return await commit_to_github(path, updated, f"prices: add {title_short}", sha=sha)
@@ -898,6 +906,24 @@ async def delete_github_file(path: str, message: str) -> bool:
         return True
 
 
+def strip_price_cards(html: str, slug: str) -> tuple[str, int]:
+    """Drop every prices.html card that links to blog/{slug}.html.
+
+    Each card is wrapped as:  \n      <!-- title -->\n      <div class="price-card">...\n      </div>\n
+    It contains anchors href="blog/{slug}.html". Match the whole card block that
+    references this slug, anchored on the price-card open/close at 6-space indent.
+    Returns (updated_html, cards_removed).
+    """
+    pattern = re.compile(
+        r"\n[ ]{6}<!--[^\n]*-->\n[ ]{6}<div class=\"price-card\">"
+        r"(?:(?!<div class=\"price-card\">).)*?"
+        r"href=\"blog/" + re.escape(slug) + r"\.html\""
+        r".*?\n[ ]{6}</div>\n",
+        re.DOTALL,
+    )
+    return pattern.subn("\n", html)
+
+
 async def remove_from_prices_page(slug: str) -> bool:
     """Remove a product card from prices.html by its slug. Idempotent — returns
     True if a card was removed, False if none matched."""
@@ -909,17 +935,7 @@ async def remove_from_prices_page(slug: str) -> bool:
             return False
         raise
 
-    # Each card is wrapped as:  \n      <!-- title -->\n      <div class="price-card">...\n      </div>\n
-    # It contains anchors href="blog/{slug}.html". Match the whole card block that
-    # references this slug, anchored on the price-card open/close at 6-space indent.
-    pattern = re.compile(
-        r"\n[ ]{6}<!--[^\n]*-->\n[ ]{6}<div class=\"price-card\">"
-        r"(?:(?!<div class=\"price-card\">).)*?"
-        r"href=\"blog/" + re.escape(slug) + r"\.html\""
-        r".*?\n[ ]{6}</div>\n",
-        re.DOTALL,
-    )
-    updated, n = pattern.subn("\n", current)
+    updated, n = strip_price_cards(current, slug)
     if n == 0:
         return False
 
