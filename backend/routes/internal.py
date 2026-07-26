@@ -16,7 +16,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
-from backend.models import Product
+from backend.models import Product, User
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -286,3 +286,55 @@ async def backfill_hebrew(db: Annotated[AsyncSession, Depends(get_db)]):
     await db.commit()
     logger.info(f"backfill-hebrew: updated {updated}/{len(products)} products")
     return {"updated": updated, "total_missing": len(products)}
+
+
+class HubWarningsRequest(BaseModel):
+    warnings: list[str] = []
+    run_url: str = ""
+
+
+@router.post("/hub-warnings", dependencies=[Depends(_require_secret)])
+async def hub_warnings(
+    body: HubWarningsRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Alert admins when build-internal-links.js could not classify a review.
+
+    Called by the website repo's update-sitemap workflow. The workflow only
+    sends *new* warnings (diffed against the previous blog/categories.json),
+    so this endpoint does not need any dedup state of its own.
+    """
+    items = [w.strip() for w in body.warnings if w and w.strip()]
+    if not items:
+        return {"sent": 0, "warnings": 0}
+
+    from backend.notifier import send_simple_email
+
+    rows = "".join(
+        f'<li style="margin-bottom:8px;">{w}</li>' for w in items
+    )
+    run_link = (
+        f'<p style="margin-top:20px;"><a href="{body.run_url}">צפייה בריצת ה-Action</a></p>'
+        if body.run_url
+        else ""
+    )
+    html = f"""<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px;background:#fffaf1;border-radius:12px;">
+      <h2 style="color:#e47911;">⚠️ סקירות שלא סווגו לקטגוריה</h2>
+      <p style="color:#555;">הפוסטים הבאים שויכו ל"שונות" ב-prices.html. להוסיף אימוג'י ל-<code>tools/category-map.json</code> או כלל ל-<code>keywords</code>:</p>
+      <ul style="padding-inline-start:20px;color:#111;">{rows}</ul>
+      {run_link}
+    </div>"""
+
+    result = await db.execute(
+        select(User).where(User.is_admin == True, User.is_active == True)  # noqa: E712
+    )
+    admins = result.scalars().all()
+
+    sent = 0
+    for admin in admins:
+        if send_simple_email(admin.email, f"⚠️ {len(items)} סקירות ללא קטגוריה", html):
+            sent += 1
+
+    logger.info("hub-warnings: %d warnings → %d/%d admins", len(items), sent, len(admins))
+    return {"sent": sent, "warnings": len(items)}
