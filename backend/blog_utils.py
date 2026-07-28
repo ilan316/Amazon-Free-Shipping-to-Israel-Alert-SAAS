@@ -473,7 +473,7 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
     </div>
     <div class="topbar-outer">
       <header class="topbar" id="topbar">
-        <a class="brand" href="../index.html">
+        <a class="brand" href="/">
           <picture>
             <source srcset="../logo-new.webp" type="image/webp">
             <img src="../logo-new.png" alt="AMZ Free Ship Alert — לוגו" class="brand-logo-img" width="36" height="36" />
@@ -481,17 +481,17 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
           <span>AMZ Free Ship Alert</span>
         </a>
         <nav id="main-nav">
-          <a href="../index.html#features">יכולות</a>
-          <a href="../index.html#how">איך זה עובד</a>
+          <a href="/#features">יכולות</a>
+          <a href="/#how">איך זה עובד</a>
           <a href="../web-guide.html">מדריך מקוון</a>
-          <a href="../index.html#faq">שאלות נפוצות</a>
+          <a href="/#faq">שאלות נפוצות</a>
           <span class="nav-break"></span>
           <a href="../free-products.html">מוצרים בחינם 🚚</a>
           <a href="../search.html">חיפוש מוצרים 🔍</a>
           <a href="../prices.html">סקירות 📝</a>
           <a href="../about.html">אודות</a>
           <a href="../blog/" class="nav-active">בלוג</a>
-          <a href="../index.html#contact">צרו קשר</a>
+          <a href="/#contact">צרו קשר</a>
         </nav>
         <div class="nav-cta-group">
           <a class="btn btn-primary btn-sm" href="https://app.amzfreeil.com" target="_blank" id="nav-web-btn" aria-label="כניסה למוניטור" style="padding:12px 24px;">🌐 כניסה למוניטור</a>
@@ -512,7 +512,7 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
     <section class="blog-hero">
       <div class="blog-hero-inner">
         <nav class="blog-breadcrumb" aria-label="פירורי לחם">
-          <a href="../index.html">דף הבית</a>
+          <a href="/">דף הבית</a>
           <span aria-hidden="true">›</span>
           <a href="../prices.html">סקירות מוצרים</a>
           <span aria-hidden="true">›</span>
@@ -696,7 +696,7 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
 
   <footer>
     <div class="footer-topbar">
-      <a class="brand" href="../index.html">
+      <a class="brand" href="/">
         <picture>
           <source srcset="../logo-new.webp" type="image/webp">
           <img src="../logo-new.png" alt="לוגו AMZ Free Ship Alert" class="brand-logo-img" width="36" height="36" loading="lazy" />
@@ -709,7 +709,7 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
           <a href="../terms.html">תנאי שימוש</a>
           <a href="../about.html">אודות</a>
           <a href="../web-guide.html">מדריך מקוון</a>
-          <a href="../index.html#disclosure">גילוי נאות</a>
+          <a href="/#disclosure">גילוי נאות</a>
         </div>
         <div class="footer-social">
           <a href="https://www.facebook.com/AmzFreeIL/" target="_blank" rel="noopener noreferrer">פייסבוק</a>
