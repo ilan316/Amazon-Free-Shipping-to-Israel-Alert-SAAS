@@ -1226,16 +1226,23 @@ async def run_send_facebook_product():
             logger.warning(f"=== Facebook product send failed: {product.asin} ===")
 
 
-def _blog_telegram_caption(title: str, slug: str, amazon_price: float | None, israel_price: float | None) -> str:
+def _blog_telegram_caption(
+    title: str, slug: str, amazon_price: float | None, israel_price: float | None,
+    kind: str = "review",
+) -> str:
+    """Caption for a blog announcement. `kind="guide"` drops every price-related
+    line — an editorial guide has no product, no price and no $49 threshold."""
     from backend.blog_utils import strip_tags
 
+    guide = kind == "guide"
     url = f"https://www.amzfreeil.com/blog/{slug}.html"
     name_he = _escape_md(strip_tags(title))
-    price = _format_price(str(amazon_price)) if amazon_price else ""
+    price = "" if guide else (_format_price(str(amazon_price)) if amazon_price else "")
     today = datetime.now().strftime("%d/%m/%Y")
 
+    kicker = "📚 מדריך חדש בבלוג" if guide else "📝 סקירה חדשה בבלוג"
     header_lines = [
-        f"{_RTL}✈️ משלוח חינם לישראל | 📝 סקירה חדשה בבלוג",
+        f"{_RTL}✈️ משלוח חינם לישראל | {kicker}",
         "",
         f"{_RTL}*{name_he}*",
         "",
@@ -1243,15 +1250,18 @@ def _blog_telegram_caption(title: str, slug: str, amazon_price: float | None, is
     footer_lines = [f"{_RTL}--", ""]
     if price:
         footer_lines.append(f"{_RTL}💰 מחיר: *{price}*")
-    if israel_price and amazon_price:
+    if not guide and israel_price and amazon_price:
         savings = round(israel_price - amazon_price)
         footer_lines.append(f"{_RTL}💸 מחיר מקביל בישראל: ~₪{israel_price:g} — חיסכון של ~₪{savings}")
+    if not guide:
+        footer_lines.append(f"{_RTL}ℹ️ משלוח חינם מותנה בהזמנה מינימלית של $49 — ניתן לצרף מוצרים נוספים")
+    footer_lines.append(f"{_RTL}🚚 משלוח חינם לישראל 🇮🇱")
+    if not guide:
+        footer_lines.append(f"{_RTL}📅 נכון ל-{today}. המחירים משתנים — בדקו לפני רכישה.")
+    cta = "לקריאת המדריך המלא" if guide else "לקריאת הסקירה המלאה"
     footer_lines += [
-        f"{_RTL}ℹ️ משלוח חינם מותנה בהזמנה מינימלית של $49 — ניתן לצרף מוצרים נוספים",
-        f"{_RTL}🚚 משלוח חינם לישראל 🇮🇱",
-        f"{_RTL}📅 נכון ל-{today}. המחירים משתנים — בדקו לפני רכישה.",
         "",
-        f"[👉 לקריאת הסקירה המלאה]({url})",
+        f"[👉 {cta}]({url})",
         "",
         f"{_RTL}📘 הצטרף לדף הפייסבוק → https://www.facebook.com/AmzFreeIL",
         "",
@@ -1260,16 +1270,21 @@ def _blog_telegram_caption(title: str, slug: str, amazon_price: float | None, is
     return "\n".join(header_lines + footer_lines)
 
 
-def _blog_facebook_caption(title: str, slug: str, amazon_price: float | None, israel_price: float | None) -> str:
+def _blog_facebook_caption(
+    title: str, slug: str, amazon_price: float | None, israel_price: float | None,
+    kind: str = "review",
+) -> str:
     from backend.blog_utils import strip_tags
 
+    guide = kind == "guide"
     url = f"https://www.amzfreeil.com/blog/{slug}.html"
     title = strip_tags(title)
-    price = _format_price(str(amazon_price)) if amazon_price else ""
+    price = "" if guide else (_format_price(str(amazon_price)) if amazon_price else "")
     today = datetime.now().strftime("%d/%m/%Y")
 
+    kicker = "📚 מדריך חדש בבלוג" if guide else "📝 סקירה חדשה בבלוג"
     header_lines = [
-        f"{_RTL}✈️ משלוח חינם לישראל | 📝 סקירה חדשה בבלוג",
+        f"{_RTL}✈️ משלוח חינם לישראל | {kicker}",
         "",
         f"{_RTL}{title}",
         "",
@@ -1277,15 +1292,18 @@ def _blog_facebook_caption(title: str, slug: str, amazon_price: float | None, is
     footer_lines = [f"{_RTL}--", ""]
     if price:
         footer_lines.append(f"{_RTL}💰 מחיר: {price}")
-    if israel_price and amazon_price:
+    if not guide and israel_price and amazon_price:
         savings = round(israel_price - amazon_price)
         footer_lines.append(f"{_RTL}💸 מחיר מקביל בישראל: ~₪{israel_price:g} — חיסכון של ~₪{savings}")
+    if not guide:
+        footer_lines.append(f"{_RTL}ℹ️ משלוח חינם מותנה בהזמנה מינימלית של $49 — ניתן לצרף מוצרים נוספים")
+    footer_lines.append(f"{_RTL}🚚 משלוח חינם לישראל 🇮🇱")
+    if not guide:
+        footer_lines.append(f"{_RTL}📅 נכון ל-{today}. המחירים משתנים — בדקו לפני רכישה.")
+    cta = "לקריאת המדריך המלא" if guide else "לקריאת הסקירה המלאה"
     footer_lines += [
-        f"{_RTL}ℹ️ משלוח חינם מותנה בהזמנה מינימלית של $49 — ניתן לצרף מוצרים נוספים",
-        f"{_RTL}🚚 משלוח חינם לישראל 🇮🇱",
-        f"{_RTL}📅 נכון ל-{today}. המחירים משתנים — בדקו לפני רכישה.",
         "",
-        f"{_RTL}👉 לקריאת הסקירה המלאה: {url}",
+        f"{_RTL}👉 {cta}: {url}",
         "",
         f"{_RTL}📱 יש עוד הרבה מוצרים שלא מגיעים לפה — כולם בטלגרם → t.me/amzfreeil",
         "",
@@ -1297,6 +1315,7 @@ def _blog_facebook_caption(title: str, slug: str, amazon_price: float | None, is
 async def send_blog_post_to_telegram(
     title: str, slug: str, image_url: str | None,
     amazon_price: float | None = None, israel_price: float | None = None,
+    kind: str = "review",
 ) -> bool:
     """Announce a newly published blog post in the @amzfreeil Telegram channel."""
     if os.environ.get("TELEGRAM_BLOG_ENABLED", "true").lower() == "false":
@@ -1309,7 +1328,7 @@ async def send_blog_post_to_telegram(
         logger.warning("TELEGRAM_PRODUCT_BOT_TOKEN or TELEGRAM_PRODUCT_CHAT_ID not set — skipping blog send")
         return False
 
-    caption = _blog_telegram_caption(title, slug, amazon_price, israel_price)
+    caption = _blog_telegram_caption(title, slug, amazon_price, israel_price, kind)
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             if image_url:
@@ -1335,6 +1354,7 @@ async def send_blog_post_to_telegram(
 async def send_blog_post_to_facebook(
     title: str, slug: str, image_url: str | None,
     amazon_price: float | None = None, israel_price: float | None = None,
+    kind: str = "review",
 ) -> bool:
     """Announce a newly published blog post on the AmzFreeIL Facebook page."""
     if os.environ.get("FACEBOOK_BLOG_ENABLED", "true").lower() == "false":
@@ -1352,7 +1372,7 @@ async def send_blog_post_to_facebook(
         logger.warning("[facebook_blog] could not obtain page access token — skipping")
         return False
 
-    caption = _blog_facebook_caption(title, slug, amazon_price, israel_price)
+    caption = _blog_facebook_caption(title, slug, amazon_price, israel_price, kind)
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             if image_url:
@@ -1560,9 +1580,9 @@ def _random_blog_social_time(
 
 
 async def queue_blog_social_post(
-    asin: str, slug: str, title: str, image_url: str | None,
+    asin: str | None, slug: str, title: str, image_url: str | None,
     amazon_price: float | None = None, israel_price: float | None = None,
-    manual_at: datetime | None = None,
+    manual_at: datetime | None = None, kind: str = "review",
 ) -> tuple[datetime, list[str]]:
     """Queue a blog post's Telegram/Facebook announcement for a random time
     (within the 06:00-22:00 IL active window, spaced 60-120 min apart from other
@@ -1617,7 +1637,7 @@ async def queue_blog_social_post(
                 )
 
         db.add(BlogSocialQueue(
-            asin=asin, slug=slug, title=title, image_url=image_url,
+            asin=asin, kind=kind, slug=slug, title=title, image_url=image_url,
             amazon_price=amazon_price, israel_price=israel_price,
             scheduled_at=scheduled_at, manual=manual_at is not None,
         ))
@@ -1634,9 +1654,12 @@ async def run_send_blog_social_queue():
     """Send any due blog-post announcements. Runs every few minutes."""
     from backend.models import BlogSocialQueue, BlogPublishedAsin
 
-    async def _stamp_published(db, asin: str, *, telegram: bool = False, facebook: bool = False):
+    async def _stamp_published(db, asin: str | None, *, telegram: bool = False, facebook: bool = False):
         """Record on the published-post row when it was actually broadcast, so the
-        'פורסמו' tab can show the social status even after the queue row is deleted."""
+        'פורסמו' tab can show the social status even after the queue row is deleted.
+        Editorial guides have no ASIN and no published-post row — nothing to stamp."""
+        if not asin:
+            return
         try:
             pub = (
                 await db.execute(select(BlogPublishedAsin).where(BlogPublishedAsin.asin == asin))
@@ -1668,7 +1691,8 @@ async def run_send_blog_social_queue():
             if not row.telegram_sent:
                 try:
                     row.telegram_sent = await send_blog_post_to_telegram(
-                        row.title, row.slug, row.image_url, row.amazon_price, row.israel_price
+                        row.title, row.slug, row.image_url, row.amazon_price, row.israel_price,
+                        row.kind or "review",
                     )
                     if row.telegram_sent:
                         await _stamp_published(db, row.asin, telegram=True)
@@ -1677,7 +1701,8 @@ async def run_send_blog_social_queue():
             if not row.facebook_sent:
                 try:
                     row.facebook_sent = await send_blog_post_to_facebook(
-                        row.title, row.slug, row.image_url, row.amazon_price, row.israel_price
+                        row.title, row.slug, row.image_url, row.amazon_price, row.israel_price,
+                        row.kind or "review",
                     )
                     if row.facebook_sent:
                         await _stamp_published(db, row.asin, facebook=True)

@@ -246,7 +246,10 @@ class BlogSocialQueue(Base):
     __tablename__ = "blog_social_queue"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    asin: Mapped[str] = mapped_column(String(10), nullable=False)
+    # NULL for editorial guides — they have no product behind them
+    asin: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    # "review" (product post) or "guide" (editorial guide) — drives the caption wording
+    kind: Mapped[str] = mapped_column(String(10), nullable=False, default="review")
     slug: Mapped[str] = mapped_column(String(200), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     israel_price: Mapped[float] = mapped_column(nullable=True)

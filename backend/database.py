@@ -76,6 +76,17 @@ async def create_tables():
                 "ALTER TABLE blog_social_queue ADD COLUMN IF NOT EXISTS manual BOOLEAN NOT NULL DEFAULT FALSE"
             )
         )
+        # Editorial guides ride the same queue but have no ASIN behind them
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE blog_social_queue ALTER COLUMN asin DROP NOT NULL"
+            )
+        )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE blog_social_queue ADD COLUMN IF NOT EXISTS kind VARCHAR(10) NOT NULL DEFAULT 'review'"
+            )
+        )
         await conn.execute(
             __import__("sqlalchemy").text(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS vacation_mode BOOLEAN NOT NULL DEFAULT FALSE"

@@ -2523,7 +2523,9 @@ async def get_blog_social_queue(
     return {
         "queue": [
             {
+                "id": r.id,
                 "asin": r.asin,
+                "kind": r.kind or "review",
                 "slug": r.slug,
                 "title": r.title,
                 "scheduled_at": r.scheduled_at.isoformat() if r.scheduled_at else None,
@@ -2540,20 +2542,23 @@ class RescheduleBlogSocialRequest(BaseModel):
     scheduled_at: str
 
 
-@router.patch("/blog-social-queue/{asin}/schedule")
+@router.patch("/blog-social-queue/{row_id}/schedule")
 async def reschedule_blog_social_post(
-    asin: str,
+    row_id: int,
     body: RescheduleBlogSocialRequest,
     admin: Annotated[User, Depends(get_current_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Set the broadcast time of a queued post by hand. Times outside the
-    06:00-22:00 window (or too close to another post) are allowed but warned about."""
+    06:00-22:00 window (or too close to another post) are allowed but warned about.
+
+    Keyed by row id rather than ASIN — editorial guides ride the same queue with
+    asin=NULL."""
     from backend.models import BlogSocialQueue
     from backend.scheduler import blog_social_time_warnings, parse_manual_blog_social_time
 
     row = (
-        await db.execute(select(BlogSocialQueue).where(BlogSocialQueue.asin == asin))
+        await db.execute(select(BlogSocialQueue).where(BlogSocialQueue.id == row_id))
     ).scalar_one_or_none()
     if not row:
         raise HTTPException(404, "הפוסט לא נמצא בתור השידור")
@@ -2564,7 +2569,7 @@ async def reschedule_blog_social_post(
         raise HTTPException(400, str(e))
 
     others = (await db.execute(
-        select(BlogSocialQueue.scheduled_at).where(BlogSocialQueue.asin != asin)
+        select(BlogSocialQueue.scheduled_at).where(BlogSocialQueue.id != row_id)
     )).scalars().all()
 
     row.scheduled_at = scheduled_at

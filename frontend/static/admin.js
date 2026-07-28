@@ -2163,10 +2163,10 @@ async function loadBlogSocialQueue() {
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--surface);">
         <div style="min-width:0;flex:1;">
           <a href="https://www.amzfreeil.com/blog/${q.slug}.html" target="_blank" rel="noopener" style="font-weight:600;color:inherit;text-decoration:none;">${q.title || q.slug}</a>
-          <div style="font-size:0.76rem;color:var(--text-muted);"><span dir="ltr">${q.asin}</span></div>
+          <div style="font-size:0.76rem;color:var(--text-muted);">${q.asin ? `<span dir="ltr">${q.asin}</span>` : (q.kind === 'guide' ? '📚 מדריך' : '')}</div>
         </div>
         <div style="font-size:0.82rem;white-space:nowrap;">${manualMark}🕒 ${dt}</div>
-        <button onclick="showSocialScheduleDialog('${q.asin}','${q.scheduled_at || ''}')" title="שנה זמן שידור"
+        <button onclick="showSocialScheduleDialog(${q.id},'${q.scheduled_at || ''}')" title="שנה זמן שידור"
           style="background:none;border:none;cursor:pointer;font-size:0.95rem;padding:2px 4px;">✏️</button>
         <div style="font-size:0.8rem;white-space:nowrap;">${status}</div>
       </div>`;
@@ -2223,7 +2223,7 @@ function showScheduleDialog({ title, hint, label, value, optional, confirmText, 
   });
 }
 
-async function showSocialScheduleDialog(asin, currentIso) {
+async function showSocialScheduleDialog(rowId, currentIso) {
   showScheduleDialog({
     title: '🕒 שינוי זמן שידור',
     hint: 'הזמן נשמר לפי שעון ישראל. מחוץ ל-06:00-22:00 אפשרי, אך תוצג אזהרה.',
@@ -2232,7 +2232,7 @@ async function showSocialScheduleDialog(asin, currentIso) {
     optional: false,
     confirmText: 'שמור',
     onConfirm: async (val) => {
-      const res = await apiFetch(`/admin/blog-social-queue/${asin}/schedule`, {
+      const res = await apiFetch(`/admin/blog-social-queue/${rowId}/schedule`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scheduled_at: val }),
