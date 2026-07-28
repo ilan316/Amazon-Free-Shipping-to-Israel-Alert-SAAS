@@ -1408,7 +1408,10 @@ _BLOG_SOCIAL_WINDOW_START_HOUR = 6
 _BLOG_SOCIAL_WINDOW_END_HOUR = 22
 _BLOG_SOCIAL_MIN_GAP_MINUTES = 60
 _BLOG_SOCIAL_MAX_GAP_MINUTES = 120
-_BLOG_SOCIAL_MAX_LOOKAHEAD_DAYS = 7
+# A week was enough while the queue only carried the odd product review. The
+# editorial guides arrive in batches, so the horizon has to be deep enough that a
+# batch never runs off the end and lands on the fallback slot.
+_BLOG_SOCIAL_MAX_LOOKAHEAD_DAYS = 21
 # Deliberately smaller than the blog-to-blog gap: the product posts are fixed
 # points, and a 60-120 min buffer around each would leave almost no room in the
 # window.
@@ -1629,9 +1632,15 @@ async def queue_blog_social_post(
                     break
 
             if scheduled_at is None:
-                # Every window in the lookahead is packed — shouldn't happen in practice.
+                # Every window in the lookahead is packed — shouldn't happen in
+                # practice. Draw a random time in the last window rather than
+                # pinning to its start, so a batch that overflows spreads out
+                # instead of firing all at once.
                 day_offset = _BLOG_SOCIAL_MAX_LOOKAHEAD_DAYS - 1
-                scheduled_at = windows[-1][0].astimezone(timezone.utc)
+                last_start, last_end = windows[-1]
+                scheduled_at = _random_blog_social_time(
+                    last_start, last_end, [], _product_post_times_utc(last_start, last_end)
+                ) or last_start.astimezone(timezone.utc)
                 logger.warning(
                     f"[blog_social_queue] no free slot in {_BLOG_SOCIAL_MAX_LOOKAHEAD_DAYS} days for {slug}"
                 )
