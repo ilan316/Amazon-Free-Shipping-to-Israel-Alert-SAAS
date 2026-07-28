@@ -598,19 +598,10 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
         </div>
       </section>
 
-      <section>
-        <h2>רוצה לדעת כשיש משלוח חינם על המוצר הזה?</h2>
-        <p>המשלוח החינם של אמזון לישראל מופיע ונעלם — לפעמים ליום, לפעמים לשבוע. במקום לבדוק ידנית כל יום, תנו לנו לעשות את זה בשבילכם.</p>
-        <div style="background:rgba(22,125,70,.07);border:1.5px solid rgba(22,125,70,.3);border-radius:16px;padding:24px 26px;margin:20px 0;">
-          <p style="margin:0 0 6px;font-weight:700;font-size:1.05rem;">📬 קבל התראה ברגע שמשלוח חינם זמין</p>
-          <p style="margin:0 0 18px;font-size:.9rem;color:#4d5a70;">תוסיף את המוצר לניטור — נשלח לך מייל ברגע שהמשלוח מתעדכן לחינם.</p>
-          <a href="https://app.amzfreeil.com" target="_blank" rel="noopener"
-             style="display:inline-block;background:linear-gradient(135deg,#ff9900,#ff6a00);color:#172033;font-weight:800;padding:13px 28px;border-radius:12px;text-decoration:none;font-size:1rem;">
-            הירשם לקבל התראה ←
-          </a>
-        </div>
-      </section>
-
+      <!-- אין כאן CTA. היה כאן סקשן "רוצה לדעת כשיש משלוח חינם" שהיה כפילות
+           כמעט מילולית של blog-cta-box שבסוף המאמר — אותה כותרת, אותו כפתור.
+           הוא הוסר מ-155 הפוסטים הקיימים ומהתבנית (28/07/2026) כדי לצמצם
+           boilerplate זהה בין הפוסטים. אל תחזיר אותו. -->
 
       <section>
         <h2>יתרונות וחסרונות</h2>
@@ -651,7 +642,9 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
       </div>
 
       <div style="background:rgba(23,32,51,.04);border:1px solid rgba(23,32,51,.1);border-radius:12px;padding:14px 18px;margin:24px 0;font-size:.82rem;color:#4d5a70;line-height:1.7;">
-        <strong>גילוי נאות:</strong> הקישורים לאמזון בעמוד זה הם קישורי שותף של תוכנית <bdi>Amazon Associates</bdi>. אם תרכשו מוצר דרכם, אנו עשויים לקבל עמלה קטנה — ללא כל עלות נוספת מצידכם. זהו המודל שמאפשר לנו לספק את השירות ללא תשלום.
+        <!-- גרסה מקוצרת: הנוסח המלא יושב ב-/#disclosure. עומד בדרישת Amazon
+             Associates לגילוי גלוי בעמוד, בלי 60 מילים זהות בכל פוסט. -->
+        <strong>גילוי נאות:</strong> עמוד זה מכיל קישורי שותף של <bdi>Amazon Associates</bdi> — ללא עלות נוספת עבורכם. <a href="/#disclosure" style="color:var(--brand-deep, #ff6a00);">פרטים ←</a>
       </div>
 
       <div class="author-bio">
