@@ -40,7 +40,7 @@ a:hover{text-decoration:underline}
 .bg-glow{position:fixed;z-index:-1;width:440px;height:440px;border-radius:50%;filter:blur(60px);opacity:.35;pointer-events:none}
 .bg-glow-a{background:#ffc36a;top:-120px;right:-120px}
 .bg-glow-b{background:#ff9e80;bottom:-160px;left:-120px}
-#fixed-header{position:fixed;top:0;left:0;right:0;z-index:9999}
+#fixed-header{position:sticky;top:0;z-index:9999}
 .index-urgency-bar{background:linear-gradient(90deg,#ff6a00,#ff9900);color:#fff;text-align:center;padding:10px 20px;font-size:.88rem;font-weight:500;line-height:1.5;display:flex;align-items:center;justify-content:center;gap:8px}
 .index-urgency-bar strong{font-weight:800}
 .index-urgency-dot{display:inline-block;width:8px;height:8px;background:#fff;border-radius:50%;flex-shrink:0;animation:index-blink 1.8s ease-in-out infinite}
@@ -50,8 +50,10 @@ a:hover{text-decoration:underline}
 .index-topbar.scrolled{box-shadow:0 8px 32px rgba(23,32,51,.1)}
 .index-brand{display:inline-flex;align-items:center;gap:10px;font-family:"Rubik",sans-serif;font-weight:700;color:#172033;text-decoration:none}
 .index-brand-logo{width:28px;height:28px;border-radius:8px;object-fit:cover}
-.index-nav{display:inline-flex;gap:18px;position:absolute;left:50%;transform:translateX(-50%)}
+.index-nav{display:inline-flex;flex-wrap:wrap;gap:0 14px;max-width:680px;justify-content:center;align-items:center}
 .index-nav a,.index-topbar a{color:#172033;text-decoration:none;font-weight:500}
+.index-nav a{display:inline-flex;align-items:center;min-height:28px;padding:2px 0}
+.nav-break{flex-basis:100%;height:0}
 .index-nav a:hover{color:#ff9900;text-decoration:none}
 .index-nav-cta{display:flex;gap:8px;align-items:center}
 .index-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;font-size:.88rem;font-weight:700;font-family:"Heebo",sans-serif;text-decoration:none;cursor:pointer;border:1px solid rgba(23,32,51,.12);transition:transform 160ms ease,box-shadow 160ms ease}
@@ -60,7 +62,7 @@ a:hover{text-decoration:underline}
 .index-btn-primary:hover{box-shadow:0 10px 24px rgba(255,153,0,.45);color:#172033}
 .index-btn-outline{background:#fff;color:#172033}
 .index-btn-outline:hover{border-color:#ff9900;color:#ff6a00}
-.index-trust-bar{display:flex;align-items:stretch;background:#172033;border-radius:14px;overflow:hidden;max-width:860px;margin:115px auto 24px}
+.index-trust-bar{display:flex;align-items:stretch;background:#172033;border-radius:14px;overflow:hidden;max-width:860px;margin:24px auto}
 .index-trust-item{display:flex;align-items:center;justify-content:center;gap:8px;color:#f0f4ff;padding:14px 20px;font-size:.88rem;font-weight:500;flex:1;border-right:1px solid rgba(255,255,255,.1)}
 .index-trust-item:first-child{border-right:none}
 .auth-hero{text-align:center;padding:0 16px 32px}
@@ -75,11 +77,11 @@ a:hover{text-decoration:underline}
 .feature-card p{font-size:.84rem;color:var(--text-muted);line-height:1.5}
 .feature-card--featured{border-color:rgba(255,153,0,.5);box-shadow:0 0 0 2px rgba(255,153,0,.18)}
 .feature-card--featured h3{color:#ff6a00}
-@media(max-width:680px){#fixed-header{position:static}.index-nav{display:none}.index-nav-cta{display:none}.index-trust-bar{display:none}.auth-hero{padding-top:0;margin-top:0}.auth-hero h1{font-size:1.35rem}.auth-hero p{font-size:.88rem}.index-urgency-bar{font-size:.8rem;padding:8px 14px}}
+@media(max-width:680px){#fixed-header{position:static}.index-nav{display:none}.nav-break{display:none}.index-nav-cta{display:none}.index-trust-bar{display:none}.auth-hero{padding-top:0;margin-top:0}.auth-hero h1{font-size:1.35rem}.auth-hero p{font-size:.88rem}.index-urgency-bar{font-size:.8rem;padding:8px 14px}}
 @media(max-width:600px){.feature-card{flex:0 1 100%}}
   </style>
-  <link rel="preload" href="/static/styles.css?v=12" as="style" onload="this.onload=null;this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="/static/styles.css?v=12"></noscript>
+  <link rel="preload" href="/static/styles.css?v=19" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="/static/styles.css?v=19"></noscript>
   <!-- Meta Pixel Code -->
   <script>
     !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window, document,'script','https://connect.facebook.net/en_US/fbevents.js');
@@ -112,17 +114,20 @@ a:hover{text-decoration:underline}
           <span>AMZ Free Ship Alert</span>
         </div>
         <nav class="index-nav" id="index-nav">
-          <a href="https://amzfreeil.com#features">יכולות</a>
-          <a href="https://amzfreeil.com#how">איך זה עובד</a>
-          <a href="https://amzfreeil.com/guide.html">מדריכים</a>
-          <a href="https://amzfreeil.com#faq">שאלות נפוצות</a>
-          <a href="https://amzfreeil.com/about.html">אודות</a>
-          <a href="https://amzfreeil.com/blog/">בלוג</a>
-          <a href="https://amzfreeil.com#contact">צרו קשר</a>
+          <a href="https://www.amzfreeil.com/#features">יכולות</a>
+          <a href="https://www.amzfreeil.com/#how">איך זה עובד</a>
+          <a href="https://www.amzfreeil.com/web-guide.html">מדריך מקוון</a>
+          <a href="https://www.amzfreeil.com/#faq">שאלות נפוצות</a>
+          <span class="nav-break"></span>
+          <a href="https://www.amzfreeil.com/free-products.html">מוצרים בחינם 🚚</a>
+          <a href="https://www.amzfreeil.com/search.html">חיפוש מוצרים 🔍</a>
+          <a href="https://www.amzfreeil.com/prices.html">סקירות 📝</a>
+          <a href="https://www.amzfreeil.com/about.html">אודות</a>
+          <a href="https://www.amzfreeil.com/blog/">בלוג</a>
+          <a href="https://www.amzfreeil.com/#contact">צרו קשר</a>
         </nav>
         <div class="index-nav-cta">
-          <a class="index-btn index-btn-primary" href="https://amzfreeil.com">🌐 אתר ראשי</a>
-          <a class="index-btn index-btn-outline" href="https://amzfreeil.com#download">🪟 גרסת Windows</a>
+          <a class="index-btn index-btn-primary" href="https://www.amzfreeil.com/">🌐 אתר ראשי</a>
         </div>
         <button class="hamburger" id="hamburger-btn" aria-label="פתח תפריט" aria-expanded="false" aria-controls="index-nav">
           <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
