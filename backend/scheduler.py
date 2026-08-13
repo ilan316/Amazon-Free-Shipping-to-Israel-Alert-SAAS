@@ -22,6 +22,7 @@ from backend.models import SystemSetting
 
 from sqlalchemy import select, func, or_, update, text, delete
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.exc import StaleDataError
 
 from backend.database import AsyncSessionLocal
 from backend.models import Product, User, UserProduct, NotificationLog, EmailTemplate, EmailSendLog, EmailSendRecipient, EmailClick
@@ -201,26 +202,53 @@ async def run_global_check_cycle():
                 [(p.asin, p.url) for p in to_check]
             )
             status_counts: dict = {}
+            # A rollback expires every instance in the session (regardless of
+            # expire_on_commit=False), so any later attribute access would fire a lazy
+            # reload — illegal outside a greenlet, and fatal if the row was deleted.
+            # Snapshot the identity of each product up front so failure handling never
+            # has to touch an expired instance.
+            identities = [(p.id, p.asin) for p in to_check]
             for i, (product, check_result) in enumerate(zip(to_check, check_results)):
                 status_counts[check_result.status.value] = status_counts.get(check_result.status.value, 0) + 1
+                asin = identities[i][1]
                 try:
                     is_first_error = await _update_product(db, product, check_result)
                     if is_first_error:
                         newly_failed.append((product, check_result))
-                    logger.info(f"[{i+1}/{len(to_check)}] [{product.asin}] → {check_result.status.value}")
+                    logger.info(f"[{i+1}/{len(to_check)}] [{asin}] → {check_result.status.value}")
+                    continue
                 except Exception as e:
+                    # Product may have been deleted mid-cycle (e.g. admin bulk-delete)
+                    deleted = isinstance(e, StaleDataError)
+                    if deleted:
+                        logger.warning(f"[{asin}] Product deleted mid-cycle, skipping.")
+                    else:
+                        logger.error(f"[{asin}] Unexpected error saving result: {e}")
+
+                # --- failure path: rollback, then repopulate the expired instances ---
+                try:
                     await db.rollback()
-                    # Product may have been deleted mid-cycle (e.g. admin bulk-delete) — skip silently
-                    from sqlalchemy.orm.exc import StaleDataError
-                    if isinstance(e, StaleDataError):
-                        logger.warning(f"[{product.asin}] Product deleted mid-cycle, skipping.")
-                        continue
-                    logger.error(f"[{product.asin}] Unexpected error saving result: {e}")
-                    try:
-                        product.consecutive_errors += 1
+                    if not deleted:
+                        # Bump the error counter by id — the ORM instance is expired here
+                        await db.execute(
+                            update(Product)
+                            .where(Product.id == identities[i][0])
+                            .values(consecutive_errors=Product.consecutive_errors + 1)
+                        )
                         await db.commit()
-                    except Exception:
+                    # Eagerly reload every product in one query: the ones ahead of us so the
+                    # next iterations don't lazy-load, and the ones behind us because
+                    # newly_failed is consumed after this session closes.
+                    await db.execute(
+                        select(Product).where(Product.id.in_([pid for pid, _ in identities]))
+                    )
+                except Exception as inner:
+                    # Error handling must never abort the whole cycle
+                    logger.error(f"[{asin}] Error while recovering session: {inner}")
+                    try:
                         await db.rollback()
+                    except Exception:
+                        pass
 
     if to_check:
         logger.info(f"=== Cycle result breakdown: {status_counts} | skipped={len(products)-len(to_check)} ===")
