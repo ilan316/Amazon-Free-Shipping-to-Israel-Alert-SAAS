@@ -1010,6 +1010,66 @@ async def _send_telegram_product_message(product: Product) -> bool:
         return False
 
 
+_POST_VERIFY_ATTEMPTS = 3
+
+
+async def _pick_verified_free_product(db: AsyncSession, sent_recently, channel: str) -> Product | None:
+    """Draw a random eligible scanner product and re-check it live before posting.
+
+    `last_status` is only as fresh as the last scanner run — and scanner products
+    nobody tracks never enter the global check cycle, so a FREE row can be days
+    old. A wrong post costs a paid impression and the channel's credibility, so
+    verify first: on a non-FREE result save the new status (which also drops the
+    product out of the eligible pool) and draw another. On ERROR/UNKNOWN there is
+    no answer, only the absence of one — skip the candidate rather than post blind.
+    Returns None when no candidate verified; the caller skips the slot.
+    """
+    tried: set[str] = set()
+    for _ in range(_POST_VERIFY_ATTEMPTS):
+        query = select(Product).where(
+            Product.last_status == "FREE",
+            Product.source == "scanner",
+            Product.asin.not_in(sent_recently),
+        )
+        if tried:
+            query = query.where(Product.asin.not_in(tried))
+        product = (
+            await db.execute(query.order_by(func.random()).limit(1))
+        ).scalar_one_or_none()
+        if not product:
+            return None
+
+        # Snapshot the identity: a rollback below expires the instance, and any
+        # later attribute access would fire a lazy reload from async context.
+        asin, url = product.asin, product.url
+        tried.add(asin)
+
+        try:
+            check_result = (await browser_manager.check_many([(asin, url)]))[0]
+        except Exception as e:
+            logger.warning(f"[{channel}] verify failed for {asin}: {e} — trying another")
+            continue
+
+        try:
+            await _update_product(db, product, check_result)
+        except Exception as e:
+            logger.error(f"[{channel}] verify save error for {asin}: {e}")
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+            continue
+
+        if check_result.status == ShippingStatus.FREE:
+            return product
+        logger.info(f"[{channel}] {asin} no longer FREE ({check_result.status.value}) — trying another")
+
+    logger.warning(
+        f"[{channel}] no verified FREE product after {_POST_VERIFY_ATTEMPTS} attempts — skipping slot"
+    )
+    return None
+
+
 async def run_send_telegram_product():
     """Send one free product to the Telegram channel.
 
@@ -1035,23 +1095,14 @@ async def run_send_telegram_product():
         now = datetime.now(timezone.utc)
         resend_cutoff = now - timedelta(days=_TELEGRAM_RESEND_DAYS)
 
-        # Products eligible: FREE + scanner source + not sent recently
+        # Products eligible: FREE + scanner source + not sent recently, then
+        # re-checked live — see _pick_verified_free_product.
         sent_recently = (
             select(TelegramSent.asin)
             .where(TelegramSent.sent_at > resend_cutoff)
             .scalar_subquery()
         )
-        result = await db.execute(
-            select(Product)
-            .where(
-                Product.last_status == "FREE",
-                Product.source == "scanner",
-                Product.asin.not_in(sent_recently),
-            )
-            .order_by(func.random())
-            .limit(1)
-        )
-        product = result.scalar_one_or_none()
+        product = await _pick_verified_free_product(db, sent_recently, "telegram_product")
 
         if not product:
             logger.info("=== Telegram product send: no eligible products ===")
@@ -1224,17 +1275,7 @@ async def run_send_facebook_product():
             .where(FacebookSent.sent_at > resend_cutoff)
             .scalar_subquery()
         )
-        result = await db.execute(
-            select(Product)
-            .where(
-                Product.last_status == "FREE",
-                Product.source == "scanner",
-                Product.asin.not_in(sent_recently),
-            )
-            .order_by(func.random())
-            .limit(1)
-        )
-        product = result.scalar_one_or_none()
+        product = await _pick_verified_free_product(db, sent_recently, "facebook")
 
         if not product:
             logger.info("=== Facebook product send: no eligible products ===")
