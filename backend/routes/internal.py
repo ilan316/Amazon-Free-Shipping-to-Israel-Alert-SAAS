@@ -16,7 +16,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
-from backend.models import Product, User
+from backend.models import Product, User, UserProduct
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -106,19 +106,33 @@ async def sync_products(
             added += 1
         synced += 1
 
-    # Delete scanner products no longer in the incoming list
+    # Delete scanner products no longer in the incoming list.
+    # Never touch a product a user is tracking: the upsert above stamps
+    # source='scanner' on any ASIN the scanner also found, including ones a user
+    # added themselves — without this guard the next sync would silently drop it
+    # from their tracking list the moment it stopped being free.
+    tracked = select(UserProduct.product_id).distinct()
     delete_result = await db.execute(
         delete(Product).where(
             Product.source == "scanner",
+            Product.id.not_in(tracked),
             Product.asin.not_in(incoming_asins) if incoming_asins else True,
         )
     )
     removed = delete_result.rowcount
 
+    kept = (await db.execute(
+        select(func.count()).select_from(Product).where(
+            Product.source == "scanner",
+            Product.id.in_(tracked),
+            Product.asin.not_in(incoming_asins) if incoming_asins else True,
+        )
+    )).scalar_one()
+
     await db.commit()
 
-    logger.info(f"sync-products: synced={synced}, removed={removed}")
-    return {"synced": synced, "removed": removed}
+    logger.info(f"sync-products: synced={synced}, removed={removed}, kept_tracked={kept}")
+    return {"synced": synced, "removed": removed, "kept_tracked": kept}
 
 
 @router.get("/product-stats", dependencies=[Depends(_require_secret)])
