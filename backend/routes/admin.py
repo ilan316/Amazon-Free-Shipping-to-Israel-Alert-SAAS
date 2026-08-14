@@ -2333,6 +2333,37 @@ async def dismiss_blog_candidate(
     return {"message": "dismissed"}
 
 
+class BulkDismissRequest(BaseModel):
+    asins: list[str]
+    dismissed: bool = True
+
+
+@router.post("/blog-candidates/dismiss-bulk")
+async def bulk_dismiss_blog_candidates(
+    body: BulkDismissRequest,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Dismiss (or restore) a whole filtered list of candidates in one round-trip."""
+    asins = [a for a in dict.fromkeys(body.asins) if a]
+    if not asins:
+        return {"message": "noop", "count": 0}
+
+    if body.dismissed:
+        existing = await db.execute(
+            select(BlogDismissedAsin.asin).where(BlogDismissedAsin.asin.in_(asins))
+        )
+        already = {row[0] for row in existing.all()}
+        for asin in asins:
+            if asin not in already:
+                db.add(BlogDismissedAsin(asin=asin))
+    else:
+        await db.execute(delete(BlogDismissedAsin).where(BlogDismissedAsin.asin.in_(asins)))
+
+    await db.commit()
+    return {"message": "dismissed" if body.dismissed else "undismissed", "count": len(asins)}
+
+
 async def get_product_view_counts(asins: list[str]) -> dict[str, int]:
     """Read per-ASIN page-view counters written by the website (Upstash Redis)."""
     url = os.environ.get("UPSTASH_REDIS_REST_URL")

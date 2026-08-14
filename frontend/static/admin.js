@@ -1822,7 +1822,17 @@ function renderBlogCandidatesList(candidates) {
     return;
   }
 
-  listEl.innerHTML = candidates.map(c => {
+  // Master toggle — dismisses exactly what is on screen (the active price/category
+  // filter), so narrowing the filter first is the way to dismiss a subset.
+  const dismissAllRow = `
+    <div style="display:flex;justify-content:flex-end;padding:0 14px 8px;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;color:var(--text-muted);cursor:pointer;white-space:nowrap;">
+        <input type="checkbox" id="blog-dismiss-all" onchange="setAllBlogDismissed(this)" style="cursor:pointer;width:15px;height:15px;" />
+        בטל מועמדות לכל ${candidates.length} המוצגים
+      </label>
+    </div>`;
+
+  listEl.innerHTML = dismissAllRow + candidates.map(c => {
     const name = c.name_he || c.name || c.asin;
     const nameEsc = name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
     const rawImg = c.image_url || "";
@@ -1870,7 +1880,7 @@ function renderBlogCandidatesList(candidates) {
               </button>`
           }
           <label style="display:flex;align-items:center;gap:5px;font-size:0.78rem;color:var(--text-muted);cursor:pointer;white-space:nowrap;">
-            <input type="checkbox" onchange="setBlogDismissed('${c.asin}', this.checked, this.closest('[data-asin]'))" style="cursor:pointer;" />
+            <input type="checkbox" class="blog-dismiss-cb" onchange="setBlogDismissed('${c.asin}', this.checked, this.closest('[data-asin]'))" style="cursor:pointer;" />
             בטל מועמדות
           </label>
         </div>
@@ -2320,22 +2330,57 @@ async function unpublishBlogPost(asin, title) {
   }
 }
 
+// Grey out (or restore) a candidate card once its dismissal is saved.
+function paintBlogDismissed(row, dismissed) {
+  row.style.opacity = dismissed ? "0.35" : "1";
+  const btn = row.querySelector("button");
+  if (btn) btn.disabled = dismissed;
+}
+
 async function setBlogDismissed(asin, dismissed, row) {
   const method = dismissed ? "POST" : "DELETE";
   const res = await apiFetch(`/admin/blog-candidates/${asin}/dismiss`, { method });
   if (res && res.ok) {
-    if (dismissed) {
-      row.style.opacity = "0.35";
-      row.querySelector("button").disabled = true;
-    } else {
-      row.style.opacity = "1";
-      row.querySelector("button").disabled = false;
-    }
+    paintBlogDismissed(row, dismissed);
   } else {
-    const cb = row.querySelector("input[type=checkbox]");
+    const cb = row.querySelector(".blog-dismiss-cb");
     if (cb) cb.checked = !dismissed;
     alert("שגיאה בשמירה");
   }
+}
+
+// Dismiss/restore every card currently rendered, in a single request.
+async function setAllBlogDismissed(masterCb) {
+  const listEl = document.getElementById("blog-candidates-list");
+  if (!listEl) return;
+  const dismissed = masterCb.checked;
+  const rows = Array.from(listEl.querySelectorAll("[data-asin]"));
+  const asins = rows.map(r => r.dataset.asin);
+  if (!asins.length) return;
+
+  if (dismissed && !confirm(`לבטל מועמדות ל-${asins.length} המוצרים המוצגים?`)) {
+    masterCb.checked = false;
+    return;
+  }
+
+  masterCb.disabled = true;
+  const res = await apiFetch("/admin/blog-candidates/dismiss-bulk", {
+    method: "POST",
+    body: JSON.stringify({ asins, dismissed }),
+  });
+  masterCb.disabled = false;
+
+  if (!res || !res.ok) {
+    masterCb.checked = !dismissed;
+    alert("שגיאה בשמירה");
+    return;
+  }
+
+  rows.forEach(row => {
+    const cb = row.querySelector(".blog-dismiss-cb");
+    if (cb) cb.checked = dismissed;
+    paintBlogDismissed(row, dismissed);
+  });
 }
 
 function openDraftModal(asin, name, imageUrl) {
@@ -2578,7 +2623,7 @@ function markCardAsDrafted(asin, data) {
     <a href="${data.preview_url}" target="_blank" rel="noopener"
       style="font-size:0.76rem;color:var(--text-muted);text-align:center;">preview ←</a>
     <label style="display:flex;align-items:center;gap:5px;font-size:0.78rem;color:var(--text-muted);cursor:pointer;white-space:nowrap;">
-      <input type="checkbox" onchange="setBlogDismissed('${asin}', this.checked, this.closest('[data-asin]'))" style="cursor:pointer;" />
+      <input type="checkbox" class="blog-dismiss-cb" onchange="setBlogDismissed('${asin}', this.checked, this.closest('[data-asin]'))" style="cursor:pointer;" />
       בטל מועמדות
     </label>`;
 }
