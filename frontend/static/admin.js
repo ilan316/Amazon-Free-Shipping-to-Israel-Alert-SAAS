@@ -2354,7 +2354,8 @@ async function setAllBlogDismissed(masterCb) {
   const listEl = document.getElementById("blog-candidates-list");
   if (!listEl) return;
   const dismissed = masterCb.checked;
-  const rows = Array.from(listEl.querySelectorAll("[data-asin]"));
+  // Cards only — the batch-select checkbox inside each card also carries data-asin.
+  const rows = Array.from(listEl.querySelectorAll(":scope > [data-asin]"));
   const asins = rows.map(r => r.dataset.asin);
   if (!asins.length) return;
 
