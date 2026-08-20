@@ -5,6 +5,7 @@ Authentication: X-Sync-Secret header must match INTERNAL_SYNC_SECRET env var.
 
 import os
 import json
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Annotated
@@ -287,11 +288,13 @@ async def backfill_hebrew(db: Annotated[AsyncSession, Depends(get_db)]):
         if not p.name:
             continue
         try:
-            msg = client.messages.create(
-                model="claude-sonnet-5",
-                max_tokens=200,
-                thinking={"type": "disabled"},
-                messages=[{"role": "user", "content": f"תרגם לעברית קצרה ומובנת (עד 7 מילים, שמור את שם המותג, ללא מרכאות): {p.name}"}],
+            msg = await asyncio.to_thread(
+                lambda name=p.name: client.messages.create(
+                    model="claude-sonnet-5",
+                    max_tokens=200,
+                    thinking={"type": "disabled"},
+                    messages=[{"role": "user", "content": f"תרגם לעברית קצרה ומובנת (עד 7 מילים, שמור את שם המותג, ללא מרכאות): {name}"}],
+                )
             )
             p.name_he = claude_text(msg).strip()
             updated += 1

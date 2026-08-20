@@ -987,7 +987,7 @@ async def _send_telegram_product_message(product: Product) -> bool:
     if not token or not chat_id:
         logger.warning("TELEGRAM_PRODUCT_BOT_TOKEN or TELEGRAM_PRODUCT_CHAT_ID not set — skipping product send")
         return False
-    caption = _telegram_caption(product)
+    caption = await asyncio.to_thread(_telegram_caption, product)
     image_url = product.image_url
     try:
         async with httpx.AsyncClient(timeout=15) as client:
@@ -1204,7 +1204,7 @@ async def _send_facebook_product_message(product: Product) -> bool:
         logger.warning("[facebook] could not obtain page access token — skipping")
         return False
 
-    caption = _facebook_caption(product)
+    caption = await asyncio.to_thread(_facebook_caption, product)
     import json as _json
     secondary = []
     if product.image_urls:
@@ -1933,11 +1933,13 @@ async def run_hebrew_backfill():
             if not p.name:
                 continue
             try:
-                msg = client.messages.create(
-                    model="claude-sonnet-5",
-                    max_tokens=200,
-                    thinking={"type": "disabled"},
-                    messages=[{"role": "user", "content": f"תרגם לעברית קצרה ומובנת (עד 7 מילים, שמור את שם המותג, ללא מרכאות): {p.name}"}],
+                msg = await asyncio.to_thread(
+                    lambda name=p.name: client.messages.create(
+                        model="claude-sonnet-5",
+                        max_tokens=200,
+                        thinking={"type": "disabled"},
+                        messages=[{"role": "user", "content": f"תרגם לעברית קצרה ומובנת (עד 7 מילים, שמור את שם המותג, ללא מרכאות): {name}"}],
+                    )
                 )
                 p.name_he = claude_text(msg).strip()
                 updated += 1
