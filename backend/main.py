@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import asyncio
 import logging
@@ -46,6 +47,42 @@ from backend.routes import internal as internal_routes
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
+# httpx logs every request at INFO with the full URL, which puts the Telegram bot
+# token and the Facebook access token in plaintext in the Railway logs. Scrub them
+# on the way out instead of silencing httpx — those lines are useful for debugging.
+_SECRET_PATTERNS = [
+    re.compile(r"(/bot)\d+:[A-Za-z0-9_-]+", re.I),
+    re.compile(r"((?:access_token|api_key|apikey|token|secret|password|key)=)[^&\s\"']+", re.I),
+    re.compile(r"(sk-ant-)[A-Za-z0-9_-]+"),
+    re.compile(r"(re_)[A-Za-z0-9_-]{12,}"),
+    re.compile(r"(Bearer\s+)[A-Za-z0-9._-]+", re.I),
+]
+
+
+class _RedactSecrets(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            msg = record.getMessage()
+        except Exception:
+            return True
+        redacted = msg
+        for pat in _SECRET_PATTERNS:
+            redacted = pat.sub(r"\1***", redacted)
+        if redacted != msg:
+            record.msg = redacted
+            record.args = ()
+        return True
+
+
+def _install_secret_redaction():
+    """Attach the scrubber to every root handler (filters on handlers see propagated
+    records; filters on loggers do not)."""
+    f = _RedactSecrets()
+    for h in logging.getLogger().handlers:
+        if not any(isinstance(x, _RedactSecrets) for x in h.filters):
+            h.addFilter(f)
+
+
 def _setup_persistent_log():
     """Add a rotating file handler that writes to the Railway volume, surviving redeploys."""
     import os
@@ -62,6 +99,7 @@ def _setup_persistent_log():
     logging.getLogger().addHandler(fh)
 
 _setup_persistent_log()
+_install_secret_redaction()
 
 async def _get_check_time() -> tuple:
     """Read daily check time from DB (SystemSetting key 'check_time'), fallback to 06:00."""
