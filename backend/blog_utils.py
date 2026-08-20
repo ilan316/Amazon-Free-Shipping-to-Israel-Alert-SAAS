@@ -28,7 +28,11 @@ def claude_text(message) -> str:
         text = getattr(block, "text", None)
         if text is not None:
             return text
-    raise ValueError("No text block in Claude response")
+    kinds = [getattr(block, "type", "?") for block in message.content]
+    raise ValueError(
+        f"No text block in Claude response "
+        f"(stop_reason={message.stop_reason}, blocks={kinds})"
+    )
 
 
 _TAG_RE = re.compile(r"<[^>]+>")

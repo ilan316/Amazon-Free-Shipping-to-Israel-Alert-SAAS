@@ -296,7 +296,8 @@ async def _get_category_he(db, english_name: str) -> str:
         client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
         msg = client.messages.create(
             model="claude-sonnet-5",
-            max_tokens=50,
+            max_tokens=200,
+            thinking={"type": "disabled"},
             messages=[{
                 "role": "user",
                 "content": f'תרגם את שם קטגוריית המוצר הזו מאמזון לעברית קצרה ומדויקת. ענה רק עם התרגום, ללא הסברים: "{english_name}"'

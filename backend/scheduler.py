@@ -912,7 +912,8 @@ def _product_hook(product: Product) -> str:
         category = product.amazon_category or ""
         msg = client.messages.create(
             model="claude-sonnet-5",
-            max_tokens=60,
+            max_tokens=200,
+            thinking={"type": "disabled"},
             system=_HOOK_SYSTEM,
             messages=[{"role": "user", "content": f"מוצר: {name_he}\nקטגוריה: {category}"}],
         )
@@ -1934,7 +1935,8 @@ async def run_hebrew_backfill():
             try:
                 msg = client.messages.create(
                     model="claude-sonnet-5",
-                    max_tokens=60,
+                    max_tokens=200,
+                    thinking={"type": "disabled"},
                     messages=[{"role": "user", "content": f"תרגם לעברית קצרה ומובנת (עד 7 מילים, שמור את שם המותג, ללא מרכאות): {p.name}"}],
                 )
                 p.name_he = claude_text(msg).strip()

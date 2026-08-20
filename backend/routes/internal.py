@@ -289,7 +289,8 @@ async def backfill_hebrew(db: Annotated[AsyncSession, Depends(get_db)]):
         try:
             msg = client.messages.create(
                 model="claude-sonnet-5",
-                max_tokens=60,
+                max_tokens=200,
+                thinking={"type": "disabled"},
                 messages=[{"role": "user", "content": f"תרגם לעברית קצרה ומובנת (עד 7 מילים, שמור את שם המותג, ללא מרכאות): {p.name}"}],
             )
             p.name_he = claude_text(msg).strip()
