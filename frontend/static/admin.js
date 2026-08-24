@@ -770,10 +770,11 @@ async function exportUsersCSV() {
 
 function exportAdminCSV() {
   if (!_allAdminProducts.length) return;
-  const headers = ['ASIN', 'שם', 'סטטוס', 'עוקבים', 'בדיקה אחרונה', 'שגיאות רצופות', 'קישור'];
+  const headers = ['ASIN', 'שם', 'מחיר', 'סטטוס', 'עוקבים', 'בדיקה אחרונה', 'שגיאות רצופות', 'קישור'];
   const rows = _allAdminProducts.map(p => [
     p.asin,
     p.name || '',
+    p.last_price || '',
     p.last_status || '',
     p.watchers,
     p.last_checked ? new Date(p.last_checked).toLocaleString('he-IL') : '',
