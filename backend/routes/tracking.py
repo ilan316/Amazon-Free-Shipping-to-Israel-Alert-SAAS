@@ -108,6 +108,13 @@ async def track_click(
                     return RedirectResponse(url, status_code=302)
             click = EmailClick(user_id=u, asin=a[:10] if a else "", ip=ip, dest_url=url[:512])
             db.add(click)
+            # A real click is a sign of life — pull the user out of auto-vacation
+            if u:
+                from backend.models import User
+                from backend.vacation import resume_if_auto
+                clicker = (await db.execute(select(User).where(User.id == u))).scalar_one_or_none()
+                if clicker:
+                    await resume_if_auto(db, clicker)
             await db.commit()
     except Exception as exc:
         logger.warning(f"Failed to record email click: {exc}")

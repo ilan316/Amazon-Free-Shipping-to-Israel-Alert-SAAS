@@ -16,6 +16,9 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     vacation_mode: Mapped[bool] = mapped_column(Boolean, default=False)
+    # True = vacation was set by the inactivity scheduler, so a login/click wakes the
+    # user up automatically. False = the user asked for it — never auto-resume.
+    vacation_auto: Mapped[bool] = mapped_column(Boolean, default=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     google_id: Mapped[str | None] = mapped_column(String(100), nullable=True, unique=True)

@@ -94,11 +94,14 @@ async def set_vacation_mode(
     current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),
 ):
+    from backend.vacation import enter_vacation, exit_vacation
+
     vacation = bool(body.get("vacation_mode", False))
-    current_user.vacation_mode = vacation
-    await db.execute(
-        update(UserProduct).where(UserProduct.user_id == current_user.id).values(is_paused=vacation)
-    )
+    if vacation:
+        # The user asked for it — auto=False so the scheduler never wakes them up.
+        await enter_vacation(db, current_user, auto=False)
+    else:
+        await exit_vacation(db, current_user)
     await db.commit()
     await db.refresh(current_user)
     return current_user

@@ -423,6 +423,7 @@ async def run_inactivity_check():
     Phase 2 (days):    move to vacation_mode.
     """
     from backend.models import SystemSetting, EmailClick
+    from backend.vacation import enter_vacation
     async with AsyncSessionLocal() as db:
         row = (await db.execute(
             select(SystemSetting).where(SystemSetting.key == "inactivity_days")
@@ -477,11 +478,8 @@ async def run_inactivity_check():
             user.automation_reengagement_sent_at = None
 
         for user in to_vacation:
-            user.vacation_mode = True
+            await enter_vacation(db, user, auto=True)
             user.automation_reengagement_sent_at = None
-            await db.execute(
-                update(UserProduct).where(UserProduct.user_id == user.id).values(is_paused=True)
-            )
             logger.info(f"[inactivity] User {user.id} → vacation_mode (inactive {days}+ days)")
 
         if tpl and to_warn:

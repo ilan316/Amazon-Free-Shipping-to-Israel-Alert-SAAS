@@ -3,7 +3,7 @@ import io
 import logging
 import os
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 from typing import Annotated
@@ -220,9 +220,46 @@ async def list_users(
     )
     last_added_map = {row.user_id: row.last_added for row in last_added_rows}
 
+    # Batch-fetch last email click per user — the strongest engagement signal we have
+    from backend.models import EmailClick, SystemSetting
+    click_rows = await db.execute(
+        select(EmailClick.user_id, func.max(EmailClick.clicked_at).label("last_click"))
+        .group_by(EmailClick.user_id)
+    )
+    last_click_map = {row.user_id: row.last_click for row in click_rows}
+
+    days_row = (await db.execute(
+        select(SystemSetting).where(SystemSetting.key == "inactivity_days")
+    )).scalar_one_or_none()
+    inactivity_days = int(days_row.value) if days_row else 90
+    now = datetime.now(timezone.utc)
+
+    def _engagement(u: User) -> str:
+        """Same thresholds the inactivity scheduler uses, so the panel matches reality."""
+        if u.vacation_mode:
+            return "vacation_auto" if u.vacation_auto else "vacation_manual"
+        last_click = last_click_map.get(u.id)
+        prods = product_count_map.get(u.id, 0)
+        if prods == 0 and last_click is None:
+            return "ghost"
+        if prods == 0:
+            return "no_products"
+        candidates = [d for d in (u.last_login_at, last_click) if d is not None]
+        if not candidates:
+            return "unknown"  # no activity data — skipped by the inactivity check
+        idle = (now - max(candidates)).days
+        if idle >= inactivity_days:
+            return "dormant"
+        if idle >= max(inactivity_days - 15, 1):
+            return "warning"
+        return "active"
+
     return [
         {
             "id": u.id,
+            "engagement": _engagement(u),
+            "last_click_at": last_click_map[u.id].isoformat() if last_click_map.get(u.id) else None,
+            "vacation_auto": u.vacation_auto,
             "email": u.email,
             "notify_email": u.notify_email,
             "is_active": u.is_active,

@@ -14,6 +14,7 @@ from backend.database import get_db
 from backend.models import User
 from backend.auth import hash_password, verify_password, create_access_token, SECRET_KEY, ALGORITHM
 from backend.schemas import RegisterRequest, LoginRequest, TokenResponse, MessageResponse
+from backend.vacation import resume_if_auto
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -173,6 +174,7 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
     if not user.is_verified:
         raise HTTPException(status_code=403, detail="EMAIL_NOT_VERIFIED")
     user.last_login_at = datetime.now(timezone.utc)
+    await resume_if_auto(db, user)
     await db.commit()
     return TokenResponse(access_token=create_access_token(user.id))
 
@@ -224,6 +226,7 @@ async def google_login_extension(request: Request, background_tasks: BackgroundT
         if not user.is_verified:
             user.is_verified = True
         user.last_login_at = datetime.now(timezone.utc)
+        await resume_if_auto(db, user)
         await db.commit()
     else:
         user = User(
@@ -304,6 +307,7 @@ async def google_login(request: Request, background_tasks: BackgroundTasks, db: 
         if not user.is_verified:
             user.is_verified = True
         user.last_login_at = datetime.now(timezone.utc)
+        await resume_if_auto(db, user)
         await db.commit()
     else:
         # Create new user — verified immediately, no password

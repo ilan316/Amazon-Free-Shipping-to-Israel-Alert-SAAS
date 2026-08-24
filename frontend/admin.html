@@ -359,6 +359,7 @@
           <span id="summary-active"   style="background:#e8f5e9;color:#2e7d32;padding:4px 14px;border-radius:20px;font-size:0.85rem;font-weight:600;">✅ פעיל: —</span>
           <span id="summary-vacation" style="background:#fff8e1;color:#b45309;padding:4px 14px;border-radius:20px;font-size:0.85rem;font-weight:600;">🏖 חופשה: —</span>
           <span id="summary-inactive" style="background:#fce8e8;color:#c0392b;padding:4px 14px;border-radius:20px;font-size:0.85rem;font-weight:600;">⏸ מושהה: —</span>
+          <span id="summary-engagement" style="background:#eef2ff;color:#3730a3;padding:4px 14px;border-radius:20px;font-size:0.85rem;font-weight:600;" title="מעורבות בפועל (רק משתמשים לא-מושהים): פעיל · אזהרה · רדום · ללא מוצרים">🔥 מעורב: —</span>
         </div>
 
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
@@ -368,13 +369,17 @@
           <button class="filter-btn user-filter-btn" data-uf="ACTIVE" onclick="setUserFilter('ACTIVE',this)">✅ פעיל</button>
           <button class="filter-btn user-filter-btn" data-uf="VACATION" onclick="setUserFilter('VACATION',this)">🏖 חופשה</button>
           <button class="filter-btn user-filter-btn" data-uf="INACTIVE" onclick="setUserFilter('INACTIVE',this)">⏸ מושהה</button>
+          <button class="filter-btn user-filter-btn" data-uf="ENGAGED" onclick="setUserFilter('ENGAGED',this)">🔥 מעורב</button>
+          <button class="filter-btn user-filter-btn" data-uf="WARNING" onclick="setUserFilter('WARNING',this)">⚠️ אזהרה</button>
+          <button class="filter-btn user-filter-btn" data-uf="DORMANT" onclick="setUserFilter('DORMANT',this)">😴 רדום</button>
+          <button class="filter-btn user-filter-btn" data-uf="GHOST" onclick="setUserFilter('GHOST',this)">👻 ללא מוצרים</button>
         </div>
 
         <div id="users-alert" class="alert"></div>
         <div style="overflow-x:auto;">
           <table class="admin-table">
             <thead>
-              <tr><th>#</th><th>אימייל</th><th>אימייל התראה</th><th>מוצרים</th><th>מגבלה</th><th>נרשם</th><th>סטטוס</th><th>פעולות</th></tr>
+              <tr><th>#</th><th>אימייל</th><th>אימייל התראה</th><th>מוצרים</th><th>מגבלה</th><th>נרשם</th><th>סטטוס</th><th>מעורבות</th><th>פעולות</th></tr>
             </thead>
             <tbody id="users-body">
               <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">טוען...</td></tr>
@@ -776,7 +781,7 @@
   </div>
 
   <script src="/static/app.js?v=11"></script>
-  <script src="/static/admin.js?v=58"></script>
+  <script src="/static/admin.js?v=59"></script>
   <script>
     requireAuth();
     loadAdminData();

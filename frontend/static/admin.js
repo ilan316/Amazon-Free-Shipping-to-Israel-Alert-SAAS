@@ -438,6 +438,24 @@ async function saveSystemMessage() {
   setTimeout(() => { statusEl.textContent = ""; }, 3000);
 }
 
+// Engagement is computed server-side with the same thresholds the inactivity
+// scheduler uses, so the panel shows what the system will actually do.
+const ENGAGEMENT_LABELS = {
+  active:           { text: '✅ פעיל',        bg: '#e8f5e9', fg: '#2e7d32', title: 'פעילות בחלון הפעיל' },
+  warning:          { text: '⚠️ אזהרה',       bg: '#fff8e1', fg: '#b45309', title: 'בחלון האזהרה — מייל re-engagement בדרך' },
+  dormant:          { text: '😴 רדום',        bg: '#fdecea', fg: '#c0392b', title: 'עבר את סף חוסר הפעילות — ייכנס לחופשה בריצה הלילית' },
+  ghost:            { text: '👻 רוח רפאים',   bg: '#eceff1', fg: '#607d8b', title: 'נרשם ומעולם לא הוסיף מוצר ולא לחץ' },
+  no_products:      { text: '📭 ללא מוצרים',  bg: '#eceff1', fg: '#607d8b', title: 'לחץ בעבר אך אין לו מוצרים כרגע' },
+  unknown:          { text: '❔ אין נתונים',  bg: '#eceff1', fg: '#607d8b', title: 'אין כניסה ואין קליק — בדיקת חוסר הפעילות מדלגת עליו' },
+  vacation_auto:    { text: '🏖 חופשה (אוטו)', bg: '#e3f2fd', fg: '#1565c0', title: 'הוכנס לחופשה ע"י המערכת — יחזור אוטומטית בכניסה או בקליק' },
+  vacation_manual:  { text: '🏖 חופשה (יזום)', bg: '#fff8e1', fg: '#b45309', title: 'המשתמש ביקש חופשה — לא נחזיר אותו אוטומטית' },
+};
+
+function engagementBadge(u) {
+  const e = ENGAGEMENT_LABELS[u.engagement] || ENGAGEMENT_LABELS.unknown;
+  return `<span title="${e.title}" style="background:${e.bg};color:${e.fg};padding:2px 9px;border-radius:12px;font-size:0.72rem;font-weight:700;white-space:nowrap;">${e.text}</span>`;
+}
+
 function setUserFilter(filter, btn) {
   _userFilter = filter;
   document.querySelectorAll('.user-filter-btn').forEach(b => b.classList.remove('active'));
@@ -456,7 +474,11 @@ function filterUsers() {
       _userFilter === 'ALL' ||
       (_userFilter === 'ACTIVE'   &&  u.is_active && !u.vacation_mode) ||
       (_userFilter === 'VACATION' &&  u.is_active &&  u.vacation_mode) ||
-      (_userFilter === 'INACTIVE' && !u.is_active);
+      (_userFilter === 'INACTIVE' && !u.is_active) ||
+      (_userFilter === 'ENGAGED'  &&  u.is_active && u.engagement === 'active') ||
+      (_userFilter === 'WARNING'  &&  u.is_active && u.engagement === 'warning') ||
+      (_userFilter === 'DORMANT'  &&  u.is_active && u.engagement === 'dormant') ||
+      (_userFilter === 'GHOST'    &&  u.is_active && (u.engagement === 'ghost' || u.engagement === 'no_products'));
     const show = matchText && matchFilter;
     row.style.display = show ? '' : 'none';
     if (expandRow && !show) expandRow.style.display = 'none';
@@ -465,10 +487,16 @@ function filterUsers() {
 
 function updateUsersSummary(users) {
   let active = 0, vacation = 0, inactive = 0;
+  const eng = { active: 0, warning: 0, dormant: 0, ghostish: 0 };
   users.forEach(u => {
     if (!u.is_active) inactive++;
     else if (u.vacation_mode) vacation++;
     else active++;
+    if (!u.is_active) return;
+    if (u.engagement === 'active') eng.active++;
+    else if (u.engagement === 'warning') eng.warning++;
+    else if (u.engagement === 'dormant') eng.dormant++;
+    else if (u.engagement === 'ghost' || u.engagement === 'no_products') eng.ghostish++;
   });
   const elA = document.getElementById('summary-active');
   const elV = document.getElementById('summary-vacation');
@@ -476,6 +504,8 @@ function updateUsersSummary(users) {
   if (elA) elA.textContent = `✅ פעיל: ${active}`;
   if (elV) elV.textContent = `🏖 חופשה: ${vacation}`;
   if (elI) elI.textContent = `⏸ מושהה: ${inactive}`;
+  const elE = document.getElementById('summary-engagement');
+  if (elE) elE.textContent = `🔥 מעורב: ${eng.active} · ⚠️ ${eng.warning} · 😴 ${eng.dormant} · 👻 ${eng.ghostish}`;
 }
 
 async function toggleUserProducts(userId, email) {
@@ -507,11 +537,14 @@ async function toggleUserProducts(userId, email) {
   const u = _allUsers.find(x => x.id === userId);
   const lastLogin = u?.last_login_at ? new Date(u.last_login_at).toLocaleString('he-IL', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '<span style="color:var(--text-muted);font-size:0.78rem;">לא נרשם (לפני המעקב)</span>';
   const lastAdded = u?.last_product_added_at ? new Date(u.last_product_added_at).toLocaleDateString('he-IL') : '—';
+  const lastClick = u?.last_click_at ? new Date(u.last_click_at).toLocaleString('he-IL', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '<span style="color:var(--text-muted);font-size:0.78rem;">אף פעם</span>';
 
   const metaBar = `
     <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px;font-size:0.82rem;">
       <span>🔑 <strong>כניסה אחרונה:</strong> <span dir="ltr">${lastLogin}</span></span>
       <span>📦 <strong>מוצר אחרון נוסף:</strong> <span dir="ltr">${lastAdded}</span></span>
+      <span>🖱 <strong>קליק אחרון במייל:</strong> <span dir="ltr">${lastClick}</span></span>
+      <span>📊 <strong>מעורבות:</strong> ${u ? engagementBadge(u) : '—'}</span>
     </div>`;
 
   const emailSection = `
@@ -591,7 +624,7 @@ async function loadUsers() {
   if (globalLimitEl) globalLimitEl.value = globalLimit;
   const tbody = document.getElementById("users-body");
   if (!users.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">אין משתמשים</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:24px;">אין משתמשים</td></tr>';
     return;
   }
 
@@ -623,6 +656,7 @@ async function loadUsers() {
               ? '<span style="color:var(--warning,#f59e0b);font-weight:600;">🏖 חופשה</span>'
               : '<span style="color:var(--success);font-weight:600;">פעיל</span>'}
       </td>
+      <td>${engagementBadge(u)}</td>
       <td onclick="event.stopPropagation()">
         <div class="action-btns">
           <button class="btn-sm ${u.is_active ? 'active-toggle' : 'inactive-toggle'}"
@@ -635,7 +669,7 @@ async function loadUsers() {
       </td>
     </tr>
     <tr id="user-expand-${u.id}" style="display:none;">
-      <td colspan="8" style="background:var(--surface);padding:12px 20px;border-bottom:2px solid var(--border);"></td>
+      <td colspan="9" style="background:var(--surface);padding:12px 20px;border-bottom:2px solid var(--border);"></td>
     </tr>`;
   }).join("");
   updateUsersSummary(users);
@@ -751,7 +785,7 @@ async function exportUsersCSV() {
   if (btn) { btn.textContent = origText; btn.disabled = false; }
 
   const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('he-IL') : '';
-  const headers = ['#', 'אימייל', 'אימייל התראה', 'מוצרים', 'ASINs', 'סטטוס', 'נרשם', 'כניסה אחרונה', 'מוצר אחרון נוסף', 'מגבלת מוצרים', 'Bounce'];
+  const headers = ['#', 'אימייל', 'אימייל התראה', 'מוצרים', 'ASINs', 'סטטוס', 'מעורבות', 'נרשם', 'כניסה אחרונה', 'קליק אחרון', 'מוצר אחרון נוסף', 'מגבלת מוצרים', 'Bounce'];
   const rows = _allUsers.map(u => [
     u.id,
     u.email,
@@ -759,8 +793,10 @@ async function exportUsersCSV() {
     u.product_count,
     asinMap[u.id] || '',
     !u.is_active ? 'מושהה' : u.vacation_mode ? 'חופשה' : 'פעיל',
+    (ENGAGEMENT_LABELS[u.engagement] || ENGAGEMENT_LABELS.unknown).text,
     fmtDate(u.created_at),
     fmtDate(u.last_login_at),
+    fmtDate(u.last_click_at),
     fmtDate(u.last_product_added_at),
     u.max_products !== null && u.max_products !== undefined ? u.max_products : 'גלובלית',
     u.notify_email_bounced ? (u.notify_email_bounce_type === 'complaint' ? 'ספאם' : 'Bounce') : '',
