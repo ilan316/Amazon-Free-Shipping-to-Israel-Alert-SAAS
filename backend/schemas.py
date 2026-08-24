@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -10,10 +10,21 @@ class RegisterRequest(BaseModel):
     notify_email: EmailStr
     language: str = "he"
 
+    @field_validator("email", "notify_email")
+    @classmethod
+    def _lower_email(cls, v: str) -> str:
+        # Emails are stored and compared lowercase — mixed case created duplicate accounts.
+        return v.strip().lower()
+
 
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+    @field_validator("email")
+    @classmethod
+    def _lower_email(cls, v: str) -> str:
+        return v.strip().lower()
 
 
 class TokenResponse(BaseModel):
@@ -41,6 +52,11 @@ class UserResponse(BaseModel):
 class UpdateSettingsRequest(BaseModel):
     notify_email: EmailStr | None = None
     language: str | None = None
+
+    @field_validator("notify_email")
+    @classmethod
+    def _lower_email(cls, v: str | None) -> str | None:
+        return v.strip().lower() if v else v
 
 
 class ChangePasswordRequest(BaseModel):

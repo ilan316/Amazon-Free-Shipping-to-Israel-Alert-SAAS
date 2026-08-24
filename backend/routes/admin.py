@@ -591,9 +591,10 @@ async def trigger_summary(
 
     target = admin
     if to:
-        found = (await db.execute(select(User).where(User.email == to))).scalar_one_or_none()
+        to_norm = to.strip().lower()
+        found = (await db.execute(select(User).where(func.lower(User.email) == to_norm))).scalar_one_or_none()
         if not found:
-            found = (await db.execute(select(User).where(User.notify_email == to))).scalar_one_or_none()
+            found = (await db.execute(select(User).where(func.lower(User.notify_email) == to_norm))).scalar_one_or_none()
         if found:
             target = found
 
@@ -972,8 +973,11 @@ async def request_email_change(
     if not verify_password(body.current_password, admin.password_hash):
         raise HTTPException(status_code=400, detail="הסיסמה שגויה")
 
+    # Emails are stored lowercase — mixed case used to create duplicate accounts
+    body.new_email = body.new_email.strip().lower()
+
     # Check new email not already taken
-    existing = (await db.execute(select(User).where(User.email == body.new_email))).scalar_one_or_none()
+    existing = (await db.execute(select(User).where(func.lower(User.email) == body.new_email))).scalar_one_or_none()
     if existing:
         raise HTTPException(status_code=400, detail="אימייל זה כבר בשימוש")
 
@@ -2162,7 +2166,7 @@ async def query_notifications(
     if asin:
         stmt = stmt.where(Product.asin == asin)
     if email:
-        stmt = stmt.where(User.email == email)
+        stmt = stmt.where(func.lower(User.email) == email.strip().lower())
 
     rows = (await db.execute(stmt)).all()
     return {

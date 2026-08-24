@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from backend.main import limiter
 
 from backend.database import get_db
@@ -84,7 +84,7 @@ def _send_verify_email(user: User, token: str):
 @router.post("/register", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
 async def register(request: Request, body: RegisterRequest, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
-    existing = await db.execute(select(User).where(User.email == body.email))
+    existing = await db.execute(select(User).where(func.lower(User.email) == body.email))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
 
@@ -154,7 +154,7 @@ async def verify_email(token: str, db: AsyncSession = Depends(get_db)):
 @limiter.limit("3/minute")
 async def resend_verification(request: Request, body: dict, db: AsyncSession = Depends(get_db)):
     email = body.get("email", "").strip().lower()
-    result = await db.execute(select(User).where(User.email == email))
+    result = await db.execute(select(User).where(func.lower(User.email) == email))
     user = result.scalar_one_or_none()
     # Always return success to prevent email enumeration
     if user and not user.is_verified:
@@ -166,7 +166,7 @@ async def resend_verification(request: Request, body: dict, db: AsyncSession = D
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit("10/minute")
 async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == body.email, User.is_active == True))
+    result = await db.execute(select(User).where(func.lower(User.email) == body.email, User.is_active == True))
     user = result.scalar_one_or_none()
     if not user or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -213,7 +213,7 @@ async def google_login_extension(request: Request, background_tasks: BackgroundT
     user = result.scalar_one_or_none()
 
     if not user:
-        result = await db.execute(select(User).where(User.email == email))
+        result = await db.execute(select(User).where(func.lower(User.email) == email))
         user = result.scalar_one_or_none()
 
     if user:
@@ -292,7 +292,7 @@ async def google_login(request: Request, background_tasks: BackgroundTasks, db: 
     user = result.scalar_one_or_none()
 
     if not user:
-        result = await db.execute(select(User).where(User.email == email))
+        result = await db.execute(select(User).where(func.lower(User.email) == email))
         user = result.scalar_one_or_none()
 
     if user:

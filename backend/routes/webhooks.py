@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
@@ -46,7 +46,7 @@ async def resend_webhook(
         email = email.strip().lower()
         result = await db.execute(
             select(User).where(
-                or_(User.notify_email == email, User.email == email)
+                or_(func.lower(User.notify_email) == email, func.lower(User.email) == email)
             )
         )
         users = result.scalars().all()
