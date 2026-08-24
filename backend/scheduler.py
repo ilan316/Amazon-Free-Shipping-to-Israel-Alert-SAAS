@@ -1790,6 +1790,35 @@ async def run_send_blog_social_queue():
             await db.commit()
 
 
+UNVERIFIED_TTL_DAYS = 14
+
+
+async def run_purge_unverified():
+    """Delete accounts that never confirmed their email. Runs daily at 02:30 IL.
+
+    A row that sat unverified for two weeks is not a user — it is a typo, a bot,
+    or someone who changed their mind. Keeping them inflated every count in the
+    admin panel and blocked the address from being registered again. All user_id
+    foreign keys are ON DELETE CASCADE / SET NULL, so a plain delete is enough.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=UNVERIFIED_TTL_DAYS)
+    async with AsyncSessionLocal() as db:
+        rows = (await db.execute(
+            select(User.id, User.email).where(
+                User.is_verified == False,
+                User.is_admin == False,
+                User.created_at < cutoff,
+            )
+        )).all()
+        if not rows:
+            logger.info("=== Unverified purge: nothing to delete ===")
+            return
+        await db.execute(delete(User).where(User.id.in_([r.id for r in rows])))
+        await db.commit()
+    logger.info(f"=== Unverified purge: deleted {len(rows)} account(s) older than "
+                f"{UNVERIFIED_TTL_DAYS}d: {[r.email for r in rows]} ===")
+
+
 async def run_cleanup_orphans():
     """Delete user-source products with no watchers. Runs once daily at 02:00 IL."""
     logger.info("=== Orphan cleanup started ===")

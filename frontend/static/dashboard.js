@@ -141,7 +141,9 @@ function renderProducts() {
         <div class="empty-icon">📦</div>
         <p>עדיין לא הוספת מוצרים למעקב</p>
         <p style="font-size:0.85rem; margin-top:8px;">הדבק URL של מוצר אמזון או ASIN בתיבה למעלה</p>
-      </div>`;
+      </div>
+      <div id="empty-suggestions"></div>`;
+    renderEmptySuggestions();
     return;
   }
 
@@ -360,6 +362,59 @@ function escHtml(str) {
 }
 
 // ── Add product (single + bulk) ───────────────────────────────────────────────
+
+// A blank dashboard is where signups die: two activation emails already told
+// these users to paste a URL and they still had nothing to paste. Show real
+// products that ship free right now, one click to track.
+async function renderEmptySuggestions() {
+  const box = document.getElementById("empty-suggestions");
+  if (!box) return;
+  let items = [];
+  try {
+    const res = await fetch("/api/public/free-products");
+    if (!res.ok) return;
+    items = (await res.json()).slice(0, 6);
+  } catch { return; }
+  if (!items.length) return;
+
+  box.innerHTML = `
+    <div style="margin-top:8px;">
+      <p style="font-weight:700;margin-bottom:4px;">✨ נשלחים חינם לישראל ממש עכשיו</p>
+      <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px;">לחיצה אחת ונתחיל לעקוב עבורך</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;">
+        ${items.map(p => `
+          <div style="border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;background:#fff;">
+            <img src="${p.image}" alt="" loading="lazy" style="width:100%;height:110px;object-fit:contain;margin-bottom:8px;">
+            <div style="font-size:0.78rem;line-height:1.35;height:3.4em;overflow:hidden;margin-bottom:8px;">${p.name_he || p.name}</div>
+            <button class="btn-outline" style="width:100%;padding:6px;font-size:0.8rem;"
+              onclick="addSuggested('${p.asin}', this)">➕ עקוב</button>
+          </div>`).join("")}
+      </div>
+    </div>`;
+}
+
+async function addSuggested(asin, btn) {
+  btn.disabled = true;
+  btn.textContent = "מוסיף...";
+  const res = await apiFetch("/me/products", {
+    method: "POST",
+    body: JSON.stringify({ url_or_asin: asin }),
+  });
+  if (!res || !res.ok) {
+    btn.disabled = false;
+    btn.textContent = "➕ עקוב";
+    const err = res ? await res.json().catch(() => ({})) : {};
+    showToast(err.detail || "שגיאה בהוספת המוצר", "error");
+    return;
+  }
+  const newProduct = await res.json();
+  checkingAsins.add(newProduct.asin);
+  products.unshift(newProduct);
+  renderProducts();
+  showToast(`✅ מוצר ${newProduct.asin} נוסף — בודק סטטוס...`, "success");
+  apiFetch("/me/products/check-new", { method: "POST" }).catch(() => {});
+  _pollForChecked([newProduct.asin], document.getElementById("add-alert"));
+}
 
 async function addProduct() {
   const input   = document.getElementById("add-input");
