@@ -721,6 +721,38 @@ function setAdminFilter(filter, btn) {
   renderAdminProducts();
 }
 
+// The Israel extra-cost cell for the admin products table.
+// Deliberately shows the raw extraction, unlike israelCostLine() in dashboard.js: there the
+// shipping fee is hidden on FREE products (their free delivery is conditional on an order
+// minimum, so showing both reads as a contradiction). Hiding it here would hide exactly the
+// rows worth inspecting. No percentage either — that's a persuasion device for the user,
+// noise for monitoring.
+function adminIsraelCost(p) {
+  const kind = p.israel_cost_kind;
+  if (!kind) {
+    return '<span style="color:var(--text-muted);" title="לא חולץ מדף המוצר">—</span>';
+  }
+  if (kind === 'free') {
+    return '<span style="color:#007600;" title="ללא עלות נוספת מעבר למחיר המוצר">✅</span>';
+  }
+
+  const extra = parseFloat(String(p.israel_extra_cost || '').replace(/[^\d.]/g, ''));
+  if (!isFinite(extra)) {
+    return `<span style="color:#e67e00;" title="kind=${kind} אבל הסכום לא מספרי: ${p.israel_extra_cost}">⚠️</span>`;
+  }
+
+  const price = parseFloat(String(p.last_price || '').replace(/[^\d.]/g, ''));
+  const totalTip = isFinite(price) && price > 0 ? ` · סה"כ ${(price + extra).toFixed(2)}₪` : '';
+  const desc = {
+    shipping_only:   ['🚚',   `משלוח ${extra.toFixed(2)}₪`],
+    shipping_import: ['🚚🧾', `משלוח ומכס ${extra.toFixed(2)}₪`],
+    import_only:     ['🧾',   `מכס ${extra.toFixed(2)}₪ · משלוח חינם`],
+    combined:        ['🚚🧾', `${extra.toFixed(2)}₪ — סכום ממוזג, אמזון לא מפצלת משלוח ממכס`],
+  }[kind] || ['❔', `kind לא מוכר: ${kind}`];
+
+  return `<span dir="ltr" title="${desc[1]}${totalTip}" style="cursor:help;white-space:nowrap;">${desc[0]} +${extra.toFixed(2)}</span>`;
+}
+
 function renderAdminProducts() {
   const tbody = document.getElementById("products-body");
   const selectAll = document.getElementById("select-all-products");
@@ -749,6 +781,17 @@ function renderAdminProducts() {
     if (lblMap[f]) btn.textContent = lblMap[f];
   });
 
+  // Extraction coverage: how many products we managed to read a figure for. This is the
+  // number that says whether the feature is worth anything — check it after the 06:00 run.
+  const coverageEl = document.getElementById('israel-cost-coverage');
+  if (coverageEl) {
+    const withCost = _allAdminProducts.filter(p => p.israel_cost_kind).length;
+    const total = _allAdminProducts.length;
+    const pct = total ? Math.round(withCost / total * 100) : 0;
+    coverageEl.textContent = `עלות לישראל: ${withCost}/${total} (${pct}%)`;
+    coverageEl.title = 'על כמה מוצרים הצליח החילוץ מ-amazonGlobal_feature_div בבדיקה האחרונה';
+  }
+
   const fullyPaused = p => p.watchers === 0 || (p.paused_watchers > 0 && p.paused_watchers === p.watchers);
   const filtered = _adminFilter === 'ALL'
     ? _allAdminProducts
@@ -757,7 +800,7 @@ function renderAdminProducts() {
       : _allAdminProducts.filter(p => p.last_status === _adminFilter && !fullyPaused(p));
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:24px;">אין מוצרים</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:24px;">אין מוצרים</td></tr>';
     return;
   }
   tbody.innerHTML = filtered.map(p => `
@@ -771,6 +814,7 @@ function renderAdminProducts() {
         : `<span class="status-badge badge-${p.last_status}" title="${STATUS_TOOLTIP[p.last_status] || ''}">${statusLabel(p.last_status)}</span>`
       }${p.screenshot_path ? ` <a href="/admin/screenshot/${p.screenshot_path}" target="_blank" title="צפה בצילום מסך מהבדיקה האחרונה" style="text-decoration:none;">📷</a>` : ''}</td>
       <td style="text-align:center;font-size:0.82rem;color:#B12704;font-weight:bold;" dir="ltr">${p.last_price || '—'}</td>
+      <td style="text-align:center;font-size:0.8rem;">${adminIsraelCost(p)}</td>
       <td style="text-align:center;">${p.watchers}${p.paused_watchers > 0 ? ` <span title="${p.paused_watchers} עוקבים בהשהייה" style="font-size:0.78rem;color:#888;cursor:help;">⏸${p.paused_watchers}</span>` : ''}</td>
       <td class="ltr">
         ${p.last_checked ? formatDate(p.last_checked) : "—"}

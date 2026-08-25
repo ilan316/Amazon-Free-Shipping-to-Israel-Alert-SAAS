@@ -437,17 +437,18 @@
           <button class="filter-btn admin-filter-btn" data-filter="NOT_FOUND" onclick="setAdminFilter('NOT_FOUND', this)">❌ מוצר לא קיים</button>
           <button class="filter-btn admin-filter-btn" data-filter="UNKNOWN" onclick="setAdminFilter('UNKNOWN', this)">⚠️ שגיאה</button>
           <button class="filter-btn admin-filter-btn" data-filter="PAUSED" onclick="setAdminFilter('PAUSED', this)">⏸ בהשהייה</button>
+          <span id="israel-cost-coverage" style="font-size:0.8rem;color:var(--text-muted);align-self:center;margin-right:8px;"></span>
         </div>
         <div style="overflow-x:auto;">
-          <table class="admin-table" style="table-layout:fixed;min-width:900px;">
+          <table class="admin-table" style="table-layout:fixed;min-width:1000px;">
             <thead>
               <tr>
                 <th style="width:36px;"><input type="checkbox" id="select-all-products" onchange="toggleSelectAllProducts(this)"></th>
-                <th style="width:100px;">ASIN</th><th style="width:66px;"></th><th style="width:auto;">שם</th><th style="width:110px;">סטטוס</th><th style="width:75px;">מחיר</th><th style="width:65px;">עוקבים</th><th style="width:105px;">בדיקה אחרונה</th><th style="width:80px;" title="מיילים מאז קליק אחרון / סה״כ">מספר / סך</th><th style="width:130px;">טקסט שנמצא</th><th style="width:70px;">בדיקה ידנית</th>
+                <th style="width:100px;">ASIN</th><th style="width:66px;"></th><th style="width:auto;">שם</th><th style="width:110px;">סטטוס</th><th style="width:75px;">מחיר</th><th style="width:95px;" title="מה שאמזון מוסיפה מעל מחיר המוצר עבור ישראל">עלות לישראל</th><th style="width:65px;">עוקבים</th><th style="width:105px;">בדיקה אחרונה</th><th style="width:80px;" title="מיילים מאז קליק אחרון / סה״כ">מספר / סך</th><th style="width:130px;">טקסט שנמצא</th><th style="width:70px;">בדיקה ידנית</th>
               </tr>
             </thead>
             <tbody id="products-body">
-              <tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:24px;">טוען...</td></tr>
+              <tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:24px;">טוען...</td></tr>
             </tbody>
           </table>
         </div>
@@ -809,7 +810,7 @@
   </div>
 
   <script src="/static/app.js?v=11"></script>
-  <script src="/static/admin.js?v=60"></script>
+  <script src="/static/admin.js?v=61"></script>
   <script>
     requireAuth();
     loadAdminData();
