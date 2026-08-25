@@ -486,6 +486,13 @@ function renderEngagementLegend() {
     `<div class="eng-tip-note">התאריך הקובע הוא המאוחר מבין הכניסה האחרונה לקליק האחרון במייל. הסף (${days ?? '—'} ימים) נקבע בלשונית ההגדרות.</div>`;
 }
 
+// האם אימייל ההתראות שונה מאימייל ההרשמה (השוואה ללא רגישות לרישיות/רווחים)
+function notifyDiffers(u) {
+  const norm = s => (s || '').trim().toLowerCase();
+  const n = norm(u.notify_email);
+  return !!n && n !== norm(u.email);
+}
+
 function setUserFilter(filter, btn) {
   _userFilter = filter;
   document.querySelectorAll('.user-filter-btn').forEach(b => b.classList.remove('active'));
@@ -516,9 +523,10 @@ function filterUsers() {
 }
 
 function updateUsersSummary(users) {
-  let active = 0, vacation = 0, inactive = 0;
+  let active = 0, vacation = 0, inactive = 0, notifyDiff = 0;
   const eng = { active: 0, warning: 0, dormant: 0, ghostish: 0 };
   users.forEach(u => {
+    if (notifyDiffers(u)) notifyDiff++;
     if (!u.is_active) inactive++;
     else if (u.vacation_mode) vacation++;
     else active++;
@@ -534,6 +542,11 @@ function updateUsersSummary(users) {
   if (elA) elA.textContent = `✅ פעיל: ${active}`;
   if (elV) elV.textContent = `🏖 חופשה: ${vacation}`;
   if (elI) elI.textContent = `⏸ מושהה: ${inactive}`;
+  const elN = document.getElementById('summary-notifydiff');
+  if (elN) {
+    elN.textContent = `📨 אימייל שונה: ${notifyDiff}`;
+    elN.style.display = notifyDiff ? '' : 'none';
+  }
   const elE = document.getElementById('summary-engagement');
   if (elE) elE.textContent = `🔥 מעורב: ${eng.active} · ⚠️ ${eng.warning} · 😴 ${eng.dormant} · 👻 ${eng.ghostish}`;
 }
@@ -654,7 +667,7 @@ async function loadUsers() {
   if (globalLimitEl) globalLimitEl.value = globalLimit;
   const tbody = document.getElementById("users-body");
   if (!users.length) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:24px;">אין משתמשים</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">אין משתמשים</td></tr>';
     return;
   }
 
@@ -668,8 +681,12 @@ async function loadUsers() {
     return `
     <tr id="user-row-${u.id}" style="cursor:pointer;" onclick="toggleUserProducts(${u.id}, '${emailEsc}')">
       <td>${u.id}</td>
-      <td class="ltr truncate">${u.email}</td>
-      <td class="ltr truncate">${u.notify_email}</td>
+      <td class="ltr">
+        <div class="truncate">${u.email}</div>
+        ${notifyDiffers(u)
+          ? `<div class="truncate" style="color:#b45309;font-size:0.75rem;margin-top:2px;" title="אימייל ההתראות שונה מאימייל ההרשמה">📨 ${u.notify_email}</div>`
+          : ''}
+      </td>
       <td style="text-align:center;">${u.product_count}</td>
       <td style="text-align:center;" onclick="event.stopPropagation()">
         ${limitDisplay}
@@ -699,7 +716,7 @@ async function loadUsers() {
       </td>
     </tr>
     <tr id="user-expand-${u.id}" style="display:none;">
-      <td colspan="9" style="background:var(--surface);padding:12px 20px;border-bottom:2px solid var(--border);"></td>
+      <td colspan="8" style="background:var(--surface);padding:12px 20px;border-bottom:2px solid var(--border);"></td>
     </tr>`;
   }).join("");
   updateUsersSummary(users);
@@ -860,11 +877,12 @@ async function exportUsersCSV() {
   if (btn) { btn.textContent = origText; btn.disabled = false; }
 
   const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('he-IL') : '';
-  const headers = ['#', 'אימייל', 'אימייל התראה', 'מוצרים', 'ASINs', 'סטטוס', 'מעורבות', 'נרשם', 'כניסה אחרונה', 'קליק אחרון', 'מוצר אחרון נוסף', 'מגבלת מוצרים', 'Bounce'];
+  const headers = ['#', 'אימייל', 'אימייל התראה', 'אימייל התראה שונה', 'מוצרים', 'ASINs', 'סטטוס', 'מעורבות', 'נרשם', 'כניסה אחרונה', 'קליק אחרון', 'מוצר אחרון נוסף', 'מגבלת מוצרים', 'Bounce'];
   const rows = _allUsers.map(u => [
     u.id,
     u.email,
     u.notify_email || '',
+    notifyDiffers(u) ? 'כן' : 'לא',
     u.product_count,
     asinMap[u.id] || '',
     !u.is_active ? 'מושהה' : u.vacation_mode ? 'חופשה' : 'פעיל',

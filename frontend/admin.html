@@ -387,6 +387,7 @@
           <span id="summary-active"   style="background:#e8f5e9;color:#2e7d32;padding:4px 14px;border-radius:20px;font-size:0.85rem;font-weight:600;">✅ פעיל: —</span>
           <span id="summary-vacation" style="background:#fff8e1;color:#b45309;padding:4px 14px;border-radius:20px;font-size:0.85rem;font-weight:600;">🏖 חופשה: —</span>
           <span id="summary-inactive" style="background:#fce8e8;color:#c0392b;padding:4px 14px;border-radius:20px;font-size:0.85rem;font-weight:600;">⏸ מושהה: —</span>
+          <span id="summary-notifydiff" style="display:none;background:#fff8e1;color:#b45309;padding:4px 14px;border-radius:20px;font-size:0.85rem;font-weight:600;" title="משתמשים שאימייל ההתראות שלהם שונה מאימייל ההרשמה">📨 אימייל שונה: —</span>
           <span id="summary-engagement" style="background:#eef2ff;color:#3730a3;padding:4px 14px;border-radius:20px;font-size:0.85rem;font-weight:600;" title="מעורבות בפועל (רק משתמשים לא-מושהים): פעיל · אזהרה · רדום · ללא מוצרים">🔥 מעורב: —</span>
         </div>
 
@@ -407,7 +408,7 @@
         <div style="overflow-x:auto;">
           <table class="admin-table">
             <thead>
-              <tr><th>#</th><th>אימייל</th><th>אימייל התראה</th><th>מוצרים</th><th>מגבלה</th><th>נרשם</th><th>סטטוס</th><th>מעורבות <span class="eng-help" tabindex="0">?<span class="eng-tip" id="engagement-legend"></span></span></th><th>פעולות</th></tr>
+              <tr><th>#</th><th>אימייל</th><th>מוצרים</th><th>מגבלה</th><th>נרשם</th><th>סטטוס</th><th>מעורבות <span class="eng-help" tabindex="0">?<span class="eng-tip" id="engagement-legend"></span></span></th><th>פעולות</th></tr>
             </thead>
             <tbody id="users-body">
               <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">טוען...</td></tr>
@@ -810,7 +811,7 @@
   </div>
 
   <script src="/static/app.js?v=11"></script>
-  <script src="/static/admin.js?v=61"></script>
+  <script src="/static/admin.js?v=62"></script>
   <script>
     requireAuth();
     loadAdminData();
