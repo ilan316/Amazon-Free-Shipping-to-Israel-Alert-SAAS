@@ -177,12 +177,16 @@ async function setGlobalProductLimit() {
   setTimeout(() => { msgEl.textContent = ""; }, 3000);
 }
 
+let inactivityDaysValue = null;
+
 async function loadInactivityDays() {
   const res = await apiFetch("/admin/inactivity-days");
   if (!res || !res.ok) return;
   const d = await res.json();
+  inactivityDaysValue = d.days;
   const inp = document.getElementById("inactivity-days-input");
   if (inp) inp.value = d.days;
+  renderEngagementLegend();
 }
 
 async function setInactivityDays() {
@@ -456,6 +460,32 @@ function engagementBadge(u) {
   return `<span title="${e.title}" style="background:${e.bg};color:${e.fg};padding:2px 9px;border-radius:12px;font-size:0.72rem;font-weight:700;white-space:nowrap;">${e.text}</span>`;
 }
 
+// The legend spells out the actual day thresholds instead of "recently" / "a while
+// ago" — the numbers come from the same setting the nightly job reads, so what the
+// column says and what the system does can never drift apart.
+function renderEngagementLegend() {
+  const box = document.getElementById("engagement-legend");
+  if (!box) return;
+  const days = inactivityDaysValue;
+  const warnAt = days ? days - 15 : null;
+  const span = (k) => {
+    const e = ENGAGEMENT_LABELS[k];
+    return `<span style="background:${e.bg};color:${e.fg};padding:1px 8px;border-radius:12px;font-size:0.7rem;font-weight:700;white-space:nowrap;">${e.text}</span>`;
+  };
+  const row = (k, txt) => `<div class="eng-tip-row">${span(k)}<span>${txt}</span></div>`;
+  box.innerHTML =
+    `<div style="font-weight:700;margin-bottom:8px;">איך נקבעת המעורבות</div>` +
+    row('active', `נכנס או לחץ במייל ב-${warnAt ?? '—'} הימים האחרונים.`) +
+    row('warning', `${warnAt ?? '—'}–${days ?? '—'} ימים בלי כניסה ובלי קליק. מקבל מייל החזרה.`) +
+    row('dormant', `מעל ${days ?? '—'} ימים בלי אות חיים — הריצה הלילית תכניס אותו לחופשה.`) +
+    row('ghost', `נרשם, מעולם לא הוסיף מוצר ומעולם לא לחץ.`) +
+    row('no_products', `היה פעיל בעבר אבל אין לו מוצרים במעקב כרגע.`) +
+    row('vacation_auto', `המערכת השהתה אותו. כניסה או קליק יחזירו אותו מעצמם.`) +
+    row('vacation_manual', `הוא ביקש להפסיק. לא נחזיר אותו אוטומטית.`) +
+    row('unknown', `אין כניסה ואין קליק — בדיקת חוסר הפעילות מדלגת עליו.`) +
+    `<div class="eng-tip-note">התאריך הקובע הוא המאוחר מבין הכניסה האחרונה לקליק האחרון במייל. הסף (${days ?? '—'} ימים) נקבע בלשונית ההגדרות.</div>`;
+}
+
 function setUserFilter(filter, btn) {
   _userFilter = filter;
   document.querySelectorAll('.user-filter-btn').forEach(b => b.classList.remove('active'));
@@ -673,6 +703,7 @@ async function loadUsers() {
     </tr>`;
   }).join("");
   updateUsersSummary(users);
+  renderEngagementLegend();
   filterUsers();
 }
 

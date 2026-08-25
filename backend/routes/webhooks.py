@@ -41,6 +41,7 @@ async def resend_webhook(
 
     bounce_type = "complaint" if event_type == "email.complained" else "bounce"
     updated = 0
+    deleted = 0
 
     for email in to_list:
         email = email.strip().lower()
@@ -51,6 +52,16 @@ async def resend_webhook(
         )
         users = result.scalars().all()
         for user in users:
+            # A bounce means the mailbox does not exist — there is no user behind the
+            # row, only a typo or a bot, so the account goes rather than lingering as a
+            # flagged ghost that inflates every count. Admins are exempt (a bounce on an
+            # admin address is an infrastructure problem, not a fake signup), and a spam
+            # complaint is a real person choosing to leave: flag, never delete.
+            if bounce_type == "bounce" and not user.is_admin:
+                logger.warning(f"Bounce: deleting user {user.id} ({email}) — mailbox does not exist")
+                await db.delete(user)
+                deleted += 1
+                continue
             if not user.notify_email_bounced:
                 user.notify_email_bounced = True
                 user.notify_email_bounced_at = datetime.now(timezone.utc)
@@ -59,4 +70,4 @@ async def resend_webhook(
                 logger.warning(f"Bounce/complaint recorded for user {user.id} ({email}) type={bounce_type}")
 
     await db.commit()
-    return {"ok": True, "updated": updated}
+    return {"ok": True, "updated": updated, "deleted": deleted}

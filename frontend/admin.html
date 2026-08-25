@@ -195,6 +195,34 @@
 
       /* Progress bar labels */
       #tpl-send-progress > div:last-child { flex-direction: column; gap: 8px; }
+
+      /* Engagement legend: keep inside the viewport on narrow screens */
+      .eng-help .eng-tip { width: min(300px, 84vw); }
+    }
+
+    /* Engagement column legend — hover/focus on the "?" in the table header */
+    .eng-help {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--border, #d5d9e0); color: var(--text-muted, #555);
+      font-size: 0.7rem; font-weight: 700; cursor: help; position: relative;
+      vertical-align: middle; margin-inline-start: 4px;
+    }
+    .eng-help .eng-tip {
+      display: none; position: absolute; top: 22px; inset-inline-end: 0;
+      width: 340px; max-width: 84vw; z-index: 60; text-align: right;
+      background: var(--surface, #fff); color: var(--text, #222);
+      border: 1px solid var(--border, #d5d9e0); border-radius: 10px;
+      padding: 12px 14px; box-shadow: 0 8px 28px rgba(0,0,0,.16);
+      font-size: 0.78rem; font-weight: 400; line-height: 1.6; white-space: normal;
+    }
+    .eng-help:hover .eng-tip, .eng-help:focus .eng-tip, .eng-help:focus-within .eng-tip { display: block; }
+    .eng-tip-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 7px; }
+    .eng-tip-row:last-child { margin-bottom: 0; }
+    .eng-tip-row b { flex: 0 0 auto; }
+    .eng-tip-note {
+      margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--border, #e5e7eb);
+      color: var(--text-muted, #666); font-size: 0.73rem;
     }
   </style>
 </head>
@@ -379,7 +407,7 @@
         <div style="overflow-x:auto;">
           <table class="admin-table">
             <thead>
-              <tr><th>#</th><th>אימייל</th><th>אימייל התראה</th><th>מוצרים</th><th>מגבלה</th><th>נרשם</th><th>סטטוס</th><th>מעורבות</th><th>פעולות</th></tr>
+              <tr><th>#</th><th>אימייל</th><th>אימייל התראה</th><th>מוצרים</th><th>מגבלה</th><th>נרשם</th><th>סטטוס</th><th>מעורבות <span class="eng-help" tabindex="0">?<span class="eng-tip" id="engagement-legend"></span></span></th><th>פעולות</th></tr>
             </thead>
             <tbody id="users-body">
               <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">טוען...</td></tr>
@@ -781,7 +809,7 @@
   </div>
 
   <script src="/static/app.js?v=11"></script>
-  <script src="/static/admin.js?v=59"></script>
+  <script src="/static/admin.js?v=60"></script>
   <script>
     requireAuth();
     loadAdminData();
