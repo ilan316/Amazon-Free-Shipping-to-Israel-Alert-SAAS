@@ -27,9 +27,16 @@ function israelCostLine(p) {
   if (p.israel_cost_kind === 'import_only') {
     return `<span style="color:#555;font-size:11px;margin-right:4px;">+ ${extra.toFixed(2)}₪ מכס · משלוח חינם · <b>סה"כ ${total}₪</b></span>`;
   }
-  // 'combined' — Amazon merges shipping and import charges into one figure and
-  // does not expose the split, so the label must not claim it's shipping alone.
-  return `<span style="color:#555;font-size:11px;margin-right:4px;">+ ${extra.toFixed(2)}₪ משלוח ומכס · <b>סה"כ ${total}₪</b> <span style="color:#888;">(${pct}% מהמחיר)</span></span>`;
+  // A FREE product can still quote a shipping fee here: its free delivery is conditional
+  // on an order minimum, and the fee is what you'd pay buying it alone. Printing it next
+  // to the "free shipping" badge reads as a contradiction, so it's left out.
+  if (p.last_status === 'FREE') return '';
+
+  // Anything else includes a shipping fee, so the percentage is shown alongside it.
+  // 'combined' is Amazon's merged figure with no split available — the label must not
+  // claim it's shipping alone.
+  const label = p.israel_cost_kind === 'shipping_only' ? 'משלוח' : 'משלוח ומכס';
+  return `<span style="color:#555;font-size:11px;margin-right:4px;">+ ${extra.toFixed(2)}₪ ${label} · <b>סה"כ ${total}₪</b> <span style="color:#888;">(${pct}% מהמחיר)</span></span>`;
 }
 
 function nextCheckLabel(p) {

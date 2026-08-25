@@ -333,17 +333,25 @@ def _extract_israel_costs(soup) -> tuple[str, str]:
     carousels (p13n-sc-uncoverable-faceout), and a page-wide search returns another
     product's numbers.
 
-    Amazon renders two different layouts:
-      * shipping is free  → separate lines: "Price ILS X", "Import Fees Deposit ILS Y",
-                            "FREE Shipping". Only the import deposit is extra.
-      * shipping is paid  → a single merged line: "ILS Z Shipping & Import Charges to
-                            Israel". Z cannot be split into its two components — don't try.
+    The block carries an itemised "Shipping & Fee Details" table, which is what we read:
 
-    Returns (amount, kind) where kind is one of:
-      'import_only' — free shipping, amount is the import fees deposit
-      'combined'    — paid shipping, amount is shipping + import charges together
-      'free'        — free shipping and no import charges (amount '0')
-      ''            — nothing usable found (amount '')
+        Price | ILS 18.04 | AmazonGlobal Shipping | ILS 46.31 |
+        Estimated Import Charges | ILS 0.00 | Total | ILS 64.35
+
+    Read the table, not the one-line summary above it. That summary is phrased
+    "No Import Charges & ILS 46.31 Shipping to Israel" — a label-then-amount regex on it
+    reads the *shipping* figure as an import charge and inverts the meaning.
+
+    Some listings only expose the older merged wording ("ILS Z Shipping & Import Charges
+    to Israel"), where the two components genuinely cannot be split; that is the fallback.
+
+    Returns (amount, kind). amount is everything Amazon adds on top of the product price.
+      'shipping_import' — both a shipping fee and import charges
+      'shipping_only'   — shipping fee, no import charges
+      'import_only'     — free shipping, import charges only
+      'free'            — nothing extra (amount '0')
+      'combined'        — merged figure, split unavailable
+      ''                — nothing usable found (amount '')
     """
     import re as _re
 
@@ -354,10 +362,40 @@ def _extract_israel_costs(soup) -> tuple[str, str]:
     if not text:
         return "", ""
 
-    def _num(raw: str) -> str:
-        return raw.replace(",", "")
+    def _row(label_pattern: str) -> float | None:
+        """Amount on the table row with this label. FREE counts as 0.
 
-    # Paid shipping: the merged line. Amount can precede or follow the label.
+        The amount must follow the label immediately — only the cell separator may sit
+        between them. Anything looser starts matching the summary line above the table.
+        """
+        m = _re.search(label_pattern + r"[\s:|]*(?:ILS|₪)\s*([\d,]+\.?\d*)", text, _re.I)
+        if m:
+            try:
+                return float(m.group(1).replace(",", ""))
+            except ValueError:
+                return None
+        if _re.search(label_pattern + r"[\s:|]*free\b", text, _re.I):
+            return 0.0
+        return None
+
+    shipping = _row(r"amazonglobal\s+shipping")
+    imports = _row(r"(?:estimated\s+)?import\s+(?:charges|fees\s+deposit)")
+
+    if shipping is not None or imports is not None:
+        ship = shipping or 0.0
+        imp = imports or 0.0
+        total_extra = ship + imp
+        if total_extra <= 0:
+            return "0", "free"
+        if ship > 0 and imp > 0:
+            kind = "shipping_import"
+        elif ship > 0:
+            kind = "shipping_only"
+        else:
+            kind = "import_only"
+        return f"{total_extra:.2f}", kind
+
+    # Older merged wording — shipping and import in one figure, no split available.
     merged = _re.search(
         r"(?:ILS|₪)\s*([\d,]+\.?\d*)\s*(?:total\s+)?shipping\s*&\s*import\s*(?:charges|fees)",
         text, _re.I)
@@ -366,27 +404,15 @@ def _extract_israel_costs(soup) -> tuple[str, str]:
             r"shipping\s*&\s*import\s*(?:charges|fees)[^\d₪]{0,40}(?:ILS|₪)\s*([\d,]+\.?\d*)",
             text, _re.I)
     if merged:
-        return _num(merged.group(1)), "combined"
-
-    # Free shipping: only the import fees deposit is extra.
-    imp = _re.search(
-        r"(?:import\s*(?:fees\s*deposit|charges)|estimated\s+import\s+charges)"
-        r"[^\d₪]{0,40}(?:ILS|₪)\s*([\d,]+\.?\d*)",
-        text, _re.I)
-    if not imp:
-        imp = _re.search(
-            r"(?:ILS|₪)\s*([\d,]+\.?\d*)\s*import\s*(?:fees\s*deposit|charges)",
-            text, _re.I)
-    if imp:
-        amount = _num(imp.group(1))
+        amount = merged.group(1).replace(",", "")
         try:
             if float(amount) == 0:
                 return "0", "free"
         except ValueError:
             return "", ""
-        return amount, "import_only"
+        return amount, "combined"
 
-    if _re.search(r"free\s+shipping", text, _re.I):
+    if _re.search(r"free\s+shipping", text, _re.I) and _re.search(r"no\s+import\s+charges", text, _re.I):
         return "0", "free"
     return "", ""
 

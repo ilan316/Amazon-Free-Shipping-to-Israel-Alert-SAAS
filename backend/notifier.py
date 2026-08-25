@@ -150,10 +150,23 @@ def _israel_cost_note(product, is_rtl: bool) -> str:
     if kind == "import_only":
         return (f"+ {extra:.2f}₪ מכס · משלוח חינם · סה\"כ {total}₪" if is_rtl
                 else f"+ ILS {extra:.2f} import charges · free shipping · total ILS {total}")
-    # 'combined' — Amazon merges shipping and import into one figure with no split available.
+
+    # A FREE product can still quote a shipping fee in the global block: its free delivery
+    # is conditional on an order minimum, and the fee is what you'd pay buying it alone.
+    # Both are true, but printing the fee beside the "free shipping" badge reads as a
+    # contradiction — so on FREE products we only show the unambiguous import charge.
+    if getattr(product, "last_status", "") == "FREE":
+        return ""
+
+    # Everything else is at least partly shipping, so the percentage matters: the fee is
+    # close to flat, which makes it most of a cheap product and noise on an expensive one.
     pct = round(extra / price * 100)
-    return (f"+ {extra:.2f}₪ משלוח ומכס · סה\"כ {total}₪ ({pct}% מהמחיר)" if is_rtl
-            else f"+ ILS {extra:.2f} shipping & import · total ILS {total} ({pct}% of price)")
+    if kind == "shipping_only":
+        label_he, label_en = "משלוח", "shipping"
+    else:  # 'shipping_import', or 'combined' where Amazon gives no split
+        label_he, label_en = "משלוח ומכס", "shipping & import"
+    return (f"+ {extra:.2f}₪ {label_he} · סה\"כ {total}₪ ({pct}% מהמחיר)" if is_rtl
+            else f"+ ILS {extra:.2f} {label_en} · total ILS {total} ({pct}% of price)")
 
 
 def _t(lang: str, key: str, **kw) -> str:
