@@ -664,18 +664,21 @@ async def seed_default_templates():
       <p style="font-size:13px;color:#888;text-align:center;margin-top:8px;">אם לא תלחץ, נעביר את החשבון שלך למצב חופשה בעוד 15 יום.</p>
     </div>""")
 
-    # Win-back: the only message an auto-vacation user can still receive. It says
-    # plainly that we stopped, because a cheerful "we miss you" to someone who got
-    # nothing for two months reads as a lie and earns a spam complaint.
+    # Win-back: the only message an auto-vacation user can still receive. It states
+    # plainly that we stopped — a cheerful "we miss you" to someone who heard nothing
+    # for two months reads as a lie and earns a spam complaint. The closing line says
+    # the account is kept rather than promising we will never write again, because the
+    # job does write again after WINBACK_REPEAT_DAYS.
     template4_body = _wrap(f"""
     <div class="body">
-      <h2>עצרנו את ההתראות שלך ⏸</h2>
-      <p>לא נכנסת ולא לחצת אצלנו זמן רב, אז הפסקנו לשלוח לך את הסיכום היומי — לא רצינו למלא לך את תיבת הדואר בכלום.</p>
-      <p>המוצרים שעקבת אחריהם עדיין שמורים בחשבון. לחיצה אחת מחזירה את הכל למקום.</p>
+      <h2>החשבון שלך עדיין בחופשה ⏸</h2>
+      <p>לא הייתה פעילות בחשבון זמן רב, ולכן העברנו אותו למצב חופשה והפסקנו את הסיכום היומי.</p>
+      <p>הכול עדיין שמור בדיוק כפי שהשארת — כולל המוצרים שעקבת אחריהם.</p>
+      <p>רוצה לחזור? בלחיצה אחת אפשר להפעיל מחדש את החשבון ולהמשיך מאיפה שעצרת.</p>
+      <a href="{dashboard_url}" class="cta">← להחזיר את החשבון לפעילות</a>
       <p style="background:{_BG};border-radius:10px;padding:14px 18px;font-size:14px;border-right:4px solid {_BRAND};">
-        אם לא מעניין אותך יותר — פשוט אל תלחץ. לא נשלח שוב.
+        אם כרגע זה פחות רלוונטי, אין צורך לעשות דבר. החשבון יישאר שמור עד שתרצה לחזור.
       </p>
-      <a href="{dashboard_url}" class="cta">← החזירו לי את ההתראות</a>
     </div>""")
 
     async with AsyncSessionLocal() as session:
@@ -704,7 +707,7 @@ async def seed_default_templates():
         if not existing_wb:
             session.add(EmailTemplate(
                 name=winback_name,
-                subject="עצרנו את ההתראות שלך — רוצה שנחזיר? ⏸",
+                subject="החשבון שלך מחכה לך",
                 body=template4_body,
             ))
 
