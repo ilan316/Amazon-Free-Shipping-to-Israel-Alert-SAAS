@@ -93,6 +93,8 @@ class ProductResponse(BaseModel):
     last_price: str | None = None
     israel_extra_cost: str | None = None
     israel_cost_kind: str | None = None
+    # Order minimum for free delivery, parsed from raw_text — not a stored column.
+    israel_free_threshold: str | None = None
     status_since: datetime | None = None
 
     model_config = {"from_attributes": True}

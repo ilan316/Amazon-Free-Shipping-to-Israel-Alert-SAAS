@@ -11,10 +11,26 @@ let userLimit = null;
 // Without the percentage the user only sees a binary "no free shipping" and waits forever.
 // Returns '' when we have no extracted figure — the caller then keeps the old wording.
 function israelCostLine(p) {
-  if (!p.israel_cost_kind || !p.last_price) return '';
+  if (!p.last_price) return '';
   const price = parseFloat(String(p.last_price).replace(/[^\d.]/g, ''));
   const extra = parseFloat(String(p.israel_extra_cost || '').replace(/[^\d.]/g, ''));
   if (!isFinite(price) || price <= 0) return '';
+
+  // Conditional free delivery: below ~$49 Amazon's "FREE delivery to Israel" holds only
+  // above an order minimum. Both phrasings classify as FREE, so without this the user is
+  // promised free shipping and finds a fee at checkout. The gap to the minimum is the
+  // number worth showing — it's how much more to put in the cart, not a figure to compute.
+  // Independent of israel_cost_kind: it comes from the delivery text, not the global block.
+  const threshold = parseFloat(String(p.israel_free_threshold || '').replace(/[^\d.]/g, ''));
+  if (p.last_status === 'FREE' && isFinite(threshold) && threshold > price) {
+    const gap = (threshold - price).toFixed(2);
+    // The single-purchase fee only appears alongside the minimum that explains it.
+    const alone = isFinite(extra) && extra > 0
+      ? ` · לקנייה בודדת +${extra.toFixed(2)}₪` : '';
+    return `<span style="color:#555;font-size:11px;margin-right:4px;">משלוח חינם בהזמנה מעל ${threshold.toFixed(2)}₪ — <b>חסרים עוד ${gap}₪</b>${alone}</span>`;
+  }
+
+  if (!p.israel_cost_kind) return '';
 
   if (p.israel_cost_kind === 'free') {
     return '<span style="color:#007600;font-size:11px;margin-right:4px;">· משלוח חינם, ללא עלויות נוספות</span>';

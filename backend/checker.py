@@ -417,6 +417,34 @@ def _extract_israel_costs(soup) -> tuple[str, str]:
     return "", ""
 
 
+def extract_free_shipping_threshold(raw_text: str) -> str:
+    """The order minimum above which Amazon ships free, from the delivery text.
+
+        "FREE delivery Thursday, August 6 to Israel on eligible orders over ILS 148.47"
+
+    Amazon gives free delivery unconditionally above ~$49 and conditionally below it.
+    Both phrasings classify as FREE, so without this number a cheap product shows a
+    "free shipping" badge and then asks for shipping at checkout.
+
+    Reads the stored delivery text rather than the page, so it also works on rows that
+    were checked before the Israel-cost extraction existed. Returns '' when absent.
+    """
+    import re as _re
+
+    if not raw_text:
+        return ""
+    m = _re.search(
+        r"eligible\s+(?:\w+\s+){0,2}?orders?\s+over\s*(?:ILS|₪|\$)\s*([\d,]+\.?\d*)",
+        raw_text, _re.I)
+    if not m:
+        return ""
+    amount = m.group(1).replace(",", "")
+    try:
+        return amount if float(amount) > 0 else ""
+    except ValueError:
+        return ""
+
+
 def _extract_amazon_category(soup) -> str:
     """Extract top-level Amazon category from product page breadcrumb."""
     breadcrumb = soup.find(id="wayfinding-breadcrumbs_feature_div")

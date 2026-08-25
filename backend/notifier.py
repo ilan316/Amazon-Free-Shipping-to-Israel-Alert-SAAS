@@ -13,6 +13,7 @@ import logging
 from datetime import datetime
 from urllib.parse import urlencode
 from backend.auth import create_pause_token, create_product_pause_token
+from backend.checker import extract_free_shipping_threshold
 
 import resend as resend_client
 
@@ -127,7 +128,7 @@ def _israel_cost_note(product, is_rtl: bool) -> str:
     """
     kind = getattr(product, "israel_cost_kind", None)
     price_raw = getattr(product, "last_price", None)
-    if not kind or not price_raw:
+    if not price_raw:
         return ""
     try:
         price = float(re.sub(r"[^\d.]", "", str(price_raw)))
@@ -136,13 +137,34 @@ def _israel_cost_note(product, is_rtl: bool) -> str:
     if price <= 0:
         return ""
 
-    if kind == "free":
-        return "משלוח חינם, ללא עלויות נוספות" if is_rtl else "Free shipping, no extra charges"
-
     try:
         extra = float(re.sub(r"[^\d.]", "", str(getattr(product, "israel_extra_cost", "") or "")))
     except (ValueError, TypeError):
+        extra = 0.0
+
+    # Conditional free delivery — the same case dashboard.js handles: below ~$49 Amazon's
+    # "FREE delivery to Israel" holds only above an order minimum, and the gap to it tells
+    # the user how much more to add to the cart. Comes from the delivery text, so it works
+    # regardless of whether the global-block extraction found anything.
+    threshold_raw = extract_free_shipping_threshold(getattr(product, "raw_text", "") or "")
+    if getattr(product, "last_status", "") == "FREE" and threshold_raw:
+        try:
+            threshold = float(threshold_raw)
+        except ValueError:
+            threshold = 0.0
+        if threshold > price:
+            gap = threshold - price
+            alone_he = f" · לקנייה בודדת +{extra:.2f}₪" if extra > 0 else ""
+            alone_en = f" · ILS {extra:.2f} if bought alone" if extra > 0 else ""
+            return (f"משלוח חינם בהזמנה מעל {threshold:.2f}₪ — חסרים עוד {gap:.2f}₪{alone_he}" if is_rtl
+                    else f"Free delivery on orders over ILS {threshold:.2f} — ILS {gap:.2f} to go{alone_en}")
+
+    if not kind:
         return ""
+
+    if kind == "free":
+        return "משלוח חינם, ללא עלויות נוספות" if is_rtl else "Free shipping, no extra charges"
+
     if extra <= 0:
         return ""
 
@@ -486,9 +508,11 @@ def send_user_alert(user, product, result) -> bool:
 
     # Real Israel cost when we managed to extract it; otherwise the generic
     # "price excludes shipping/taxes" wording stays exactly as it was.
+    # The generic fallback carries its own parentheses; the real cost note doesn't, because
+    # it can already end in "(257% מהמחיר)" and wrapping it would nest parentheses.
     price_note = _israel_cost_note(product, is_rtl) or (
-        "מחיר באמזון (לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl
-        else "Amazon price (excl. shipping, taxes & fees)"
+        "(מחיר באמזון — לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl
+        else "(Amazon price, excl. shipping, taxes & fees)"
     )
 
     body_dir = ' dir="rtl"' if is_rtl else ""
@@ -527,7 +551,7 @@ def send_user_alert(user, product, result) -> bool:
                     <a href="{url}" style="color:#111111;text-decoration:none;">{name}</a>
                   </p>
                   <p style="margin:0 0 10px;font-size:13px;color:#666;text-align:{txt_align};">ASIN: {asin}</p>
-                  {f'<p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {product.last_price} <span style="font-size:11px;color:#888;font-weight:normal;">({price_note})</span></p>' if getattr(product, "last_price", None) else ""}
+                  {f'<p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {product.last_price} <span style="font-size:11px;color:#888;font-weight:normal;">{price_note}</span></p>' if getattr(product, "last_price", None) else ""}
                   <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#007600;text-align:{txt_align};" {txt_dir}>{_t(lang, "shipping_badge")}</p>
                   <div style="text-align:{txt_align};">{_cta_btn(url, _t(lang, "btn_buy"), txt_align)}</div>
                   <p style="margin:8px 0 4px;font-size:13px;color:#555;font-style:italic;text-align:{txt_align};" {txt_dir}>{_t(lang, "urgency")}</p>
@@ -624,10 +648,10 @@ def send_daily_summary(user, free_products: list, pause_warnings: dict = None) -
         price_html = ""
         if getattr(p, "last_price", None):
             price_note = _israel_cost_note(p, is_rtl) or (
-                "מחיר באמזון (לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl
-                else "Amazon price (excl. shipping, taxes & fees)"
+                "(מחיר באמזון — לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl
+                else "(Amazon price, excl. shipping, taxes & fees)"
             )
-            price_html = f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {p.last_price} <span style="font-size:11px;color:#888;font-weight:normal;">({price_note})</span></p>'
+            price_html = f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {p.last_price} <span style="font-size:11px;color:#888;font-weight:normal;">{price_note}</span></p>'
         warning_html = ""
         if pause_warnings and p.asin in pause_warnings:
             days_left = pause_warnings[p.asin]

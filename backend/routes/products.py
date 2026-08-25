@@ -13,6 +13,7 @@ from backend.database import get_db
 from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting
 from backend.auth import get_current_user
 from backend.schemas import AddProductRequest, ProductResponse, MessageResponse
+from backend.checker import extract_free_shipping_threshold
 
 DEFAULT_MAX_PRODUCTS = 10
 
@@ -125,6 +126,7 @@ async def list_products(
             last_price=p.last_price or None,
             israel_extra_cost=p.israel_extra_cost or None,
             israel_cost_kind=p.israel_cost_kind or None,
+            israel_free_threshold=extract_free_shipping_threshold(p.raw_text or "") or None,
             status_since=p.status_since,
         ))
     return items
