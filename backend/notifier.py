@@ -170,8 +170,11 @@ def _israel_cost_note(product, is_rtl: bool) -> str:
 
     total = f"{price + extra:.2f}"
     if kind == "import_only":
-        return (f"+ {extra:.2f}₪ מכס · משלוח חינם · סה\"כ {total}₪" if is_rtl
-                else f"+ ILS {extra:.2f} import charges · free shipping · total ILS {total}")
+        # "משלוח חינם" leads: it's the good news and the reason the product is in the email
+        # at all. Opening with "+ 149.50₪" made the line read as a charge before the reader
+        # reached the word that explains it isn't shipping.
+        return (f"משלוח חינם + {extra:.2f}₪ מכס · סה\"כ {total}₪" if is_rtl
+                else f"Free shipping + ILS {extra:.2f} import charges · total ILS {total}")
 
     # A FREE product can still quote a shipping fee in the global block: its free delivery
     # is conditional on an order minimum, and the fee is what you'd pay buying it alone.
@@ -185,10 +188,14 @@ def _israel_cost_note(product, is_rtl: bool) -> str:
     pct = round(extra / price * 100)
     if kind == "shipping_only":
         label_he, label_en = "משלוח", "shipping"
+        subject_he, subject_en = "עלות המשלוח", "Shipping"
     else:  # 'shipping_import', or 'combined' where Amazon gives no split
         label_he, label_en = "משלוח ומכס", "shipping & import"
-    return (f"+ {extra:.2f}₪ {label_he} · סה\"כ {total}₪ ({pct}% מהמחיר)" if is_rtl
-            else f"+ ILS {extra:.2f} {label_en} · total ILS {total} ({pct}% of price)")
+        subject_he, subject_en = "עלות המשלוח והמכס", "Shipping & import"
+    # Spelled out rather than a bare "(57% מהמחיר)", matching dashboard.js: the percentage
+    # sits beside two other figures, and without a subject it reads as ambiguous.
+    return (f"+ {extra:.2f}₪ {label_he} · סה\"כ {total}₪ ({subject_he} היא {pct}% ממחיר המוצר)" if is_rtl
+            else f"+ ILS {extra:.2f} {label_en} · total ILS {total} ({subject_en} is {pct}% of the item price)")
 
 
 def _t(lang: str, key: str, **kw) -> str:

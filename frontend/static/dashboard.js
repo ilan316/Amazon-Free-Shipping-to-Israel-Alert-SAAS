@@ -41,7 +41,9 @@ function israelCostLine(p) {
   const pct = Math.round((extra / price) * 100);
 
   if (p.israel_cost_kind === 'import_only') {
-    return `<span style="color:#555;font-size:13px;margin-right:4px;">+ ${extra.toFixed(2)}₪ מכס · משלוח חינם · <b>סה"כ ${total}₪</b></span>`;
+    // "משלוח חינם" leads — it's the good news, and opening with "+ 149.50₪" read as a
+    // charge before the reader reached the word that explains it isn't shipping.
+    return `<span style="color:#555;font-size:13px;margin-right:4px;">משלוח חינם + ${extra.toFixed(2)}₪ מכס · <b>סה"כ ${total}₪</b></span>`;
   }
   // A FREE product can still quote a shipping fee here: its free delivery is conditional
   // on an order minimum, and the fee is what you'd pay buying it alone. Printing it next
