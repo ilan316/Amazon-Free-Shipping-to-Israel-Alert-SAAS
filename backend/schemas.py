@@ -91,6 +91,8 @@ class ProductResponse(BaseModel):
     raw_text: str = ""
     affiliate_url: str = ""
     last_price: str | None = None
+    israel_extra_cost: str | None = None
+    israel_cost_kind: str | None = None
     status_since: datetime | None = None
 
     model_config = {"from_attributes": True}

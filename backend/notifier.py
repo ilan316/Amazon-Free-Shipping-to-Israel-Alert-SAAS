@@ -8,6 +8,7 @@ Key changes vs Gmail SMTP version:
 """
 
 import os
+import re
 import logging
 from datetime import datetime
 from urllib.parse import urlencode
@@ -115,6 +116,44 @@ def _daily_tip(lang: str) -> str:
     tips = _DAILY_TIPS.get(lang, _DAILY_TIPS["en"])
     idx = datetime.now().timetuple().tm_yday % len(tips)
     return tips[idx]
+
+
+def _israel_cost_note(product, is_rtl: bool) -> str:
+    """The Israel cost note shown next to the price, e.g. '+ 154.28₪ מכס · סה"כ 840.79₪'.
+
+    Returns '' when nothing was extracted from the product page, in which case callers
+    fall back to the existing generic "price excludes shipping/taxes" wording — a
+    disclaimer that says costs exist but never how much.
+    """
+    kind = getattr(product, "israel_cost_kind", None)
+    price_raw = getattr(product, "last_price", None)
+    if not kind or not price_raw:
+        return ""
+    try:
+        price = float(re.sub(r"[^\d.]", "", str(price_raw)))
+    except (ValueError, TypeError):
+        return ""
+    if price <= 0:
+        return ""
+
+    if kind == "free":
+        return "משלוח חינם, ללא עלויות נוספות" if is_rtl else "Free shipping, no extra charges"
+
+    try:
+        extra = float(re.sub(r"[^\d.]", "", str(getattr(product, "israel_extra_cost", "") or "")))
+    except (ValueError, TypeError):
+        return ""
+    if extra <= 0:
+        return ""
+
+    total = f"{price + extra:.2f}"
+    if kind == "import_only":
+        return (f"+ {extra:.2f}₪ מכס · משלוח חינם · סה\"כ {total}₪" if is_rtl
+                else f"+ ILS {extra:.2f} import charges · free shipping · total ILS {total}")
+    # 'combined' — Amazon merges shipping and import into one figure with no split available.
+    pct = round(extra / price * 100)
+    return (f"+ {extra:.2f}₪ משלוח ומכס · סה\"כ {total}₪ ({pct}% מהמחיר)" if is_rtl
+            else f"+ ILS {extra:.2f} shipping & import · total ILS {total} ({pct}% of price)")
 
 
 def _t(lang: str, key: str, **kw) -> str:
@@ -432,6 +471,13 @@ def send_user_alert(user, product, result) -> bool:
           </td>
         </tr>"""
 
+    # Real Israel cost when we managed to extract it; otherwise the generic
+    # "price excludes shipping/taxes" wording stays exactly as it was.
+    price_note = _israel_cost_note(product, is_rtl) or (
+        "מחיר באמזון (לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl
+        else "Amazon price (excl. shipping, taxes & fees)"
+    )
+
     body_dir = ' dir="rtl"' if is_rtl else ""
     html_body = f"""<!DOCTYPE html>
 <html{body_dir}>
@@ -468,7 +514,7 @@ def send_user_alert(user, product, result) -> bool:
                     <a href="{url}" style="color:#111111;text-decoration:none;">{name}</a>
                   </p>
                   <p style="margin:0 0 10px;font-size:13px;color:#666;text-align:{txt_align};">ASIN: {asin}</p>
-                  {f'<p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {product.last_price} <span style="font-size:11px;color:#888;font-weight:normal;">({("מחיר באמזון (לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl else "Amazon price (excl. shipping, taxes & fees)")})</span></p>' if getattr(product, "last_price", None) else ""}
+                  {f'<p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {product.last_price} <span style="font-size:11px;color:#888;font-weight:normal;">({price_note})</span></p>' if getattr(product, "last_price", None) else ""}
                   <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#007600;text-align:{txt_align};" {txt_dir}>{_t(lang, "shipping_badge")}</p>
                   <div style="text-align:{txt_align};">{_cta_btn(url, _t(lang, "btn_buy"), txt_align)}</div>
                   <p style="margin:8px 0 4px;font-size:13px;color:#555;font-style:italic;text-align:{txt_align};" {txt_dir}>{_t(lang, "urgency")}</p>
@@ -564,7 +610,10 @@ def send_daily_summary(user, free_products: list, pause_warnings: dict = None) -
         img_url = p.image_url or f"https://images-na.ssl-images-amazon.com/images/P/{p.asin}.01._SL100_.jpg"
         price_html = ""
         if getattr(p, "last_price", None):
-            price_note = "מחיר באמזון (לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl else "Amazon price (excl. shipping, taxes & fees)"
+            price_note = _israel_cost_note(p, is_rtl) or (
+                "מחיר באמזון (לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl
+                else "Amazon price (excl. shipping, taxes & fees)"
+            )
             price_html = f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {p.last_price} <span style="font-size:11px;color:#888;font-weight:normal;">({price_note})</span></p>'
         warning_html = ""
         if pause_warnings and p.asin in pause_warnings:

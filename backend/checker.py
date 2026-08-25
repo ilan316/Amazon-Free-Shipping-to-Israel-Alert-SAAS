@@ -101,6 +101,8 @@ class CheckResult:
     last_price: str = ""
     image_url: str = ""
     amazon_category: str = ""
+    israel_extra_cost: str = ""
+    israel_cost_kind: str = ""
     raw_html: str | None = None
 
 
@@ -321,6 +323,72 @@ def _extract_price(soup) -> str:
                 if not first_found:
                     first_found = normalized
     return first_found
+
+
+def _extract_israel_costs(soup) -> tuple[str, str]:
+    """Extract the extra cost Amazon charges on top of the product price for Israel.
+
+    Reads ONLY from #amazonGlobal_feature_div. The scoping is deliberate: the same
+    "Shipping & Import Charges to Israel" phrasing also appears inside recommendation
+    carousels (p13n-sc-uncoverable-faceout), and a page-wide search returns another
+    product's numbers.
+
+    Amazon renders two different layouts:
+      * shipping is free  → separate lines: "Price ILS X", "Import Fees Deposit ILS Y",
+                            "FREE Shipping". Only the import deposit is extra.
+      * shipping is paid  → a single merged line: "ILS Z Shipping & Import Charges to
+                            Israel". Z cannot be split into its two components — don't try.
+
+    Returns (amount, kind) where kind is one of:
+      'import_only' — free shipping, amount is the import fees deposit
+      'combined'    — paid shipping, amount is shipping + import charges together
+      'free'        — free shipping and no import charges (amount '0')
+      ''            — nothing usable found (amount '')
+    """
+    import re as _re
+
+    block = soup.find(id="amazonGlobal_feature_div")
+    if not block:
+        return "", ""
+    text = " ".join(block.get_text(separator=" ", strip=True).split())
+    if not text:
+        return "", ""
+
+    def _num(raw: str) -> str:
+        return raw.replace(",", "")
+
+    # Paid shipping: the merged line. Amount can precede or follow the label.
+    merged = _re.search(
+        r"(?:ILS|₪)\s*([\d,]+\.?\d*)\s*(?:total\s+)?shipping\s*&\s*import\s*(?:charges|fees)",
+        text, _re.I)
+    if not merged:
+        merged = _re.search(
+            r"shipping\s*&\s*import\s*(?:charges|fees)[^\d₪]{0,40}(?:ILS|₪)\s*([\d,]+\.?\d*)",
+            text, _re.I)
+    if merged:
+        return _num(merged.group(1)), "combined"
+
+    # Free shipping: only the import fees deposit is extra.
+    imp = _re.search(
+        r"(?:import\s*(?:fees\s*deposit|charges)|estimated\s+import\s+charges)"
+        r"[^\d₪]{0,40}(?:ILS|₪)\s*([\d,]+\.?\d*)",
+        text, _re.I)
+    if not imp:
+        imp = _re.search(
+            r"(?:ILS|₪)\s*([\d,]+\.?\d*)\s*import\s*(?:fees\s*deposit|charges)",
+            text, _re.I)
+    if imp:
+        amount = _num(imp.group(1))
+        try:
+            if float(amount) == 0:
+                return "0", "free"
+        except ValueError:
+            return "", ""
+        return amount, "import_only"
+
+    if _re.search(r"free\s+shipping", text, _re.I):
+        return "0", "free"
+    return "", ""
 
 
 def _extract_amazon_category(soup) -> str:
@@ -582,6 +650,7 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
     price = _extract_price(soup)
     image_url = _extract_image_url(soup)
     amazon_category = _extract_amazon_category(soup)
+    extra_cost, cost_kind = _extract_israel_costs(soup)
 
     # Rule 1: ILS buybox price is the definitive signal — no ILS price = NO_SHIP.
     if not price.upper().startswith("ILS"):
@@ -595,14 +664,16 @@ def _parse_html_delivery(html: str, asin: str) -> CheckResult:
         logger.info(f"[{asin}] httpx: PAID (ILS price, no delivery block) | price={price!r}")
         return CheckResult(asin, ShippingStatus.PAID, error_message="No delivery block found",
                            product_name=product_name, last_price=price, image_url=image_url,
-                           amazon_category=amazon_category)
+                           amazon_category=amazon_category,
+                           israel_extra_cost=extra_cost, israel_cost_kind=cost_kind)
 
     status = _classify(raw_text)
     if status != ShippingStatus.FREE:
         status = ShippingStatus.PAID
-    logger.info(f"[{asin}] httpx: {status.value} | price={price!r} | {raw_text[:120]!r}")
+    logger.info(f"[{asin}] httpx: {status.value} | price={price!r} | extra={extra_cost!r}/{cost_kind!r} | {raw_text[:120]!r}")
     return CheckResult(asin, status, raw_text=raw_text, product_name=product_name, last_price=price,
-                       image_url=image_url, amazon_category=amazon_category)
+                       image_url=image_url, amazon_category=amazon_category,
+                       israel_extra_cost=extra_cost, israel_cost_kind=cost_kind)
 
 
 async def _check_product_httpx(asin: str, url: str, cookies: list) -> CheckResult:
@@ -1006,6 +1077,8 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
         pw_image = ""
         pw_category = ""
         pw_html = ""
+        pw_extra_cost = ""
+        pw_cost_kind = ""
         try:
             from bs4 import BeautifulSoup as _BS
             pw_html = await page.content()
@@ -1013,6 +1086,7 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
             pw_price = _extract_price(pw_soup)
             pw_image = _extract_image_url(pw_soup)
             pw_category = _extract_amazon_category(pw_soup)
+            pw_extra_cost, pw_cost_kind = _extract_israel_costs(pw_soup)
         except Exception:
             pass
 
@@ -1028,14 +1102,16 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
             logger.info(f"[{asin}] Playwright: PAID (ILS price, no delivery block) | price={pw_price!r}")
             return CheckResult(asin, ShippingStatus.PAID, error_message="No delivery block found",
                                product_name=product_name, last_price=pw_price, image_url=pw_image,
-                               amazon_category=pw_category)
+                               amazon_category=pw_category,
+                               israel_extra_cost=pw_extra_cost, israel_cost_kind=pw_cost_kind)
 
         if status != ShippingStatus.FREE:
             status = ShippingStatus.PAID
-        logger.info(f"[{asin}] Playwright: {status.value} | price={pw_price!r} | {raw_text[:120]!r}")
+        logger.info(f"[{asin}] Playwright: {status.value} | price={pw_price!r} | extra={pw_extra_cost!r}/{pw_cost_kind!r} | {raw_text[:120]!r}")
         return CheckResult(asin, status, raw_text=raw_text, product_name=product_name,
                            found_in_aod=found_in_aod, last_price=pw_price, image_url=pw_image,
-                           amazon_category=pw_category)
+                           amazon_category=pw_category,
+                           israel_extra_cost=pw_extra_cost, israel_cost_kind=pw_cost_kind)
 
     except PWTimeout as e:
         return CheckResult(asin, ShippingStatus.ERROR, error_message=f"Timeout: {e}")

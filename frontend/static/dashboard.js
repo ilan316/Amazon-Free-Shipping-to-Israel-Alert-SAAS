@@ -5,6 +5,33 @@ let checkingAsins = new Set();
 let currentFilter = 'ALL';
 let userLimit = null;
 
+// Builds the "final cost to Israel" line under the price.
+// The point of the percentage: shipping to Israel is close to flat (~46-52₪ in our data),
+// so on a cheap product it dominates the price and on an expensive one it's noise.
+// Without the percentage the user only sees a binary "no free shipping" and waits forever.
+// Returns '' when we have no extracted figure — the caller then keeps the old wording.
+function israelCostLine(p) {
+  if (!p.israel_cost_kind || !p.last_price) return '';
+  const price = parseFloat(String(p.last_price).replace(/[^\d.]/g, ''));
+  const extra = parseFloat(String(p.israel_extra_cost || '').replace(/[^\d.]/g, ''));
+  if (!isFinite(price) || price <= 0) return '';
+
+  if (p.israel_cost_kind === 'free') {
+    return '<span style="color:#007600;font-size:11px;margin-right:4px;">· משלוח חינם, ללא עלויות נוספות</span>';
+  }
+  if (!isFinite(extra) || extra <= 0) return '';
+
+  const total = (price + extra).toFixed(2);
+  const pct = Math.round((extra / price) * 100);
+
+  if (p.israel_cost_kind === 'import_only') {
+    return `<span style="color:#555;font-size:11px;margin-right:4px;">+ ${extra.toFixed(2)}₪ מכס · משלוח חינם · <b>סה"כ ${total}₪</b></span>`;
+  }
+  // 'combined' — Amazon merges shipping and import charges into one figure and
+  // does not expose the split, so the label must not claim it's shipping alone.
+  return `<span style="color:#555;font-size:11px;margin-right:4px;">+ ${extra.toFixed(2)}₪ משלוח ומכס · <b>סה"כ ${total}₪</b> <span style="color:#888;">(${pct}% מהמחיר)</span></span>`;
+}
+
 function nextCheckLabel(p) {
   if (!p.status_since || !['PAID', 'NO_SHIP'].includes(p.last_status)) return null;
   const cycle = p.last_status === 'PAID' ? 14 : 21;
@@ -242,7 +269,7 @@ function renderProducts() {
         </div>
         ${p.last_price && !['NO_SHIP','NOT_FOUND'].includes(p.last_status) ? `<div class="card-row-price" style="margin-top:3px;font-size:12px;">
           <span style="color:#B12704;font-weight:bold;">💰 ${escHtml(p.last_price)}</span>
-          <span style="color:#999;font-size:11px;margin-right:4px;">${p.last_status === 'FREE' ? '(כולל משלוח חינם — לא כולל מכס ומע"מ במידה וחל)' : '(מחיר המוצר בלבד - לא כולל משלוח, מיסים ועלויות שונות)'}</span>
+          ${israelCostLine(p) || `<span style="color:#999;font-size:11px;margin-right:4px;">${p.last_status === 'FREE' ? '(כולל משלוח חינם — לא כולל מכס ומע"מ במידה וחל)' : '(מחיר המוצר בלבד - לא כולל משלוח, מיסים ועלויות שונות)'}</span>`}
         </div>` : ''}
 
         <!-- שורה 3: סטטוס | השהה | בדוק | הסר -->

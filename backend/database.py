@@ -171,6 +171,16 @@ async def create_tables():
         )
         await conn.execute(
             __import__("sqlalchemy").text(
+                "ALTER TABLE products ADD COLUMN IF NOT EXISTS israel_extra_cost VARCHAR(50)"
+            )
+        )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE products ADD COLUMN IF NOT EXISTS israel_cost_kind VARCHAR(20)"
+            )
+        )
+        await conn.execute(
+            __import__("sqlalchemy").text(
                 "ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url VARCHAR(512)"
             )
         )

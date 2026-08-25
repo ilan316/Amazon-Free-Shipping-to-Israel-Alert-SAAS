@@ -94,6 +94,16 @@ async def _update_product(db: AsyncSession, product: Product, result: CheckResul
         if result.product_name:
             product.name = result.product_name
         product.last_price = result.last_price  # '' clears stale buybox price
+        # Israel extra cost: keep the previous value when this run couldn't read
+        # #amazonGlobal_feature_div (absent block ≠ "no extra cost"). The one case we
+        # must clear is a product that just turned FREE — a stale 'combined' figure
+        # there would show the user a shipping fee they no longer pay.
+        if result.israel_cost_kind:
+            product.israel_extra_cost = result.israel_extra_cost
+            product.israel_cost_kind = result.israel_cost_kind
+        elif result.status == ShippingStatus.FREE:
+            product.israel_extra_cost = None
+            product.israel_cost_kind = None
         if result.image_url:
             product.image_url = result.image_url
         if result.amazon_category and not product.amazon_category:

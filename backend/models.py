@@ -49,6 +49,12 @@ class Product(Base):
     raw_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
     consecutive_errors: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_price: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Extra cost Amazon charges on top of last_price for delivery to Israel.
+    # kind: 'combined' (paid shipping + import merged by Amazon, cannot be split),
+    #       'import_only' (free shipping, this is the import deposit),
+    #       'free' (nothing extra), or NULL when unknown.
+    israel_extra_cost: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    israel_cost_kind: Mapped[str | None] = mapped_column(String(20), nullable=True)
     image_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     image_urls: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list of up to 4 URLs
     name_he: Mapped[str | None] = mapped_column(String(300), nullable=True)
