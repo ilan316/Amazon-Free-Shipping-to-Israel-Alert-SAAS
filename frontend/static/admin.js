@@ -644,7 +644,7 @@ async function toggleUserProducts(userId, email) {
               <td dir="ltr" style="padding:5px 8px;"><a href="${p.url}" target="_blank" style="color:var(--brand-dark);font-family:monospace;">${p.asin}</a></td>
               <td class="truncate" style="padding:5px 8px;max-width:220px;">${p.custom_name || p.name || '—'}</td>
               <td style="text-align:center;padding:5px 8px;"><span class="status-badge badge-${p.last_status}" title="${STATUS_TOOLTIP[p.last_status] || ''}">${statusLabel(p.last_status)}</span>${p.screenshot_path ? ` <a href="/admin/screenshot/${p.screenshot_path}" target="_blank" title="צפה בצילום מסך מהבדיקה האחרונה" style="text-decoration:none;">📷</a>` : ''}</td>
-              <td dir="ltr" style="text-align:center;padding:5px 8px;font-size:0.82rem;color:#B12704;font-weight:bold;">${p.last_price || '—'}</td>
+              <td dir="ltr" style="text-align:center;padding:5px 8px;font-size:0.82rem;color:#B12704;font-weight:bold;">${formatPrice(p.last_price) || '—'}</td>
               <td style="text-align:center;padding:5px 8px;">${p.is_paused ? (p.paused_reason === 'auto' ? '<span title="הושהה אוטומטית — 5 ימים חינם ללא קליק" style="cursor:default;">⏸🤖</span>' : '<span title="הושהה ידנית" style="cursor:default;">⏸</span>') : ''}</td>
               <td dir="ltr" style="padding:5px 8px;white-space:nowrap;">${p.added_at ? new Date(p.added_at).toLocaleDateString('he-IL') : '—'}</td>
             </tr>`).join('')}
@@ -767,7 +767,7 @@ function adminIsraelCost(p) {
     combined:        ['🚚🧾', `${extra.toFixed(2)}₪ — סכום ממוזג, אמזון לא מפצלת משלוח ממכס`],
   }[kind] || ['❔', `kind לא מוכר: ${kind}`];
 
-  return `<span dir="ltr" title="${desc[1]}${totalTip}" style="cursor:help;white-space:nowrap;">${desc[0]} +${extra.toFixed(2)}</span>`;
+  return `<span dir="ltr" title="${desc[1]}${totalTip}" style="cursor:help;white-space:nowrap;">${desc[0]} +${extra.toFixed(2)} ₪</span>`;
 }
 
 function renderAdminProducts() {
@@ -830,7 +830,7 @@ function renderAdminProducts() {
         ? '<span class="status-badge" style="background:#f0f0f0;color:#888;border:1px solid #ccc;" title="כל העוקבים של מוצר זה בהשהייה — לא נעשית בדיקה">⏸ בהשהייה</span>'
         : `<span class="status-badge badge-${p.last_status}" title="${STATUS_TOOLTIP[p.last_status] || ''}">${statusLabel(p.last_status)}</span>`
       }${p.screenshot_path ? ` <a href="/admin/screenshot/${p.screenshot_path}" target="_blank" title="צפה בצילום מסך מהבדיקה האחרונה" style="text-decoration:none;">📷</a>` : ''}</td>
-      <td style="text-align:center;font-size:0.82rem;color:#B12704;font-weight:bold;" dir="ltr">${p.last_price || '—'}</td>
+      <td style="text-align:center;font-size:0.82rem;color:#B12704;font-weight:bold;" dir="ltr">${formatPrice(p.last_price) || '—'}</td>
       <td style="text-align:center;font-size:0.8rem;">${adminIsraelCost(p)}</td>
       <td style="text-align:center;">${p.watchers}${p.paused_watchers > 0 ? ` <span title="${p.paused_watchers} עוקבים בהשהייה" style="font-size:0.78rem;color:#888;cursor:help;">⏸${p.paused_watchers}</span>` : ''}</td>
       <td class="ltr">
@@ -903,7 +903,7 @@ function exportAdminCSV() {
   const rows = _allAdminProducts.map(p => [
     p.asin,
     p.name || '',
-    p.last_price || '',
+    formatPrice(p.last_price),
     p.last_status || '',
     p.watchers,
     p.last_checked ? new Date(p.last_checked).toLocaleString('he-IL') : '',
