@@ -27,13 +27,13 @@ function israelCostLine(p) {
     // The single-purchase fee only appears alongside the minimum that explains it.
     const alone = isFinite(extra) && extra > 0
       ? ` · לקנייה בודדת +${extra.toFixed(2)}₪` : '';
-    return `<span style="color:#555;font-size:11px;margin-right:4px;">משלוח חינם בהזמנה מעל ${threshold.toFixed(2)}₪ — <b>חסרים עוד ${gap}₪</b>${alone}</span>`;
+    return `<span style="color:#555;font-size:13px;margin-right:4px;">משלוח חינם בהזמנה מעל ${threshold.toFixed(2)}₪ — <b>חסרים עוד ${gap}₪</b>${alone}</span>`;
   }
 
   if (!p.israel_cost_kind) return '';
 
   if (p.israel_cost_kind === 'free') {
-    return '<span style="color:#007600;font-size:11px;margin-right:4px;">· משלוח חינם, ללא עלויות נוספות</span>';
+    return '<span style="color:#007600;font-size:13px;margin-right:4px;">· משלוח חינם, ללא עלויות נוספות</span>';
   }
   if (!isFinite(extra) || extra <= 0) return '';
 
@@ -41,7 +41,7 @@ function israelCostLine(p) {
   const pct = Math.round((extra / price) * 100);
 
   if (p.israel_cost_kind === 'import_only') {
-    return `<span style="color:#555;font-size:11px;margin-right:4px;">+ ${extra.toFixed(2)}₪ מכס · משלוח חינם · <b>סה"כ ${total}₪</b></span>`;
+    return `<span style="color:#555;font-size:13px;margin-right:4px;">+ ${extra.toFixed(2)}₪ מכס · משלוח חינם · <b>סה"כ ${total}₪</b></span>`;
   }
   // A FREE product can still quote a shipping fee here: its free delivery is conditional
   // on an order minimum, and the fee is what you'd pay buying it alone. Printing it next
@@ -52,7 +52,10 @@ function israelCostLine(p) {
   // 'combined' is Amazon's merged figure with no split available — the label must not
   // claim it's shipping alone.
   const label = p.israel_cost_kind === 'shipping_only' ? 'משלוח' : 'משלוח ומכס';
-  return `<span style="color:#555;font-size:11px;margin-right:4px;">+ ${extra.toFixed(2)}₪ ${label} · <b>סה"כ ${total}₪</b> <span style="color:#888;">(${pct}% מהמחיר)</span></span>`;
+  // Spelled out rather than "(57% מהמחיר)": the bare percentage next to two other numbers
+  // reads as ambiguous — percentage of what — and generated support questions.
+  const pctSubject = p.israel_cost_kind === 'shipping_only' ? 'עלות המשלוח' : 'עלות המשלוח והמכס';
+  return `<span style="color:#555;font-size:13px;margin-right:4px;">+ ${extra.toFixed(2)}₪ ${label} · <b>סה"כ ${total}₪</b> <span style="color:#888;">${pctSubject} היא ${pct}% ממחיר המוצר</span></span>`;
 }
 
 function nextCheckLabel(p) {
@@ -292,7 +295,7 @@ function renderProducts() {
         </div>
         ${p.last_price && !['NO_SHIP','NOT_FOUND'].includes(p.last_status) ? `<div class="card-row-price" style="margin-top:3px;font-size:12px;">
           <span style="color:#B12704;font-weight:bold;">💰 <bdi>${escHtml(formatPrice(p.last_price))}</bdi></span>
-          ${israelCostLine(p) || `<span style="color:#999;font-size:11px;margin-right:4px;">${p.last_status === 'FREE' ? '(כולל משלוח חינם — לא כולל מכס ומע"מ במידה וחל)' : '(מחיר המוצר בלבד - לא כולל משלוח, מיסים ועלויות שונות)'}</span>`}
+          ${israelCostLine(p) || `<span style="color:#999;font-size:12px;margin-right:4px;">${p.last_status === 'FREE' ? '(כולל משלוח חינם — לא כולל מכס ומע"מ במידה וחל)' : '(מחיר המוצר בלבד - לא כולל משלוח, מיסים ועלויות שונות)'}</span>`}
         </div>` : ''}
 
         <!-- שורה 3: סטטוס | השהה | בדוק | הסר -->
