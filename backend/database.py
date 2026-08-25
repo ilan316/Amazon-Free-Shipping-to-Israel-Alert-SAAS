@@ -161,6 +161,11 @@ async def create_tables():
         )
         await conn.execute(
             __import__("sqlalchemy").text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS automation_winback_sent_at TIMESTAMP WITH TIME ZONE"
+            )
+        )
+        await conn.execute(
+            __import__("sqlalchemy").text(
                 "ALTER TABLE products ADD COLUMN IF NOT EXISTS last_price VARCHAR(50)"
             )
         )
@@ -517,6 +522,7 @@ async def fix_gmail_template():
             "לקוח לא הוסיף מוצרים - אפס מוצרים",
             "לקוח - הוסף עוד מוצרים למעקב",
             "לקוח לא פעיל - האם אתה עדיין פה?",
+            "לקוח בחופשה - החזרה",
         ]:
             tpl = (await session.execute(
                 select(EmailTemplate).where(EmailTemplate.name == tpl_name)
@@ -658,6 +664,20 @@ async def seed_default_templates():
       <p style="font-size:13px;color:#888;text-align:center;margin-top:8px;">אם לא תלחץ, נעביר את החשבון שלך למצב חופשה בעוד 15 יום.</p>
     </div>""")
 
+    # Win-back: the only message an auto-vacation user can still receive. It says
+    # plainly that we stopped, because a cheerful "we miss you" to someone who got
+    # nothing for two months reads as a lie and earns a spam complaint.
+    template4_body = _wrap(f"""
+    <div class="body">
+      <h2>עצרנו את ההתראות שלך ⏸</h2>
+      <p>לא נכנסת ולא לחצת אצלנו זמן רב, אז הפסקנו לשלוח לך את הסיכום היומי — לא רצינו למלא לך את תיבת הדואר בכלום.</p>
+      <p>המוצרים שעקבת אחריהם עדיין שמורים בחשבון. לחיצה אחת מחזירה את הכל למקום.</p>
+      <p style="background:{_BG};border-radius:10px;padding:14px 18px;font-size:14px;border-right:4px solid {_BRAND};">
+        אם לא מעניין אותך יותר — פשוט אל תלחץ. לא נשלח שוב.
+      </p>
+      <a href="{dashboard_url}" class="cta">← החזירו לי את ההתראות</a>
+    </div>""")
+
     async with AsyncSessionLocal() as session:
         defaults = [
             EmailTemplate(
@@ -675,4 +695,17 @@ async def seed_default_templates():
                 existing.body = t.body
             else:
                 session.add(t)
+
+        # Insert-only: once it exists, whatever the admin panel says wins.
+        winback_name = "לקוח בחופשה - החזרה"
+        existing_wb = (await session.execute(
+            select(EmailTemplate).where(EmailTemplate.name == winback_name)
+        )).scalar_one_or_none()
+        if not existing_wb:
+            session.add(EmailTemplate(
+                name=winback_name,
+                subject="עצרנו את ההתראות שלך — רוצה שנחזיר? ⏸",
+                body=template4_body,
+            ))
+
         await session.commit()

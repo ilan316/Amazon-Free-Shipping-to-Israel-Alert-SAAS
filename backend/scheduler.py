@@ -556,6 +556,62 @@ async def _run_automation_flow(
     return sent, failed
 
 
+WINBACK_DAILY_CAP = 25
+WINBACK_REPEAT_DAYS = 180
+
+
+async def run_winback_emails():
+    """Wake auto-parked users. Runs daily at 11:00 IL, after the summary has gone out.
+
+    An auto-vacation user is excluded from the daily summary, from the inactivity
+    check and from the re-engagement warning, so they receive nothing at all — and
+    the only two things that pull them back out, a login or an email click, both
+    require them to hear from us first. This is the one message that reaches them.
+
+    Capped at WINBACK_DAILY_CAP a day: these addresses have been silent for months,
+    and dumping the whole backlog at once is exactly the pattern that costs a domain
+    its reputation. Manual vacation is never touched — they asked to be left alone.
+    """
+    logger.info("=== Win-back emails started ===")
+    async with AsyncSessionLocal() as db:
+        now = datetime.now(timezone.utc)
+
+        tpl = (await db.execute(
+            select(EmailTemplate).where(EmailTemplate.name == "לקוח בחופשה - החזרה")
+        )).scalar_one_or_none()
+        if not tpl:
+            logger.warning("=== Win-back: template missing, nothing sent ===")
+            return
+
+        users = (await db.execute(
+            select(User).where(
+                User.vacation_mode == True,
+                User.vacation_auto == True,
+                User.is_active == True,
+                User.is_verified == True,
+                User.is_admin == False,
+                User.notify_email_bounced == False,
+                or_(
+                    User.automation_winback_sent_at == None,
+                    User.automation_winback_sent_at <= now - timedelta(days=WINBACK_REPEAT_DAYS),
+                ),
+            )
+            # Never-contacted first, then whoever went quiet most recently — the
+            # warmest addresses go out while the sending reputation is still fresh.
+            .order_by(User.automation_winback_sent_at.asc().nulls_first(),
+                      User.last_login_at.desc().nulls_last())
+            .limit(WINBACK_DAILY_CAP)
+        )).scalars().all()
+
+        sent, failed = await _run_automation_flow(
+            db, tpl, "automation_winback", users, now,
+            lambda u, ts: setattr(u, "automation_winback_sent_at", ts),
+        )
+        await db.commit()
+
+    logger.info(f"=== Win-back emails complete — sent: {sent}, failed: {failed} ===")
+
+
 async def run_automation_emails():
     """Daily automation: activation + reminder for 0-product users, expansion for 1-9 product users."""
     logger.info("=== Automation emails started ===")
