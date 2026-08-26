@@ -34,6 +34,28 @@ _CLICK_DEDUP_MINUTES = 5
 _APPLE_MPP_UA_FRAGMENTS = ("applemail", "apple mail")
 
 
+def _client_ip(request: Request) -> str | None:
+    """Extract the caller's IP and immediately truncate it.
+
+    A full IP is personal data, and the privacy policy states we do not store
+    location data. Truncating to /24 (IPv4) or /48 (IPv6) keeps everything the
+    tracking code actually needs — the Apple MPP (17.x) and Google Image Proxy
+    (66.249.x) prefix checks are unaffected — while dropping the part that
+    identifies an individual subscriber.
+    """
+    raw = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
+    if not raw:
+        return None
+    raw = raw.split(",")[0].strip()[:64]
+    if ":" in raw:  # IPv6 — keep the first three hextets (/48)
+        parts = [p for p in raw.split(":") if p]
+        return ":".join(parts[:3]) + "::" if parts else None
+    octets = raw.split(".")
+    if len(octets) == 4:
+        return ".".join(octets[:3]) + ".0"
+    return None
+
+
 def _is_bot(ua: str) -> bool:
     """Return True if User-Agent looks like an email security scanner or bot."""
     if not ua or len(ua) < 5:
@@ -90,9 +112,7 @@ async def track_click(
         if _is_bot(ua):
             logger.info(f"click BLOCKED (bot UA): u={u} a={a} ua={ua[:120]}")
         else:
-            ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
-            if ip:
-                ip = ip.split(",")[0].strip()[:64]
+            ip = _client_ip(request)
             # Dedup: same user + ASIN within 5 min = scanner duplicate, skip
             if u and a:
                 cutoff = datetime.now(timezone.utc) - timedelta(minutes=_CLICK_DEDUP_MINUTES)
@@ -144,12 +164,8 @@ async def track_email_open(
             if _is_bot(ua):
                 logger.info(f"email-open BLOCKED (bot UA): uid={uid} tid={tid} tn={tn} ua={ua[:120]}")
             else:
-                suspicious = _is_apple_mpp(ua, None)  # IP checked after extraction
-                ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
-                if ip:
-                    ip = ip.split(",")[0].strip()[:64]
-                    if ip.startswith("17."):
-                        suspicious = True
+                ip = _client_ip(request)
+                suspicious = _is_apple_mpp(ua, ip)
                 logger.info(f"email-open {'SUSPICIOUS(MPP)' if suspicious else 'ALLOWED'}: uid={uid} tid={tid} tn={tn} ua={ua[:120]} ip={ip}")
                 from datetime import datetime, timezone
                 cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
