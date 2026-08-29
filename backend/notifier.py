@@ -462,7 +462,7 @@ def send_user_alert(user, product, result) -> bool:
     recipient = user.notify_email
     affiliate_tag = os.environ.get("AMAZON_AFFILIATE_TAG", "").strip()
     logo_url = os.environ.get("LOGO_URL", "").strip()
-    checked_at = datetime.now().strftime("%d/%m/%Y")
+    checked_at = (product.last_checked or datetime.now()).strftime("%d/%m/%Y %H:%M")
 
     asin = product.asin
     name = _short(product.name or asin, _MAX_NAME_BODY)
@@ -616,7 +616,8 @@ def send_daily_summary(user, free_products: list, pause_warnings: dict = None) -
     recipient = user.notify_email
     affiliate_tag = os.environ.get("AMAZON_AFFILIATE_TAG", "").strip()
     logo_url = os.environ.get("LOGO_URL", "").strip()
-    checked_at = datetime.now().strftime("%d/%m/%Y")
+    checked_ats = [p.last_checked for p, _ in free_products if getattr(p, "last_checked", None)]
+    checked_at = (max(checked_ats) if checked_ats else datetime.now()).strftime("%d/%m/%Y %H:%M")
     n = len(free_products)
 
     is_rtl = lang == "he"
@@ -631,8 +632,11 @@ def send_daily_summary(user, free_products: list, pause_warnings: dict = None) -
     for p, custom_name in free_products:
         name = _short(custom_name or p.name or p.asin, _MAX_NAME_BODY)
         url = _tracking_url(user.id, p.asin)
+        p_checked = p.last_checked.strftime("%d/%m/%Y %H:%M") if getattr(p, "last_checked", None) else ""
         lines.append(f"• {name}")
         lines.append(f"  {url}")
+        if p_checked:
+            lines.append(f"  {_t(lang, 'plain_footer', checked_at=p_checked)}")
         lines.append("")
     lines.append(_t(lang, "plain_urgency"))
     lines.append(_t(lang, "plain_footer", checked_at=checked_at))
@@ -659,6 +663,10 @@ def send_daily_summary(user, free_products: list, pause_warnings: dict = None) -
                 else "(Amazon price, excl. shipping, taxes & fees)"
             )
             price_html = f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {p.last_price} <span style="font-size:11px;color:#888;font-weight:normal;">{price_note}</span></p>'
+        checked_html = ""
+        if getattr(p, "last_checked", None):
+            p_checked = p.last_checked.strftime("%d/%m/%Y %H:%M")
+            checked_html = f'<p style="margin:0 0 8px;font-size:11px;color:#999;text-align:{txt_align};" {txt_dir}>{_t(lang, "plain_footer", checked_at=p_checked)}</p>'
         warning_html = ""
         if pause_warnings and p.asin in pause_warnings:
             days_left = pause_warnings[p.asin]
@@ -687,7 +695,7 @@ def send_daily_summary(user, free_products: list, pause_warnings: dict = None) -
               <p style="margin:0 0 8px;font-size:12px;color:#666;text-align:{txt_align};">ASIN: {p.asin}</p>
               {price_html}
               <p style="margin:0 0 10px;font-size:13px;font-weight:bold;color:#007600;text-align:{txt_align};" {txt_dir}>{_t(lang, "shipping_badge")}</p>
-              {warning_html}<div style="text-align:{txt_align};">{_cta_btn(url, _t(lang, "btn_buy"), txt_align)}</div>
+              {checked_html}{warning_html}<div style="text-align:{txt_align};">{_cta_btn(url, _t(lang, "btn_buy"), txt_align)}</div>
             </td>
           </tr>
         </table>"""
@@ -798,7 +806,7 @@ def send_no_click_reminder(user, product, days_free: int) -> bool:
     pause_url = _pause_product_url(user.id, asin)
     logo_url = os.environ.get("LOGO_URL", "").strip()
     affiliate_tag = os.environ.get("AMAZON_AFFILIATE_TAG", "").strip()
-    checked_at = datetime.now().strftime("%d/%m/%Y")
+    checked_at = (product.last_checked or datetime.now()).strftime("%d/%m/%Y %H:%M")
 
     if lang == "he":
         subject = f"⏰ {name_subject} — חינם כבר {days_free} ימים, עדיין מתכנן לקנות?"
