@@ -1435,19 +1435,20 @@ class BrowserManager:
                 # With valid Israel cookies: NO_SHIP + no buybox price = product genuinely
                 # doesn't ship to Israel. Trust the result — no Playwright needed.
                 # Without cookies: no-price could be a location issue, so still fall back.
-                # Exception: NO_SHIP + USD price + cookies = ILS price requires JS — fall back to Playwright.
+                # Exception: NO_SHIP + cookies but a suspect price — either USD (ILS price
+                # requires JS) or empty (httpx render came back incomplete, not a genuine
+                # NO_SHIP signal) — fall back to Playwright rather than trust it.
                 has_cookies = len(self._session_cookies) > 0
-                usd_price_with_cookies = (
+                suspect_price_with_cookies = (
                     result.status == ShippingStatus.NO_SHIP
                     and has_cookies
-                    and result.last_price.startswith("$")
-                    and "to israel" in (result.raw_text or "").lower()
+                    and (result.last_price.startswith("$") or not result.last_price)
                 )
                 if result.status in (ShippingStatus.ERROR, ShippingStatus.UNKNOWN) or (
                     result.status == ShippingStatus.NO_SHIP and not result.last_price and not has_cookies
-                ) or usd_price_with_cookies:
+                ) or suspect_price_with_cookies:
                     fallback_reason = result.error_message or result.raw_text or result.status.value
-                    trigger = "usd_price_needs_js" if usd_price_with_cookies else fallback_reason[:100]
+                    trigger = "suspect_price_needs_js" if suspect_price_with_cookies else fallback_reason[:100]
                     logger.warning(
                         f"[{asin}] httpx→Playwright fallback | status={result.status.value} "
                         f"price={result.last_price!r} cookies={has_cookies} reason={trigger!r}"
