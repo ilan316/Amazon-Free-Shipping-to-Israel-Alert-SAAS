@@ -432,6 +432,7 @@ async def public_free_products():
             "name_he": p.name_he,
             "amazon_category": p.amazon_category,
             "category_he": cat_map.get(p.amazon_category, p.amazon_category) if p.amazon_category else "",
+            "source": p.source,
         }
         for p in products
     ]
