@@ -17,7 +17,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
-from backend.models import Product, User, UserProduct
+from backend.models import Product, User, UserProduct, SystemSetting
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -129,6 +129,15 @@ async def sync_products(
             Product.asin.not_in(incoming_asins) if incoming_asins else True,
         )
     )).scalar_one()
+
+    # Stamp when the scanner last synced — independent of any product's
+    # last_checked, which the far-more-frequent per-user checker also touches
+    # for any scanner ASIN a user happens to track.
+    sync_stmt = insert(SystemSetting).values(key="last_scanner_sync", value=now.isoformat())
+    sync_stmt = sync_stmt.on_conflict_do_update(
+        index_elements=["key"], set_={"value": sync_stmt.excluded.value}
+    )
+    await db.execute(sync_stmt)
 
     await db.commit()
 

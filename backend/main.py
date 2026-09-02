@@ -442,6 +442,22 @@ async def public_free_products():
     return data
 
 
+@app.get("/api/public/last-scanner-sync")
+async def public_last_scanner_sync():
+    """When the local Category Scanner last synced its product list — the
+    source of truth for amzfreeil.com/free-products.html's 'עדכון אחרון' badge.
+    Deliberately separate from any product's last_checked, which the
+    per-user checker also updates far more often."""
+    from backend.database import AsyncSessionLocal
+    from backend.models import SystemSetting
+    from sqlalchemy import select
+    async with AsyncSessionLocal() as db:
+        row = (await db.execute(
+            select(SystemSetting).where(SystemSetting.key == "last_scanner_sync")
+        )).scalar_one_or_none()
+        return {"last_sync": row.value if row else None}
+
+
 @app.get("/system-message")
 async def public_system_message():
     from backend.database import AsyncSessionLocal
