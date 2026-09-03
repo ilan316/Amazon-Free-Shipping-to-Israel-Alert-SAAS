@@ -94,6 +94,53 @@ async def go_asin(asin: str):
     return RedirectResponse(dest, status_code=302)
 
 
+@router.get("/ig-image/{asin}.jpg", include_in_schema=False)
+async def ig_image(asin: str, db: Annotated[AsyncSession, Depends(get_db)]):
+    """Re-serves a product image as a valid JPEG padded to 1:1, for Instagram's
+    Graph API — unlike Facebook/Telegram, IG rejects non-JPEG formats and aspect
+    ratios outside 4:5-1.91:1, and Amazon's raw product images routinely violate both."""
+    import re
+    from io import BytesIO
+    import httpx
+    from PIL import Image
+    from backend.models import Product
+
+    if not re.fullmatch(r"[A-Z0-9]{10}", asin.upper()):
+        return Response(status_code=404)
+    result = await db.execute(select(Product).where(Product.asin == asin.upper()))
+    product = result.scalar_one_or_none()
+    if not product or not product.image_url:
+        return Response(status_code=404)
+
+    try:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            resp = await client.get(product.image_url)
+        if resp.status_code != 200:
+            return Response(status_code=404)
+
+        img = Image.open(BytesIO(resp.content))
+        if img.mode in ("RGBA", "P", "LA"):
+            rgba = img.convert("RGBA")
+            flattened = Image.new("RGB", rgba.size, (255, 255, 255))
+            flattened.paste(rgba, mask=rgba.split()[-1])
+            img = flattened
+        elif img.mode != "RGB":
+            img = img.convert("RGB")
+
+        side = min(max(img.width, img.height), 1440)  # IG recommended max edge
+        img.thumbnail((side, side))
+        canvas = Image.new("RGB", (side, side), (255, 255, 255))
+        canvas.paste(img, ((side - img.width) // 2, (side - img.height) // 2))
+
+        buf = BytesIO()
+        canvas.save(buf, format="JPEG", quality=85)
+        return Response(content=buf.getvalue(), media_type="image/jpeg",
+                         headers={"Cache-Control": "public, max-age=3600"})
+    except Exception as e:
+        logger.warning(f"[ig-image] failed for {asin}: {e}")
+        return Response(status_code=404)
+
+
 @router.get("/track/click", include_in_schema=False)
 async def track_click(
     request: Request,

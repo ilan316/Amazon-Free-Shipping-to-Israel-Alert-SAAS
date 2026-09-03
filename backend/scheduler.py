@@ -1385,11 +1385,13 @@ async def _send_instagram_product_message(product: Product) -> bool:
         return False
 
     caption = await asyncio.to_thread(_facebook_caption, product)
+    app_base_url = os.environ.get("APP_BASE_URL", "https://app.amzfreeil.com").rstrip("/")
+    ig_image_url = f"{app_base_url}/ig-image/{product.asin}.jpg"
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             create_resp = await client.post(
                 f"https://graph.facebook.com/v19.0/{ig_user_id}/media",
-                data={"image_url": product.image_url, "caption": caption, "access_token": page_token},
+                data={"image_url": ig_image_url, "caption": caption, "access_token": page_token},
             )
             if create_resp.status_code != 200:
                 logger.warning(f"[instagram] media create failed for {product.asin}: {create_resp.text[:300]}")
