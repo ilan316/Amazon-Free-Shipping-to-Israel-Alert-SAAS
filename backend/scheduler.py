@@ -1360,6 +1360,98 @@ async def run_send_facebook_product():
             logger.warning(f"=== Facebook product send failed: {product.asin} ===")
 
 
+_INSTAGRAM_RESEND_DAYS = 7
+
+
+async def _send_instagram_product_message(product: Product) -> bool:
+    """Publish a product to Instagram via the two-step Graph API flow:
+    create a media container, then publish it. Reuses the same System User /
+    Page token as Facebook — Instagram permissions ride on the same token."""
+    user_token = os.environ.get("FACEBOOK_PAGE_TOKEN", "")
+    page_id = os.environ.get("FACEBOOK_PAGE_ID", "")
+    if not user_token or not page_id:
+        logger.warning("FACEBOOK_PAGE_TOKEN or FACEBOOK_PAGE_ID not set — skipping Instagram send")
+        return False
+
+    ig_user_id = os.environ.get("INSTAGRAM_BUSINESS_ID", "17841431920060212")
+
+    if not product.image_url:
+        logger.warning(f"[instagram] {product.asin} has no image_url — Instagram requires media, skipping")
+        return False
+
+    page_token = await _get_facebook_page_token(user_token, page_id)
+    if not page_token:
+        logger.warning("[instagram] could not obtain page access token — skipping")
+        return False
+
+    caption = await asyncio.to_thread(_facebook_caption, product)
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            create_resp = await client.post(
+                f"https://graph.facebook.com/v19.0/{ig_user_id}/media",
+                data={"image_url": product.image_url, "caption": caption, "access_token": page_token},
+            )
+            if create_resp.status_code != 200:
+                logger.warning(f"[instagram] media create failed for {product.asin}: {create_resp.text[:300]}")
+                return False
+            creation_id = create_resp.json().get("id")
+            if not creation_id:
+                logger.warning(f"[instagram] media create returned no id for {product.asin}: {create_resp.text[:300]}")
+                return False
+
+            publish_resp = await client.post(
+                f"https://graph.facebook.com/v19.0/{ig_user_id}/media_publish",
+                data={"creation_id": creation_id, "access_token": page_token},
+            )
+        if publish_resp.status_code == 200:
+            return True
+        logger.warning(f"[instagram] media_publish failed for {product.asin}: {publish_resp.text[:300]}")
+        return False
+    except Exception as e:
+        logger.warning(f"[instagram] send error for {product.asin}: {e}")
+        return False
+
+
+async def run_send_instagram_product():
+    """Send one free product to Instagram (@amzfreeil). Runs once per entry in
+    INSTAGRAM_PRODUCT_POST_TIMES (IL). Skips ASINs sent in the last 7 days."""
+    if os.environ.get("INSTAGRAM_PRODUCT_ENABLED", "true").lower() == "false":
+        logger.info("[instagram] disabled via INSTAGRAM_PRODUCT_ENABLED=false — skipping")
+        return
+
+    from backend.models import InstagramSent
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    logger.info("=== Instagram product send started ===")
+    async with AsyncSessionLocal() as db:
+        now = datetime.now(timezone.utc)
+        resend_cutoff = now - timedelta(days=_INSTAGRAM_RESEND_DAYS)
+
+        sent_recently = (
+            select(InstagramSent.asin)
+            .where(InstagramSent.sent_at > resend_cutoff)
+            .scalar_subquery()
+        )
+        product = await _pick_verified_free_product(db, sent_recently, "instagram")
+
+        if not product:
+            logger.info("=== Instagram product send: no eligible products ===")
+            return
+
+        ok = await _send_instagram_product_message(product)
+        if ok:
+            stmt = pg_insert(InstagramSent).values(asin=product.asin, sent_at=now)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["asin"],
+                set_={"sent_at": now},
+            )
+            await db.execute(stmt)
+            await db.commit()
+            logger.info(f"=== Instagram product sent: {product.asin} — {product.name_he or product.name} ===")
+        else:
+            logger.warning(f"=== Instagram product send failed: {product.asin} ===")
+
+
 def _blog_telegram_caption(
     title: str, slug: str, amazon_price: float | None, israel_price: float | None,
     kind: str = "review",
@@ -1538,6 +1630,10 @@ FACEBOOK_PRODUCT_POST_TIMES = [(8, 0), (10, 30), (13, 0), (16, 0), (19, 0)]
 # and spreading these out evenly would leave the window with almost no free slots.
 TELEGRAM_PRODUCT_POST_TIMES = [(7, 0), (8, 0), (10, 30), (13, 0), (14, 30), (16, 0), (19, 0), (20, 30)]
 
+# Instagram mirrors the Facebook times exactly — same cadence decision as
+# keeping shared hours between channels, no new cadence to design.
+INSTAGRAM_PRODUCT_POST_TIMES = list(FACEBOOK_PRODUCT_POST_TIMES)
+
 _BLOG_SOCIAL_WINDOW_START_HOUR = 6
 _BLOG_SOCIAL_WINDOW_END_HOUR = 22
 _BLOG_SOCIAL_MIN_GAP_MINUTES = 60
@@ -1590,7 +1686,7 @@ def _all_product_post_times() -> list[tuple[int, int]]:
     slot has to keep its distance from either channel's product posts. Times
     shared by both lists are deduped so they only count once.
     """
-    return sorted(set(FACEBOOK_PRODUCT_POST_TIMES) | set(TELEGRAM_PRODUCT_POST_TIMES))
+    return sorted(set(FACEBOOK_PRODUCT_POST_TIMES) | set(TELEGRAM_PRODUCT_POST_TIMES) | set(INSTAGRAM_PRODUCT_POST_TIMES))
 
 
 def _product_post_times_utc(window_start: datetime, window_end: datetime) -> list[datetime]:

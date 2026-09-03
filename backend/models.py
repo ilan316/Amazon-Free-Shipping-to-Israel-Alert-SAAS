@@ -183,6 +183,14 @@ class FacebookSent(Base):
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 
+class InstagramSent(Base):
+    __tablename__ = "instagram_sent"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    asin: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
 class CategoryTranslation(Base):
     __tablename__ = "category_translations"
 

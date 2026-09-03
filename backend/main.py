@@ -208,7 +208,7 @@ async def lifespan(app: FastAPI):
 
     scheduler.start()
 
-    from backend.scheduler import run_inactivity_check, run_automation_emails, check_decodo_quota, run_telegram_report, run_hebrew_backfill, run_send_telegram_product, run_send_facebook_product, run_cleanup_orphans, run_purge_unverified, run_winback_emails, cleanup_old_screenshots, run_send_blog_social_queue, FACEBOOK_PRODUCT_POST_TIMES, TELEGRAM_PRODUCT_POST_TIMES
+    from backend.scheduler import run_inactivity_check, run_automation_emails, check_decodo_quota, run_telegram_report, run_hebrew_backfill, run_send_telegram_product, run_send_facebook_product, run_send_instagram_product, run_cleanup_orphans, run_purge_unverified, run_winback_emails, cleanup_old_screenshots, run_send_blog_social_queue, FACEBOOK_PRODUCT_POST_TIMES, TELEGRAM_PRODUCT_POST_TIMES, INSTAGRAM_PRODUCT_POST_TIMES
 
     telegram_hour = int(os.environ.get("TELEGRAM_REPORT_HOUR", "8"))
     telegram_minute = int(os.environ.get("TELEGRAM_REPORT_MINUTE", "0"))
@@ -255,6 +255,11 @@ async def lifespan(app: FastAPI):
     for _fb_hour, _fb_minute in FACEBOOK_PRODUCT_POST_TIMES:
         _upsert_job(run_send_facebook_product, f"facebook_product_{_fb_hour:02d}{_fb_minute:02d}", dict(
             trigger="cron", hour=_fb_hour, minute=_fb_minute, timezone="Asia/Jerusalem", misfire_grace_time=1800
+        ))
+    # Instagram product posts — same fixed times as Facebook (scheduler.INSTAGRAM_PRODUCT_POST_TIMES).
+    for _ig_hour, _ig_minute in INSTAGRAM_PRODUCT_POST_TIMES:
+        _upsert_job(run_send_instagram_product, f"instagram_product_{_ig_hour:02d}{_ig_minute:02d}", dict(
+            trigger="cron", hour=_ig_hour, minute=_ig_minute, timezone="Asia/Jerusalem", misfire_grace_time=1800
         ))
 
     _upsert_job(cleanup_old_screenshots, "screenshot_cleanup", dict(
