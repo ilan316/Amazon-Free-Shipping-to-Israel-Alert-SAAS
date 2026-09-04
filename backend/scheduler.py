@@ -1401,6 +1401,21 @@ async def _send_instagram_product_message(product: Product) -> bool:
                 logger.warning(f"[instagram] media create returned no id for {product.asin}: {create_resp.text[:300]}")
                 return False
 
+            # Instagram processes the container asynchronously (image fetch + transcode) —
+            # publishing before status_code=FINISHED fails with "Media ID is not available".
+            for _ in range(5):
+                status_resp = await client.get(
+                    f"https://graph.facebook.com/v19.0/{creation_id}",
+                    params={"fields": "status_code", "access_token": page_token},
+                )
+                status = status_resp.json().get("status_code") if status_resp.status_code == 200 else None
+                if status == "FINISHED":
+                    break
+                if status == "ERROR":
+                    logger.warning(f"[instagram] media processing errored for {product.asin}: {status_resp.text[:300]}")
+                    return False
+                await asyncio.sleep(2)
+
             publish_resp = await client.post(
                 f"https://graph.facebook.com/v19.0/{ig_user_id}/media_publish",
                 data={"creation_id": creation_id, "access_token": page_token},
