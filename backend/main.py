@@ -380,6 +380,15 @@ _free_products_cache: dict = {"data": None, "ts": 0.0}
 _FREE_PRODUCTS_TTL = 1800  # seconds (30 min)
 
 
+def invalidate_free_products_cache() -> None:
+    """Force the next /api/public/free-products call to rebuild from the DB.
+
+    Called after a live pre-post verification changes a product's status, so the
+    page the Instagram caption points at reflects that result immediately rather
+    than up to 30 minutes later."""
+    _free_products_cache["ts"] = 0.0
+
+
 @app.get("/api/public/free-products")
 async def public_free_products():
     """Public endpoint — returns all products currently with FREE shipping to Israel.

@@ -1125,6 +1125,14 @@ async def _pick_verified_free_product(db: AsyncSession, sent_recently, channel: 
                 pass
             continue
 
+        # The live check may have flipped the status either way; drop the public
+        # cache so free-products.html matches what we are about to claim in the post.
+        try:
+            from backend.main import invalidate_free_products_cache
+            invalidate_free_products_cache()
+        except Exception:
+            pass
+
         if check_result.status == ShippingStatus.FREE:
             return product
         logger.info(f"[{channel}] {asin} no longer FREE ({check_result.status.value}) — trying another")
@@ -1190,7 +1198,7 @@ async def run_send_telegram_product():
 _FACEBOOK_RESEND_DAYS = 7
 
 
-def _facebook_caption(product: Product) -> str:
+def _facebook_caption(product: Product, channel: str = "facebook") -> str:
     url = f"https://app.amzfreeil.com/go/{product.asin}"
     name_he = product.name_he or product.name or product.asin
     price = _format_price(product.last_price)
@@ -1208,6 +1216,25 @@ def _facebook_caption(product: Product) -> str:
     if hook:
         header_lines += [f"{_RTL}{hook}", ""]
     header_lines += [f"{_RTL}{name_he}", ""]
+    # Instagram never renders a URL in a feed caption as a tappable link, so the
+    # Facebook CTA is dead text there. Point at the bio link (the only clickable
+    # one) and at the live free-products page instead — the picker verifies the
+    # product against Amazon right before posting, so the claim holds at post time.
+    if channel == "instagram":
+        cta_lines = [
+            f"{_RTL}✅ המוצר מופיע ברשימת המוצרים עם משלוח חינם — נכון ל-{today}",
+            f"{_RTL}🔗 לרכישה ולעוד עשרות מוצרים: הלינק בביו ☝️",
+            f"{_RTL}www.amzfreeil.com/free-products.html",
+            "",
+            f"{_RTL}📱 כל המוצרים גם בטלגרם → t.me/amzfreeil",
+        ]
+    else:
+        cta_lines = [
+            f"{_RTL}👉 לרכישה באמזון: {url}",
+            "",
+            f"{_RTL}📱 יש עוד הרבה מוצרים שלא מגיעים לפה — כולם בטלגרם → t.me/amzfreeil",
+        ]
+
     footer_lines = [
         f"{_RTL}--",
         "",
@@ -1216,9 +1243,7 @@ def _facebook_caption(product: Product) -> str:
         f"{_RTL}🚚 משלוח חינם לישראל 🇮🇱",
         f"{_RTL}📅 נכון ל-{today}. המחירים משתנים — בדקו לפני רכישה.",
         "",
-        f"{_RTL}👉 לרכישה באמזון: {url}",
-        "",
-        f"{_RTL}📱 יש עוד הרבה מוצרים שלא מגיעים לפה — כולם בטלגרם → t.me/amzfreeil",
+        *cta_lines,
         "",
         f"{_RTL}📢 AMZ Free Ship Alert",
     ]
@@ -1384,7 +1409,7 @@ async def _send_instagram_product_message(product: Product) -> bool:
         logger.warning("[instagram] could not obtain page access token — skipping")
         return False
 
-    caption = await asyncio.to_thread(_facebook_caption, product)
+    caption = await asyncio.to_thread(_facebook_caption, product, "instagram")
     app_base_url = os.environ.get("APP_BASE_URL", "https://app.amzfreeil.com").rstrip("/")
     ig_image_url = f"{app_base_url}/ig-image/{product.asin}.jpg"
     try:
