@@ -1223,7 +1223,7 @@ def _facebook_caption(product: Product, channel: str = "facebook") -> str:
     if channel == "instagram":
         cta_lines = [
             f"{_RTL}✅ המוצר מופיע ברשימת המוצרים עם משלוח חינם — נכון ל-{today}",
-            f"{_RTL}🔗 לרכישה ולעוד עשרות מוצרים: הלינק בביו ☝️",
+            f"{_RTL}🔗 לרכישה ולעוד עשרות מוצרים: בביו ☝️ → \"מוצרים במשלוח חינם\"",
             f"{_RTL}www.amzfreeil.com/free-products.html",
             "",
             f"{_RTL}📱 כל המוצרים גם בטלגרם → t.me/amzfreeil",
