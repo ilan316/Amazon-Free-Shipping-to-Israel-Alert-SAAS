@@ -112,9 +112,25 @@ async def ig_image(asin: str, db: Annotated[AsyncSession, Depends(get_db)]):
     if not product or not product.image_url:
         return Response(status_code=404)
 
+    def _hires(u: str) -> str:
+        """Amazon's CDN serves any size via the URL modifier token; the scraped URL is
+        often a ~300px thumbnail, far too small for IG's 1080px feed rendering."""
+        return re.sub(r"\._[^/]*?(\.(?:jpg|jpeg|png|webp))$", r"._SL1500_\1",
+                      u, flags=re.I)
+
     try:
         async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-            resp = await client.get(product.image_url)
+            resp = None
+            hires_url = _hires(product.image_url)
+            if hires_url != product.image_url:
+                try:
+                    hires_resp = await client.get(hires_url)
+                    if hires_resp.status_code == 200:
+                        resp = hires_resp
+                except Exception:
+                    pass
+            if resp is None:
+                resp = await client.get(product.image_url)
         if resp.status_code != 200:
             return Response(status_code=404)
 
