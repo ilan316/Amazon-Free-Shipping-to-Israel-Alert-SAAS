@@ -94,23 +94,14 @@ async def go_asin(asin: str):
     return RedirectResponse(dest, status_code=302)
 
 
-@router.get("/ig-image/{asin}.jpg", include_in_schema=False)
-async def ig_image(asin: str, db: Annotated[AsyncSession, Depends(get_db)]):
-    """Re-serves a product image as a valid JPEG padded to 1:1, for Instagram's
+async def _normalized_ig_jpeg(source_url: str, label: str) -> Response:
+    """Fetch an image URL and re-serve it as a valid JPEG padded to 1:1, for Instagram's
     Graph API — unlike Facebook/Telegram, IG rejects non-JPEG formats and aspect
     ratios outside 4:5-1.91:1, and Amazon's raw product images routinely violate both."""
     import re
     from io import BytesIO
     import httpx
     from PIL import Image
-    from backend.models import Product
-
-    if not re.fullmatch(r"[A-Z0-9]{10}", asin.upper()):
-        return Response(status_code=404)
-    result = await db.execute(select(Product).where(Product.asin == asin.upper()))
-    product = result.scalar_one_or_none()
-    if not product or not product.image_url:
-        return Response(status_code=404)
 
     def _hires(u: str) -> str:
         """Amazon's CDN serves any size via the URL modifier token; the scraped URL is
@@ -121,8 +112,8 @@ async def ig_image(asin: str, db: Annotated[AsyncSession, Depends(get_db)]):
     try:
         async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
             resp = None
-            hires_url = _hires(product.image_url)
-            if hires_url != product.image_url:
+            hires_url = _hires(source_url)
+            if hires_url != source_url:
                 try:
                     hires_resp = await client.get(hires_url)
                     if hires_resp.status_code == 200:
@@ -130,7 +121,7 @@ async def ig_image(asin: str, db: Annotated[AsyncSession, Depends(get_db)]):
                 except Exception:
                     pass
             if resp is None:
-                resp = await client.get(product.image_url)
+                resp = await client.get(source_url)
         if resp.status_code != 200:
             return Response(status_code=404)
 
@@ -153,8 +144,38 @@ async def ig_image(asin: str, db: Annotated[AsyncSession, Depends(get_db)]):
         return Response(content=buf.getvalue(), media_type="image/jpeg",
                          headers={"Cache-Control": "public, max-age=3600"})
     except Exception as e:
-        logger.warning(f"[ig-image] failed for {asin}: {e}")
+        logger.warning(f"[ig-image] failed for {label}: {e}")
         return Response(status_code=404)
+
+
+@router.get("/ig-image/blog/{queue_id}.jpg", include_in_schema=False)
+async def ig_image_blog(queue_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
+    """Same normalization as /ig-image/{asin}.jpg, but for blog announcements — the
+    source URL comes from the queue row itself (guides have no ASIN). Reading the URL
+    from the DB rather than a query param keeps this from becoming an open image proxy."""
+    from backend.models import BlogSocialQueue
+
+    row = (await db.execute(
+        select(BlogSocialQueue).where(BlogSocialQueue.id == queue_id)
+    )).scalar_one_or_none()
+    if not row or not row.image_url:
+        return Response(status_code=404)
+    return await _normalized_ig_jpeg(row.image_url, f"blog:{queue_id}")
+
+
+@router.get("/ig-image/{asin}.jpg", include_in_schema=False)
+async def ig_image(asin: str, db: Annotated[AsyncSession, Depends(get_db)]):
+    """Instagram-safe JPEG for a scanner product image, by ASIN."""
+    import re
+    from backend.models import Product
+
+    if not re.fullmatch(r"[A-Z0-9]{10}", asin.upper()):
+        return Response(status_code=404)
+    result = await db.execute(select(Product).where(Product.asin == asin.upper()))
+    product = result.scalar_one_or_none()
+    if not product or not product.image_url:
+        return Response(status_code=404)
+    return await _normalized_ig_jpeg(product.image_url, asin)
 
 
 @router.get("/track/click", include_in_schema=False)

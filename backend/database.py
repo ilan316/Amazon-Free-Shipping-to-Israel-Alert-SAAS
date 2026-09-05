@@ -70,6 +70,16 @@ async def create_tables():
                 "ALTER TABLE blog_published_asins ADD COLUMN IF NOT EXISTS facebook_sent_at TIMESTAMP WITH TIME ZONE"
             )
         )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE blog_published_asins ADD COLUMN IF NOT EXISTS instagram_sent_at TIMESTAMP WITH TIME ZONE"
+            )
+        )
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE blog_social_queue ADD COLUMN IF NOT EXISTS instagram_sent BOOLEAN NOT NULL DEFAULT FALSE"
+            )
+        )
         # TRUE when an admin set the broadcast time by hand instead of the random scheduler
         await conn.execute(
             __import__("sqlalchemy").text(

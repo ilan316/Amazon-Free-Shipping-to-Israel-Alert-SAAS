@@ -1540,7 +1540,7 @@ def _blog_telegram_caption(
 
 def _blog_facebook_caption(
     title: str, slug: str, amazon_price: float | None, israel_price: float | None,
-    kind: str = "review",
+    kind: str = "review", channel: str = "facebook",
 ) -> str:
     from backend.blog_utils import strip_tags
 
@@ -1569,9 +1569,18 @@ def _blog_facebook_caption(
     if not guide:
         footer_lines.append(f"{_RTL}📅 נכון ל-{today}. המחירים משתנים — בדקו לפני רכישה.")
     cta = "לקריאת המדריך המלא" if guide else "לקריאת הסקירה המלאה"
+    if channel == "instagram":
+        # Links in an IG caption are not tappable — send readers to the bio instead,
+        # and keep the address as plain text so it is still copyable.
+        cta_lines = [
+            f"{_RTL}👉 {cta}: הקישור בביו ☝️ → \"בלוג\"",
+            f"{_RTL}{url.replace('https://', '')}",
+        ]
+    else:
+        cta_lines = [f"{_RTL}👉 {cta}: {url}"]
     footer_lines += [
         "",
-        f"{_RTL}👉 {cta}: {url}",
+        *cta_lines,
         "",
         f"{_RTL}📱 יש עוד הרבה מוצרים שלא מגיעים לפה — כולם בטלגרם → t.me/amzfreeil",
         "",
@@ -1659,6 +1668,79 @@ async def send_blog_post_to_facebook(
         return False
     except Exception as e:
         logger.warning(f"[facebook_blog] send error for {slug}: {e}")
+        return False
+
+
+async def send_blog_post_to_instagram(
+    queue_id: int, title: str, slug: str, image_url: str | None,
+    amazon_price: float | None = None, israel_price: float | None = None,
+    kind: str = "review",
+) -> bool:
+    """Announce a newly published blog post on Instagram (@amzfreeil), via the same
+    two-step container/publish flow used for product posts. The image is served
+    through /ig-image/blog/{queue_id}.jpg so IG always gets a valid square JPEG."""
+    if os.environ.get("INSTAGRAM_BLOG_ENABLED", "true").lower() == "false":
+        logger.info("[instagram_blog] disabled via INSTAGRAM_BLOG_ENABLED=false — skipping")
+        return False
+
+    user_token = os.environ.get("FACEBOOK_PAGE_TOKEN", "")
+    page_id = os.environ.get("FACEBOOK_PAGE_ID", "")
+    if not user_token or not page_id:
+        logger.warning("FACEBOOK_PAGE_TOKEN or FACEBOOK_PAGE_ID not set — skipping Instagram blog send")
+        return False
+
+    if not image_url:
+        logger.warning(f"[instagram_blog] {slug} has no image_url — Instagram requires media, skipping")
+        return False
+
+    ig_user_id = os.environ.get("INSTAGRAM_BUSINESS_ID", "17841431920060212")
+    page_token = await _get_facebook_page_token(user_token, page_id)
+    if not page_token:
+        logger.warning("[instagram_blog] could not obtain page access token — skipping")
+        return False
+
+    caption = _blog_facebook_caption(title, slug, amazon_price, israel_price, kind, channel="instagram")
+    app_base_url = os.environ.get("APP_BASE_URL", "https://app.amzfreeil.com").rstrip("/")
+    ig_image_url = f"{app_base_url}/ig-image/blog/{queue_id}.jpg"
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            create_resp = await client.post(
+                f"https://graph.facebook.com/v19.0/{ig_user_id}/media",
+                data={"image_url": ig_image_url, "caption": caption, "access_token": page_token},
+            )
+            if create_resp.status_code != 200:
+                logger.warning(f"[instagram_blog] media create failed for {slug}: {create_resp.text[:300]}")
+                return False
+            creation_id = create_resp.json().get("id")
+            if not creation_id:
+                logger.warning(f"[instagram_blog] media create returned no id for {slug}: {create_resp.text[:300]}")
+                return False
+
+            # The container is processed asynchronously — publishing before
+            # status_code=FINISHED fails with "Media ID is not available".
+            for _ in range(5):
+                status_resp = await client.get(
+                    f"https://graph.facebook.com/v19.0/{creation_id}",
+                    params={"fields": "status_code", "access_token": page_token},
+                )
+                status = status_resp.json().get("status_code") if status_resp.status_code == 200 else None
+                if status == "FINISHED":
+                    break
+                if status == "ERROR":
+                    logger.warning(f"[instagram_blog] media processing errored for {slug}: {status_resp.text[:300]}")
+                    return False
+                await asyncio.sleep(2)
+
+            publish_resp = await client.post(
+                f"https://graph.facebook.com/v19.0/{ig_user_id}/media_publish",
+                data={"creation_id": creation_id, "access_token": page_token},
+            )
+        if publish_resp.status_code == 200:
+            return True
+        logger.warning(f"[instagram_blog] media_publish failed for {slug}: {publish_resp.text[:300]}")
+        return False
+    except Exception as e:
+        logger.warning(f"[instagram_blog] send error for {slug}: {e}")
         return False
 
 
@@ -1935,7 +2017,8 @@ async def run_send_blog_social_queue():
     """Send any due blog-post announcements. Runs every few minutes."""
     from backend.models import BlogSocialQueue, BlogPublishedAsin
 
-    async def _stamp_published(db, asin: str | None, *, telegram: bool = False, facebook: bool = False):
+    async def _stamp_published(db, asin: str | None, *, telegram: bool = False,
+                               facebook: bool = False, instagram: bool = False):
         """Record on the published-post row when it was actually broadcast, so the
         'פורסמו' tab can show the social status even after the queue row is deleted.
         Editorial guides have no ASIN and no published-post row — nothing to stamp."""
@@ -1952,6 +2035,8 @@ async def run_send_blog_social_queue():
                 pub.telegram_sent_at = stamp
             if facebook and pub.facebook_sent_at is None:
                 pub.facebook_sent_at = stamp
+            if instagram and pub.instagram_sent_at is None:
+                pub.instagram_sent_at = stamp
         except Exception as e:
             logger.warning(f"[blog_social_queue] could not stamp published row for {asin}: {e}")
 
@@ -1960,7 +2045,11 @@ async def run_send_blog_social_queue():
         result = await db.execute(
             select(BlogSocialQueue).where(
                 BlogSocialQueue.scheduled_at <= now,
-                or_(BlogSocialQueue.telegram_sent.is_(False), BlogSocialQueue.facebook_sent.is_(False)),
+                or_(
+                    BlogSocialQueue.telegram_sent.is_(False),
+                    BlogSocialQueue.facebook_sent.is_(False),
+                    BlogSocialQueue.instagram_sent.is_(False),
+                ),
             )
         )
         due = result.scalars().all()
@@ -1989,7 +2078,23 @@ async def run_send_blog_social_queue():
                         await _stamp_published(db, row.asin, facebook=True)
                 except Exception as e:
                     logger.warning(f"[blog_social_queue] facebook send error for {row.slug}: {e}")
-            if row.telegram_sent and row.facebook_sent:
+            if not row.instagram_sent:
+                if not row.image_url:
+                    # IG requires media. Without an image this row can never succeed —
+                    # mark it done explicitly so it does not linger in the queue forever.
+                    logger.info(f"[instagram_blog] {row.slug} skipped (no image)")
+                    row.instagram_sent = True
+                else:
+                    try:
+                        row.instagram_sent = await send_blog_post_to_instagram(
+                            row.id, row.title, row.slug, row.image_url,
+                            row.amazon_price, row.israel_price, row.kind or "review",
+                        )
+                        if row.instagram_sent:
+                            await _stamp_published(db, row.asin, instagram=True)
+                    except Exception as e:
+                        logger.warning(f"[blog_social_queue] instagram send error for {row.slug}: {e}")
+            if row.telegram_sent and row.facebook_sent and row.instagram_sent:
                 await db.delete(row)
             await db.commit()
 

@@ -210,6 +210,7 @@ class BlogPublishedAsin(Base):
     # Set by the blog-social drain when the post is actually broadcast (NULL = not sent / not tracked)
     telegram_sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     facebook_sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    instagram_sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class BlogDismissedAsin(Base):
@@ -277,4 +278,5 @@ class BlogSocialQueue(Base):
     manual: Mapped[bool] = mapped_column(Boolean, default=False)
     telegram_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     facebook_sent: Mapped[bool] = mapped_column(Boolean, default=False)
+    instagram_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)

@@ -2454,6 +2454,7 @@ async def get_blog_published(
                 "marked_at": r.marked_at.isoformat() if r.marked_at else None,
                 "telegram_sent_at": r.telegram_sent_at.isoformat() if r.telegram_sent_at else None,
                 "facebook_sent_at": r.facebook_sent_at.isoformat() if r.facebook_sent_at else None,
+                "instagram_sent_at": r.instagram_sent_at.isoformat() if r.instagram_sent_at else None,
                 "views": view_counts.get(r.asin, 0),
             }
             for r in rows
@@ -2509,6 +2510,7 @@ async def unpublish_blog_post(
                 BlogSocialQueue.asin == asin,
                 BlogSocialQueue.telegram_sent.is_(False),
                 BlogSocialQueue.facebook_sent.is_(False),
+                BlogSocialQueue.instagram_sent.is_(False),
             )
         )
     except Exception as e:
@@ -2587,7 +2589,9 @@ async def get_blog_social_queue(
     from backend.models import BlogSocialQueue
     sent_result = await db.execute(
         select(BlogSocialQueue).where(
-            BlogSocialQueue.telegram_sent.is_(True), BlogSocialQueue.facebook_sent.is_(True)
+            BlogSocialQueue.telegram_sent.is_(True),
+            BlogSocialQueue.facebook_sent.is_(True),
+            BlogSocialQueue.instagram_sent.is_(True),
         )
     )
     for row in sent_result.scalars().all():
@@ -2608,6 +2612,7 @@ async def get_blog_social_queue(
                 "manual": bool(r.manual),
                 "telegram_sent": r.telegram_sent,
                 "facebook_sent": r.facebook_sent,
+                "instagram_sent": r.instagram_sent,
             }
             for r in rows
         ]

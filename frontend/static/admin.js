@@ -2296,9 +2296,9 @@ async function loadBlogSocialQueue() {
   }
   listEl.innerHTML = queue.map(q => {
     const dt = q.scheduled_at ? new Date(q.scheduled_at).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' }) : '';
-    const status = (q.telegram_sent && q.facebook_sent)
+    const status = (q.telegram_sent && q.facebook_sent && q.instagram_sent)
       ? '<span style="color:var(--success);font-weight:600;">✅ שודר</span>'
-      : `<span style="color:var(--text-muted);">${q.telegram_sent ? '📨 טלגרם ✓' : ''} ${q.facebook_sent ? '📘 פייסבוק ✓' : ''}</span>`;
+      : `<span style="color:var(--text-muted);">${q.telegram_sent ? '📨 טלגרם ✓' : ''} ${q.facebook_sent ? '📘 פייסבוק ✓' : ''} ${q.instagram_sent ? '📷 אינסטגרם ✓' : ''}</span>`;
     const manualMark = q.manual ? '<span title="תוזמן ידנית">✋</span> ' : '';
     return `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--surface);">
@@ -2412,7 +2412,7 @@ async function loadBlogPublished() {
       }
       return `<span title="לא נרשם שידור" style="font-size:0.72rem;padding:2px 7px;border-radius:999px;background:var(--surface);color:var(--text-muted);border:1px solid var(--border);white-space:nowrap;">${label} –</span>`;
     };
-    const social = `<span style="display:inline-flex;gap:5px;">${socialBadge('טלגרם', p.telegram_sent_at)}${socialBadge('פייסבוק', p.facebook_sent_at)}</span>`;
+    const social = `<span style="display:inline-flex;gap:5px;">${socialBadge('טלגרם', p.telegram_sent_at)}${socialBadge('פייסבוק', p.facebook_sent_at)}${socialBadge('אינסטגרם', p.instagram_sent_at)}</span>`;
     const titleEsc = String(p.title || p.asin).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, "&quot;");
     return `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--surface);">
@@ -3006,7 +3006,7 @@ async function generateBlogDraftMissingFields(asin) {
 function publishBlogDraft(asin, slug, btn) {
   showScheduleDialog({
     title: '🚀 פרסום פוסט',
-    hint: 'noindex יוסר והפוסט יהיה גלוי לגוגל. אפשר לקבוע זמן שידור לטלגרם/פייסבוק — השאר ריק לתזמון אוטומטי.',
+    hint: 'noindex יוסר והפוסט יהיה גלוי לגוגל. אפשר לקבוע זמן שידור לטלגרם/פייסבוק/אינסטגרם — השאר ריק לתזמון אוטומטי.',
     label: 'זמן שידור (אופציונלי)',
     value: '',
     optional: true,
