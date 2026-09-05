@@ -94,10 +94,15 @@ async def go_asin(asin: str):
     return RedirectResponse(dest, status_code=302)
 
 
-async def _normalized_ig_jpeg(source_url: str, label: str) -> Response:
+async def _normalized_ig_jpeg(source_url: str, label: str, *,
+                              name: str | None = None,
+                              price: str | None = None) -> Response:
     """Fetch an image URL and re-serve it as a valid JPEG padded to 1:1, for Instagram's
     Graph API — unlike Facebook/Telegram, IG rejects non-JPEG formats and aspect
-    ratios outside 4:5-1.91:1, and Amazon's raw product images routinely violate both."""
+    ratios outside 4:5-1.91:1, and Amazon's raw product images routinely violate both.
+
+    When `name`/`price` are given, brand bars are drawn over the top and bottom; the
+    product is then shrunk into the band between them so the bars don't crop it."""
     import re
     from io import BytesIO
     import httpx
@@ -135,9 +140,26 @@ async def _normalized_ig_jpeg(source_url: str, label: str) -> Response:
             img = img.convert("RGB")
 
         side = min(max(img.width, img.height), 1440)  # IG recommended max edge
-        img.thumbnail((side, side))
+        overlay = bool(name or price)
         canvas = Image.new("RGB", (side, side), (255, 255, 255))
-        canvas.paste(img, ((side - img.width) // 2, (side - img.height) // 2))
+
+        if overlay:
+            from backend.image_overlay import FREE_BAND, draw_bars, _TOP_H
+            band_h = int(side * FREE_BAND)
+            img.thumbnail((side, band_h))
+            canvas.paste(img, ((side - img.width) // 2,
+                               int(side * _TOP_H) + (band_h - img.height) // 2))
+            try:
+                draw_bars(canvas, name, price)
+            except Exception as e:
+                # A post without bars beats a post that never goes out.
+                logger.warning(f"[ig-image] overlay failed for {label}: {e}")
+                canvas = Image.new("RGB", (side, side), (255, 255, 255))
+                img.thumbnail((side, side))
+                canvas.paste(img, ((side - img.width) // 2, (side - img.height) // 2))
+        else:
+            img.thumbnail((side, side))
+            canvas.paste(img, ((side - img.width) // 2, (side - img.height) // 2))
 
         buf = BytesIO()
         canvas.save(buf, format="JPEG", quality=85)
@@ -175,7 +197,8 @@ async def ig_image(asin: str, db: Annotated[AsyncSession, Depends(get_db)]):
     product = result.scalar_one_or_none()
     if not product or not product.image_url:
         return Response(status_code=404)
-    return await _normalized_ig_jpeg(product.image_url, asin)
+    return await _normalized_ig_jpeg(product.image_url, asin,
+                                     name=product.name_he, price=product.last_price)
 
 
 @router.get("/track/click", include_in_schema=False)
