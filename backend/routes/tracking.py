@@ -29,6 +29,10 @@ _BOT_UA_FRAGMENTS = (
 
 _CLICK_DEDUP_MINUTES = 5
 
+# A blog announcement has no single price, so its brand bar carries this label
+# in the price slot instead. Keys match BlogSocialQueue.kind.
+_KIND_LABEL = {"review": "סקירה", "guide": "מדריך"}
+
 # Apple Mail Privacy Protection: Apple pre-fetches images on delivery (not on open).
 # Detected by Apple's allocated IP block (17.0.0.0/8) or AppleMail UA strings.
 _APPLE_MPP_UA_FRAGMENTS = ("applemail", "apple mail")
@@ -96,13 +100,14 @@ async def go_asin(asin: str):
 
 async def _normalized_ig_jpeg(source_url: str, label: str, *,
                               name: str | None = None,
-                              price: str | None = None) -> Response:
+                              price: str | None = None,
+                              badge: str | None = None) -> Response:
     """Fetch an image URL and re-serve it as a valid JPEG padded to 1:1, for Instagram's
     Graph API — unlike Facebook/Telegram, IG rejects non-JPEG formats and aspect
     ratios outside 4:5-1.91:1, and Amazon's raw product images routinely violate both.
 
-    When `name`/`price` are given, brand bars are drawn over the top and bottom; the
-    product is then shrunk into the band between them so the bars don't crop it."""
+    When `name`/`price`/`badge` are given, brand bars are drawn over the top and bottom;
+    the product is then shrunk into the band between them so the bars don't crop it."""
     import re
     from io import BytesIO
     import httpx
@@ -140,7 +145,7 @@ async def _normalized_ig_jpeg(source_url: str, label: str, *,
             img = img.convert("RGB")
 
         side = min(max(img.width, img.height), 1440)  # IG recommended max edge
-        overlay = bool(name or price)
+        overlay = bool(name or price or badge)
         canvas = Image.new("RGB", (side, side), (255, 255, 255))
 
         if overlay:
@@ -150,7 +155,7 @@ async def _normalized_ig_jpeg(source_url: str, label: str, *,
             canvas.paste(img, ((side - img.width) // 2,
                                int(side * _TOP_H) + (band_h - img.height) // 2))
             try:
-                draw_bars(canvas, name, price)
+                draw_bars(canvas, name, price, badge)
             except Exception as e:
                 # A post without bars beats a post that never goes out.
                 logger.warning(f"[ig-image] overlay failed for {label}: {e}")
@@ -182,7 +187,9 @@ async def ig_image_blog(queue_id: int, db: Annotated[AsyncSession, Depends(get_d
     )).scalar_one_or_none()
     if not row or not row.image_url:
         return Response(status_code=404)
-    return await _normalized_ig_jpeg(row.image_url, f"blog:{queue_id}")
+    return await _normalized_ig_jpeg(row.image_url, f"blog:{queue_id}",
+                                     name=row.title,
+                                     badge=_KIND_LABEL.get(row.kind or "review", "סקירה"))
 
 
 @router.get("/ig-image/{asin}.jpg", include_in_schema=False)

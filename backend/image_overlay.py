@@ -92,8 +92,12 @@ def _clean_price(raw: str | None) -> str:
     return f"{p} ₪" if re.search(r"\d", p) else ""
 
 
-def draw_bars(canvas: Image.Image, name: str | None, price: str | None) -> Image.Image:
-    """Paint the top (cream + logo) and bottom (navy + name/price) bars in place."""
+def draw_bars(canvas: Image.Image, name: str | None, price: str | None,
+              badge: str | None = None) -> Image.Image:
+    """Paint the top (cream + logo) and bottom (navy + name/price) bars in place.
+
+    `badge` fills the price slot for posts that have no single price — a blog
+    announcement carries "סקירה" there instead."""
     W, H = canvas.size
     draw = ImageDraw.Draw(canvas)
     pad = int(W * _PAD)
@@ -138,11 +142,14 @@ def draw_bars(canvas: Image.Image, name: str | None, price: str | None) -> Image
     name_left = pad
     name_right = W - pad
     price_text = _clean_price(price)
-    if price_text:
-        price_font = _font(int(W * 0.085), 900)
-        pbox = draw.textbbox((0, 0), price_text, font=price_font)
+    # A Hebrew word set at the price size eats far more of the bar than a number
+    # does, leaving too little for the title — so the badge runs a notch smaller.
+    slot_text, slot_size = (price_text, 0.085) if price_text else (_shape(badge or ""), 0.068)
+    if slot_text:
+        slot_font = _font(int(W * slot_size), 900)
+        pbox = draw.textbbox((0, 0), slot_text, font=slot_font)
         py = b_top + rule + (bottom_h - rule - (pbox[3] - pbox[1])) // 2 - pbox[1]
-        draw.text((pad, py), price_text, font=price_font, fill=_BRAND)
+        draw.text((pad, py), slot_text, font=slot_font, fill=_BRAND)
         name_left = pad + (pbox[2] - pbox[0]) + int(W * 0.04)
 
     if name:
