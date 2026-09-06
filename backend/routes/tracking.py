@@ -119,6 +119,13 @@ async def _normalized_ig_jpeg(source_url: str, label: str, *,
         return re.sub(r"\._[^/]*?(\.(?:jpg|jpeg|png|webp))$", r"._SL1500_\1",
                       u, flags=re.I)
 
+    def _fit(im: "Image.Image", box_w: int, box_h: int) -> "Image.Image":
+        """Like Image.thumbnail, but scales up as well as down — many catalog assets
+        top out at 500px even at _SL1500_, and the canvas is no longer their size."""
+        k = min(box_w / im.width, box_h / im.height)
+        return im.resize((max(1, round(im.width * k)), max(1, round(im.height * k))),
+                         Image.LANCZOS)
+
     try:
         async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
             resp = None
@@ -146,22 +153,28 @@ async def _normalized_ig_jpeg(source_url: str, label: str, *,
 
         side = min(max(img.width, img.height), 1440)  # IG recommended max edge
         overlay = bool(name or price or badge)
+        if overlay:
+            # The bars and their Hebrew text are drawn at canvas scale, so a 500px
+            # source would ship 500px-worth of type for IG to blow up to 1080 in the
+            # feed. Floor the canvas at IG's feed width so the type is born sharp.
+            side = max(side, 1080)
         canvas = Image.new("RGB", (side, side), (255, 255, 255))
 
         if overlay:
             from backend.image_overlay import FREE_BAND, draw_bars, _TOP_H
             band_h = int(side * FREE_BAND)
-            img.thumbnail((side, band_h))
-            canvas.paste(img, ((side - img.width) // 2,
-                               int(side * _TOP_H) + (band_h - img.height) // 2))
+            fitted = _fit(img, side, band_h)
+            canvas.paste(fitted, ((side - fitted.width) // 2,
+                                  int(side * _TOP_H) + (band_h - fitted.height) // 2))
             try:
                 draw_bars(canvas, name, price, badge)
             except Exception as e:
                 # A post without bars beats a post that never goes out.
                 logger.warning(f"[ig-image] overlay failed for {label}: {e}")
                 canvas = Image.new("RGB", (side, side), (255, 255, 255))
-                img.thumbnail((side, side))
-                canvas.paste(img, ((side - img.width) // 2, (side - img.height) // 2))
+                fitted = _fit(img, side, side)
+                canvas.paste(fitted, ((side - fitted.width) // 2,
+                                      (side - fitted.height) // 2))
         else:
             img.thumbnail((side, side))
             canvas.paste(img, ((side - img.width) // 2, (side - img.height) // 2))
