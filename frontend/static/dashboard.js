@@ -283,10 +283,10 @@ function renderProducts() {
             ${aodNote}
           </div>
           <a href="${linkUrl}" target="_blank" rel="noopener" class="card-product-link" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;direction:ltr;text-align:left;">${escHtml(displayName)}</a>
-          <img src="${p.image || `https://images-na.ssl-images-amazon.com/images/P/${p.asin}.01._SL100_.jpg`}"
-               alt="" width="60" height="60"
+          ${p.image ? `<img src="${escHtml(p.image)}"
+               alt="" width="60" height="60" loading="lazy"
                style="flex-shrink:0;object-fit:contain;border-radius:6px;border:1px solid #eee;"
-               onerror="this.style.display='none'">
+               onerror="this.style.display='none'">` : ''}
         </div>
 
         <!-- שורה 2: בדיקה אחרונה (ימין) | ASIN LTR (שמאל) -->

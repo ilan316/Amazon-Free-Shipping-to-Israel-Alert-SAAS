@@ -128,6 +128,7 @@ async def list_products(
             israel_cost_kind=p.israel_cost_kind or None,
             israel_free_threshold=extract_free_shipping_threshold(p.raw_text or "") or None,
             status_since=p.status_since,
+            image=p.image_url or None,
         ))
     return items
 
@@ -197,6 +198,7 @@ async def add_product(
         last_notified=None,
         added_at=up.added_at,
         is_paused=False,
+        image=product.image_url or None,
     )
 
 
