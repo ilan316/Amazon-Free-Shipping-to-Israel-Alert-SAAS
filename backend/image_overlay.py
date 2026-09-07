@@ -4,7 +4,7 @@ Instagram captions are not clickable and get folded after ~2 lines, so a bare
 Amazon catalog shot carries no brand, no price and no reason to stop scrolling.
 These bars put all three on the pixels themselves.
 
-Colors are the site's own tokens from amzfreeil-www/styles.css.
+Colors are the site's own tokens from Amazon-Free-Shipping-to-Israel-Alert-website/styles.css.
 """
 
 import logging
@@ -20,7 +20,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 _FONT_PATH = _ROOT / "backend" / "assets" / "fonts" / "Heebo[wght].ttf"
 _LOGO_PATH = _ROOT / "frontend" / "static" / "logo-new.png"
 
-# Site palette (:root in amzfreeil-www/styles.css)
+# Site palette (:root in Amazon-Free-Shipping-to-Israel-Alert-website/styles.css)
 _CREAM = (255, 250, 241)   # --bg
 _NAVY = (23, 32, 51)       # --ink
 _BRAND = (255, 153, 0)     # --brand
