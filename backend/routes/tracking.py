@@ -92,7 +92,10 @@ async def go_asin(asin: str):
     import os, re
     if not re.fullmatch(r"[A-Z0-9]{10}", asin.upper()):
         return RedirectResponse("https://www.amazon.com/", status_code=302)
-    tag = os.environ.get("AMAZON_AFFILIATE_TAG", "").strip()
+    # תג ייעודי לפייסבוק — /go/ משמש רק את פוסטי הפייסבוק.
+    # אם לא מוגדר, נופל חזרה לתג הגלובלי.
+    tag = (os.environ.get("FACEBOOK_AFFILIATE_TAG", "").strip()
+           or os.environ.get("AMAZON_AFFILIATE_TAG", "").strip())
     asin = asin.upper()
     dest = f"https://www.amazon.com/dp/{asin}?tag={tag}" if tag else f"https://www.amazon.com/dp/{asin}"
     return RedirectResponse(dest, status_code=302)

@@ -995,7 +995,10 @@ def _product_hook(product: Product) -> str:
 
 
 def _telegram_caption(product: Product) -> str:
-    tag = os.environ.get("AMAZON_AFFILIATE_TAG", "").strip()
+    # תג ייעודי לטלגרם — מפריד את המכירות מהערוצים האחרים בדוחות Associates.
+    # אם לא מוגדר, נופל חזרה לתג הגלובלי.
+    tag = (os.environ.get("TELEGRAM_AFFILIATE_TAG", "").strip()
+           or os.environ.get("AMAZON_AFFILIATE_TAG", "").strip())
     url = f"https://www.amazon.com/dp/{product.asin}?tag={tag}" if tag else f"https://www.amazon.com/dp/{product.asin}"
     name_he = _escape_md(product.name_he or product.name or product.asin)
     price = _format_price(product.last_price)
