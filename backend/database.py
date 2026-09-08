@@ -476,6 +476,19 @@ async def create_tables():
             )
         )
 
+        # One-time seed for price_history: give every existing product a first
+        # reference point, otherwise a product whose price does not move for a month
+        # never enters the table at all. The NOT EXISTS guard on the whole table makes
+        # this run exactly once — create_tables() runs on every boot.
+        await conn.execute(
+            __import__("sqlalchemy").text("""
+                INSERT INTO price_history (product_id, price, israel_extra_cost, israel_cost_kind, last_status, recorded_at)
+                SELECT id, last_price, israel_extra_cost, israel_cost_kind, COALESCE(last_status, 'UNKNOWN'), NOW()
+                FROM products
+                WHERE NOT EXISTS (SELECT 1 FROM price_history)
+            """)
+        )
+
 
 def _apply_rtl_to_html(body: str) -> str:
     """Add dir=rtl/lang=he to <html>, direction:rtl to <body>, and force RTL on content divs."""

@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import String, Integer, Boolean, Text, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import String, Integer, Boolean, Text, DateTime, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.database import Base
 
@@ -280,3 +280,19 @@ class BlogSocialQueue(Base):
     facebook_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     instagram_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class PriceHistory(Base):
+    """Append-on-change snapshot of a product's price and Israel delivery cost.
+    Written only from the global check cycle, only when a value actually moved."""
+    __tablename__ = "price_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    product_id: Mapped[int] = mapped_column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    price: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    israel_extra_cost: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    israel_cost_kind: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    last_status: Mapped[str] = mapped_column(String(20), nullable=False, default="UNKNOWN")
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+    __table_args__ = (Index("ix_price_history_product_time", "product_id", "recorded_at"),)

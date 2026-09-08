@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 
 from backend.database import AsyncSessionLocal
-from backend.models import Product, User, UserProduct, NotificationLog, EmailTemplate, EmailSendLog, EmailSendRecipient, EmailClick
+from backend.models import Product, User, UserProduct, NotificationLog, EmailTemplate, EmailSendLog, EmailSendRecipient, EmailClick, PriceHistory
 from backend.checker import browser_manager, ShippingStatus, CheckResult, save_buybox_snapshot
 from backend.notifier import send_daily_summary, _send_via_resend, _wrap_responsive, _open_pixel
 
@@ -77,6 +77,9 @@ async def cleanup_old_screenshots():
 
 async def _update_product(db: AsyncSession, product: Product, result: CheckResult) -> bool:
     """Update product in DB. Returns True if this is the product's first error (notify admin)."""
+    # Captured before any assignment — the function mutates `product` in place, and the
+    # price-history append below needs to know what the values were on entry.
+    _prev = (product.last_price, product.israel_extra_cost, product.israel_cost_kind, product.last_status)
     product.last_checked = datetime.now(timezone.utc)
 
     if result.status in (ShippingStatus.FREE, ShippingStatus.PAID, ShippingStatus.NO_SHIP, ShippingStatus.NOT_FOUND):
@@ -108,6 +111,16 @@ async def _update_product(db: AsyncSession, product: Product, result: CheckResul
             product.image_url = result.image_url
         if result.amazon_category and not product.amazon_category:
             product.amazon_category = result.amazon_category
+        # Append-on-change price history. Only definitive results get here, so a scraping
+        # failure can never be recorded as a price drop. Rides the existing commit.
+        if (product.last_price, product.israel_extra_cost, product.israel_cost_kind, product.last_status) != _prev:
+            db.add(PriceHistory(
+                product_id=product.id,
+                price=product.last_price,
+                israel_extra_cost=product.israel_extra_cost,
+                israel_cost_kind=product.israel_cost_kind,
+                last_status=product.last_status,
+            ))
         await db.commit()
         if result.status == ShippingStatus.FREE:
             asyncio.create_task(_take_and_save_screenshot(product.id, product.asin, result.raw_html, result.raw_text))
@@ -2135,6 +2148,16 @@ async def run_cleanup_orphans():
     """Delete user-source products with no watchers. Runs once daily at 02:00 IL."""
     logger.info("=== Orphan cleanup started ===")
     async with AsyncSessionLocal() as db:
+        # Prune price history first — it must happen even when there are no orphans
+        # (the early return below skips everything after it). 400 days keeps a
+        # year-back comparison available even after a mid-year deploy.
+        pruned = await db.execute(text(
+            "DELETE FROM price_history WHERE recorded_at < NOW() - INTERVAL '400 days'"
+        ))
+        await db.commit()
+        if pruned.rowcount:
+            logger.info(f"=== Price history: pruned {pruned.rowcount} row(s) older than 400 days ===")
+
         watched_ids = select(UserProduct.product_id).distinct()
         orphans = (await db.execute(
             select(Product.id, Product.asin).where(
