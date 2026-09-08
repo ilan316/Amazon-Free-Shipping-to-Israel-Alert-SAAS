@@ -55,9 +55,9 @@ _STRINGS = {
         "header_weekly_sub":    "{n} מוצרים ברשימה שלך",
         "weekly_scope_note":    "המייל הזה מרכז רק מוצרים שהמשלוח שלהם לישראל בתשלום. "
                                 "מוצרים שברשימה שלך שנמצאים במשלוח חינם ממשיכים להגיע אליך בסיכום היומי.",
-        "weekly_tip_title":     "💡 שווה לדעת",
-        "weekly_tip_body":      "הסכומים שלמעלה הם מה שאמזון מציגה לפני התשלום — מוצר, משלוח ומיסים יחד. "
-                                "אמזון גובה את הכול מראש, כך שלא מגיע חיוב נוסף כשהחבילה נכנסת לארץ.",
+        "weekly_never_free":    "לא כל מוצר באמזון מגיע אי-פעם למשלוח חינם לישראל, וייתכן שהמוצרים ברשימה הזו "
+                                "יישארו במשלוח בתשלום גם בהמשך. הסכום הכולל שמופיע לכל מוצר הוא מה שתשלם בפועל — "
+                                "שווה להשוות אותו למחיר בארץ ולהחליט, במקום לחכות לשינוי שאולי לא יגיע.",
         "plain_weekly_header":  "📦 סיכום שבועי — מוצרים במשלוח בתשלום\n",
         "btn_view":             "צפה באמזון",
         "paid_since":           "🚚 במשלוח בתשלום כבר {days} ימים",
@@ -98,9 +98,10 @@ _STRINGS = {
         "header_weekly_sub":    "{n} products on your list",
         "weekly_scope_note":    "This email covers only products whose shipping to Israel is paid. "
                                 "Products on your list with free shipping keep arriving in the daily digest.",
-        "weekly_tip_title":     "💡 Good to know",
-        "weekly_tip_body":      "The totals above are what Amazon shows before checkout — item, shipping and taxes "
-                                "together. Amazon charges it all upfront, so no extra bill arrives with the parcel.",
+        "weekly_never_free":    "Not every Amazon product ever gets free shipping to Israel, and the products on "
+                                "this list may well stay on paid shipping. The total shown for each one is what you "
+                                "would actually pay — worth comparing it to local prices instead of waiting for a "
+                                "change that may never come.",
         "plain_weekly_header":  "📦 Weekly digest — products with paid shipping\n",
         "btn_view":             "View on Amazon",
         "paid_since":           "🚚 Paid shipping for {days} days",
@@ -178,8 +179,8 @@ def _israel_cost_note(product, is_rtl: bool, ils_prefix: bool = False) -> str:
     fall back to the existing generic "price excludes shipping/taxes" wording — a
     disclaimer that says costs exist but never how much.
     """
-    # '₪46.77' in the weekly digest, '46.77₪' in the daily summary — the daily email's
-    # wording is unchanged, so callers opt in.
+    # Hebrew puts the sign to the left of the digits ('₪46.77'); English keeps 'ILS 46.77'.
+    # Callers opt in, so the flag tracks the recipient's language, not the email type.
     def ils(v: str) -> str:
         return f"₪{v}" if ils_prefix else f"{v}₪"
 
@@ -225,7 +226,8 @@ def _israel_cost_note(product, is_rtl: bool, ils_prefix: bool = False) -> str:
     if extra <= 0:
         return ""
 
-    total = f"{price + extra:.2f}"
+    # Thousands separator so the total matches how the price itself is quoted (₪1,234.50).
+    total = f"{price + extra:,.2f}"
     if kind == "import_only":
         # "משלוח חינם" leads: it's the good news and the reason the product is in the email
         # at all. Opening with "+ 149.50₪" made the line read as a charge before the reader
@@ -656,10 +658,12 @@ def send_user_alert(user, product, result) -> bool:
     # "price excludes shipping/taxes" wording stays exactly as it was.
     # The generic fallback carries its own parentheses; the real cost note doesn't, because
     # it can already end in "(257% מהמחיר)" and wrapping it would nest parentheses.
-    price_note = _israel_cost_note(product, is_rtl) or (
+    price_note = _israel_cost_note(product, is_rtl, ils_prefix=is_rtl) or (
         "(מחיר באמזון — לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl
         else "(Amazon price, excl. shipping, taxes & fees)"
     )
+    price_raw = getattr(product, "last_price", None)
+    price_disp = _ils_amount(price_raw, ils_prefix=True) if is_rtl else price_raw
 
     body_dir = ' dir="rtl"' if is_rtl else ""
     html_body = f"""<!DOCTYPE html>
@@ -697,7 +701,7 @@ def send_user_alert(user, product, result) -> bool:
                     <a href="{url}" style="color:#111111;text-decoration:none;">{name}</a>
                   </p>
                   <p style="margin:0 0 10px;font-size:13px;color:#666;text-align:{txt_align};">ASIN: {asin}</p>
-                  {f'<p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {product.last_price} <span style="font-size:11px;color:#888;font-weight:normal;">{price_note}</span></p>' if getattr(product, "last_price", None) else ""}
+                  {f'<p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {price_disp} <span style="font-size:13px;color:#888;font-weight:normal;">{price_note}</span></p>' if price_raw else ""}
                   <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#007600;text-align:{txt_align};" {txt_dir}>{_t(lang, "shipping_badge")}</p>
                   <div style="text-align:{txt_align};">{_cta_btn(url, _t(lang, "btn_buy"), txt_align)}</div>
                   <p style="margin:8px 0 4px;font-size:13px;color:#555;font-style:italic;text-align:{txt_align};" {txt_dir}>{_t(lang, "urgency")}</p>
@@ -801,11 +805,12 @@ def send_daily_summary(user, free_products: list, pause_warnings: dict = None) -
         img_url = p.image_url or f"https://images-na.ssl-images-amazon.com/images/P/{p.asin}.01._SL100_.jpg"
         price_html = ""
         if getattr(p, "last_price", None):
-            price_note = _israel_cost_note(p, is_rtl) or (
+            price_note = _israel_cost_note(p, is_rtl, ils_prefix=is_rtl) or (
                 "(מחיר באמזון — לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl
                 else "(Amazon price, excl. shipping, taxes & fees)"
             )
-            price_html = f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {p.last_price} <span style="font-size:11px;color:#888;font-weight:normal;">{price_note}</span></p>'
+            price_disp = _ils_amount(p.last_price, ils_prefix=True) if is_rtl else p.last_price
+            price_html = f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {price_disp} <span style="font-size:13px;color:#888;font-weight:normal;">{price_note}</span></p>'
         checked_html = ""
         if getattr(p, "last_checked", None):
             p_checked = p.last_checked.strftime("%d/%m/%Y %H:%M")
@@ -970,6 +975,8 @@ def send_weekly_paid_summary(user, paid_products: list, history: dict | None = N
             lines.append(f"  {disp}" + (f" · {note}" if note else ""))
         lines.append(f"  {url}")
         lines.append("")
+    lines.append(_t(lang, "weekly_never_free"))
+    lines.append("")
     lines.append(_t(lang, "plain_footer", checked_at=checked_at))
     text_body = "\n".join(lines)
 
@@ -1007,7 +1014,7 @@ def send_weekly_paid_summary(user, paid_products: list, history: dict | None = N
                 else "(Amazon price, excl. shipping, taxes & fees)"
             )
             price_disp = _ils_amount(p.last_price, ils_prefix=True) if is_rtl else p.last_price
-            price_html = f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {price_disp} <span style="font-size:11px;color:#888;font-weight:normal;">{price_note}</span></p>'
+            price_html = f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {price_disp} <span style="font-size:13px;color:#888;font-weight:normal;">{price_note}</span></p>'
 
         trend_html = _price_trend(p, history.get(p.id), lang, txt_align, txt_dir)
 
@@ -1077,15 +1084,8 @@ def send_weekly_paid_summary(user, paid_products: list, history: dict | None = N
           </td>
         </tr>
         <tr>
-          <td style="background:#f8f8f8;padding:0 20px 20px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff8e1;border-radius:8px;border:1px solid #ffe0a3;">
-              <tr>
-                <td style="padding:12px 16px;text-align:{txt_align};" {txt_dir}>
-                  <p style="margin:0 0 3px;font-size:13px;font-weight:bold;color:#8a5a00;">{_t(lang, "weekly_tip_title")}</p>
-                  <p style="margin:0;font-size:12px;color:#8a5a00;line-height:1.5;">{_t(lang, "weekly_tip_body")}</p>
-                </td>
-              </tr>
-            </table>
+          <td style="background:#f8f8f8;padding:4px 24px 20px;text-align:{txt_align};" {txt_dir}>
+            <p style="margin:0;font-size:12px;color:#767676;line-height:1.6;">{_t(lang, "weekly_never_free")}</p>
           </td>
         </tr>
         <tr>
@@ -1201,7 +1201,8 @@ def send_no_click_reminder(user, product, days_free: int) -> bool:
 
     price_html = ""
     if getattr(product, "last_price", None):
-        price_html = f'<p style="margin:0 0 16px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {product.last_price}</p>'
+        disp = _ils_amount(product.last_price, ils_prefix=True) if is_rtl else product.last_price
+        price_html = f'<p style="margin:0 0 16px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {disp}</p>'
 
     html_body = f"""<!DOCTYPE html>
 <html{body_dir}>
