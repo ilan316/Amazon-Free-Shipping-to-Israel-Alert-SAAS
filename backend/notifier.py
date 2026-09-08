@@ -1084,8 +1084,14 @@ def send_weekly_paid_summary(user, paid_products: list, history: dict | None = N
           </td>
         </tr>
         <tr>
-          <td style="background:#f8f8f8;padding:4px 24px 20px;text-align:{txt_align};" {txt_dir}>
-            <p style="margin:0;font-size:12px;color:#767676;line-height:1.6;">{_t(lang, "weekly_never_free")}</p>
+          <td style="background:#f8f8f8;padding:6px 20px 20px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;border:1px solid #e3e3e3;">
+              <tr>
+                <td style="padding:14px 18px;text-align:{txt_align};border-{'right' if is_rtl else 'left'}:4px solid #FF9900;" {txt_dir}>
+                  <p style="margin:0;font-size:14px;color:#333333;line-height:1.65;">{_t(lang, "weekly_never_free")}</p>
+                </td>
+              </tr>
+            </table>
           </td>
         </tr>
         <tr>
