@@ -62,8 +62,8 @@ _STRINGS = {
         "btn_view":             "צפה באמזון",
         "paid_since":           "🚚 במשלוח בתשלום כבר {days} ימים",
         "trend_flat":           "⟷ המחיר לא זז מאז השבוע שעבר",
-        "trend_price_down":     "▼ ירד ב-₪{delta} מאז השבוע שעבר",
-        "trend_price_up":       "▲ עלה ב-₪{delta} מאז השבוע שעבר",
+        "trend_price_down":     "▼ מחיר המוצר ירד ב-₪{delta} מאז השבוע שעבר",
+        "trend_price_up":       "▲ מחיר המוצר עלה ב-₪{delta} מאז השבוע שעבר",
         "trend_ship_down":      "▼ עלות המשלוח ירדה ב-₪{delta} מאז השבוע שעבר",
         "trend_ship_up":        "▲ עלות המשלוח עלתה ב-₪{delta} מאז השבוע שעבר",
     },
@@ -106,8 +106,8 @@ _STRINGS = {
         "btn_view":             "View on Amazon",
         "paid_since":           "🚚 Paid shipping for {days} days",
         "trend_flat":           "⟷ Unchanged since last week",
-        "trend_price_down":     "▼ Down ILS {delta} since last week",
-        "trend_price_up":       "▲ Up ILS {delta} since last week",
+        "trend_price_down":     "▼ Item price down ILS {delta} since last week",
+        "trend_price_up":       "▲ Item price up ILS {delta} since last week",
         "trend_ship_down":      "▼ Shipping down ILS {delta} since last week",
         "trend_ship_up":        "▲ Shipping up ILS {delta} since last week",
     },
@@ -281,25 +281,31 @@ def _price_trend(product, prev, lang: str, txt_align: str, txt_dir: str) -> str:
     now_ship = _num(getattr(product, "israel_extra_cost", None)) or 0.0
     was_ship = _num(getattr(prev, "israel_extra_cost", None)) or 0.0
 
-    key, delta = None, 0.0
+    # Both movements are reported. A drop in the item price next to a bigger rise in
+    # shipping is exactly the case the reader must not miss, so one line can't stand
+    # in for the other.
+    moves = []
     if now_price is not None and was_price is not None and abs(now_price - was_price) >= 0.01:
-        key = "trend_price_down" if now_price < was_price else "trend_price_up"
-        delta = abs(now_price - was_price)
-    elif abs(now_ship - was_ship) >= 0.01:
-        key = "trend_ship_down" if now_ship < was_ship else "trend_ship_up"
-        delta = abs(now_ship - was_ship)
+        moves.append(("trend_price_down" if now_price < was_price else "trend_price_up",
+                      abs(now_price - was_price)))
+    if abs(now_ship - was_ship) >= 0.01:
+        moves.append(("trend_ship_down" if now_ship < was_ship else "trend_ship_up",
+                      abs(now_ship - was_ship)))
 
-    if key is None:
+    if not moves:
         # Nothing moved — only worth saying when we actually had a price to compare.
         if now_price is None or was_price is None:
             return ""
         return (f'<p style="margin:0 0 6px;font-size:12px;color:#767676;text-align:{txt_align};" {txt_dir}>'
                 f'{_t(lang, "trend_flat")}</p>')
 
-    color = "#007600" if key.endswith("_down") else "#B12704"
-    txt = _t(lang, key, delta=f"{delta:.2f}")
-    return (f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:{color};'
-            f'text-align:{txt_align};" {txt_dir}>{txt}</p>')
+    out = ""
+    for key, delta in moves:
+        color = "#007600" if key.endswith("_down") else "#B12704"
+        txt = _t(lang, key, delta=f"{delta:.2f}")
+        out += (f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:{color};'
+                f'text-align:{txt_align};" {txt_dir}>{txt}</p>')
+    return out
 
 
 def _t(lang: str, key: str, **kw) -> str:
