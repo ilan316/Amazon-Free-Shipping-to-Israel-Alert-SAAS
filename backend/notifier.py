@@ -216,6 +216,43 @@ def _short(name: str, limit: int = _MAX_NAME_BODY) -> str:
     return f"{head.rstrip()}…"
 
 
+def _short_around(clean: str, split_at: int, limit: int = _MAX_NAME_BODY) -> str:
+    """Truncate from the middle, keeping the segment that starts at split_at.
+
+    Amazon titles put the distinguishing attribute (color, count, size) last, so a
+    plain tail cut can render two variants of the same product identically.
+    """
+    tail_budget = max(16, limit // 3)
+    start = clean.rfind(" ", 0, split_at + 1) + 1  # back up to a word boundary
+    tail = clean[start:start + tail_budget].rstrip()
+    truncated_tail = (start + tail_budget) < len(clean)
+    head_budget = max(1, limit - len(tail) - 2)
+    head = clean[:head_budget]
+    cut = head.rfind(" ")
+    if cut >= int(head_budget * 0.6):
+        head = head[:cut]
+    return f"{head.rstrip()}…{tail}" + ("…" if truncated_tail else "")
+
+
+def _display_names(raw_names: list, limit: int = _MAX_NAME_BODY) -> list:
+    """_short() over a whole email's names, disambiguating rows that collide."""
+    cleans = [" ".join(str(n or "").split()) for n in raw_names]
+    out = [_short(c, limit) for c in cleans]
+    groups = {}
+    for i, s in enumerate(out):
+        groups.setdefault(s, []).append(i)
+    for idxs in groups.values():
+        if len(idxs) < 2:
+            continue
+        distinct = {cleans[i] for i in idxs}
+        if len(distinct) < 2:
+            continue  # genuinely the same name — nothing to disambiguate
+        lcp = os.path.commonprefix(sorted(distinct))
+        for i in idxs:
+            out[i] = _short_around(cleans[i], len(lcp), limit)
+    return out
+
+
 def _cta_btn(url: str, label: str, align: str = "left") -> str:
     ml = "auto" if align == "right" else "0"
     return f"""<table cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 4px; margin-left:{ml};">
@@ -627,10 +664,14 @@ def send_daily_summary(user, free_products: list, pause_warnings: dict = None) -
 
     subject = _t(lang, "subject_summary", n=n)
 
+    # Names for the whole email at once, so two variants of the same product
+    # (same title up to the color/count at the end) never render identically.
+    names = _display_names([cn or p.name or p.asin for p, cn in free_products])
+
     # Plain text
     lines = [_t(lang, "plain_summary_header")]
-    for p, custom_name in free_products:
-        name = _short(custom_name or p.name or p.asin, _MAX_NAME_BODY)
+    for i, (p, custom_name) in enumerate(free_products):
+        name = names[i]
         url = _tracking_url(user.id, p.asin)
         p_checked = p.last_checked.strftime("%d/%m/%Y %H:%M") if getattr(p, "last_checked", None) else ""
         lines.append(f"• {name}")
@@ -652,8 +693,8 @@ def send_daily_summary(user, free_products: list, pause_warnings: dict = None) -
         </tr>"""
 
     product_rows = ""
-    for p, custom_name in free_products:
-        name = _short(custom_name or p.name or p.asin, _MAX_NAME_BODY)
+    for i, (p, custom_name) in enumerate(free_products):
+        name = names[i]
         url = _tracking_url(user.id, p.asin)
         img_url = p.image_url or f"https://images-na.ssl-images-amazon.com/images/P/{p.asin}.01._SL100_.jpg"
         price_html = ""
