@@ -1318,6 +1318,79 @@ async def send_test_newsletter(
     return {"ok": ok, "to": target}
 
 
+@router.post("/send-test-weekly-paid")
+async def send_test_weekly_paid(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    to: str | None = None,
+    asins: str | None = None,
+):
+    """Send the weekly PAID digest to a specific email (or the admin) for review.
+
+    Manual only — there is no scheduled job for this email yet, so this endpoint is
+    the sole way it goes out. Deliberately writes nothing to NotificationLog /
+    EmailSendLog: a test send should not move the delivery metrics.
+    """
+    from backend.models import Product, UserProduct
+    from backend.notifier import send_weekly_paid_summary
+
+    target = admin
+    if to:
+        to_norm = to.strip().lower()
+        found = (await db.execute(select(User).where(func.lower(User.email) == to_norm))).scalar_one_or_none()
+        if not found:
+            found = (await db.execute(select(User).where(func.lower(User.notify_email) == to_norm))).scalar_one_or_none()
+        if found:
+            target = found
+
+    if asins:
+        asin_list = [a.strip().upper() for a in asins.split(",") if a.strip()]
+        rows = (await db.execute(select(Product).where(Product.asin.in_(asin_list)))).scalars().all()
+        by_asin = {p.asin: p for p in rows}
+        products = [(by_asin[a], None) for a in asin_list if a in by_asin]
+    else:
+        products = (await db.execute(
+            select(Product, UserProduct.custom_name)
+            .join(UserProduct, Product.id == UserProduct.product_id)
+            .where(
+                UserProduct.user_id == target.id,
+                UserProduct.is_paused == False,
+                Product.last_status == "PAID",
+            )
+        )).all()
+
+    if not products:
+        return {"ok": False, "message": f"⚠️ אין מוצרי PAID פעילים ל-{target.email} — לא נשלח מייל"}
+
+    # Newest history row that is at least a week old, one row per product. Returns
+    # nothing until a full week has accumulated — the email renders fine without it.
+    history = {}
+    pids = [p.id for p, _ in products if getattr(p, "id", None)]
+    if pids:
+        hist_rows = (await db.execute(
+            text("""SELECT DISTINCT ON (product_id) product_id, price, israel_extra_cost,
+                           israel_cost_kind, last_status, recorded_at
+                      FROM price_history
+                     WHERE product_id = ANY(:pids)
+                       AND recorded_at < NOW() - INTERVAL '6 days'
+                  ORDER BY product_id, recorded_at DESC"""),
+            {"pids": pids},
+        )).all()
+        history = {r.product_id: r for r in hist_rows}
+
+    dest = to or target.notify_email or target.email
+    target.notify_email = dest
+    ok = send_weekly_paid_summary(target, products, history)
+    await db.rollback()  # discard the in-memory notify_email override
+
+    return {
+        "ok": ok,
+        "to": dest,
+        "message": (f"✅ סיכום שבועי נשלח ל-{dest} ({len(products)} מוצרים, "
+                    f"{len(history)} עם היסטוריה)") if ok else f"❌ שליחה נכשלה ל-{dest}",
+    }
+
+
 @router.post("/seed-newsletter-template")
 async def seed_newsletter_template(
     admin: Annotated[User, Depends(get_current_admin)],

@@ -49,6 +49,23 @@ _STRINGS = {
         "plain_url":            "קישור",
         "plain_urgency":        "⏰ המחיר עשוי להשתנות בכל עת",
         "plain_footer":         "נבדק: {checked_at}",
+        # Weekly PAID digest
+        "subject_weekly_paid":  "📦 סיכום שבועי: {n} מוצרים במשלוח בתשלום",
+        "header_weekly_paid":   "סיכום שבועי — משלוח בתשלום",
+        "header_weekly_sub":    "{n} מוצרים ברשימה שלך",
+        "weekly_scope_note":    "המייל הזה מרכז רק מוצרים שהמשלוח שלהם לישראל בתשלום. "
+                                "מוצרים שברשימה שלך שנמצאים במשלוח חינם ממשיכים להגיע אליך בסיכום היומי.",
+        "weekly_tip_title":     "💡 שווה לדעת",
+        "weekly_tip_body":      "הסכומים שלמעלה הם מה שאמזון מציגה לפני התשלום — מוצר, משלוח ומיסים יחד. "
+                                "אמזון גובה את הכול מראש, כך שלא מגיע חיוב נוסף כשהחבילה נכנסת לארץ.",
+        "plain_weekly_header":  "📦 סיכום שבועי — מוצרים במשלוח בתשלום\n",
+        "btn_view":             "צפה באמזון",
+        "paid_since":           "🚚 במשלוח בתשלום כבר {days} ימים",
+        "trend_flat":           "⟷ המחיר לא זז מאז השבוע שעבר",
+        "trend_price_down":     "▼ ירד ב-{delta}₪ מאז השבוע שעבר",
+        "trend_price_up":       "▲ עלה ב-{delta}₪ מאז השבוע שעבר",
+        "trend_ship_down":      "▼ עלות המשלוח ירדה ב-{delta}₪ מאז השבוע שעבר",
+        "trend_ship_up":        "▲ עלות המשלוח עלתה ב-{delta}₪ מאז השבוע שעבר",
     },
     "en": {
         "subject_single":       "✅ FREE Shipping to Israel: {name}",
@@ -75,6 +92,23 @@ _STRINGS = {
         "plain_url":            "URL    ",
         "plain_urgency":        "⏰ Price may change at any time",
         "plain_footer":         "Checked at: {checked_at}",
+        # Weekly PAID digest
+        "subject_weekly_paid":  "📦 Weekly digest: {n} products with paid shipping",
+        "header_weekly_paid":   "Weekly digest — paid shipping",
+        "header_weekly_sub":    "{n} products on your list",
+        "weekly_scope_note":    "This email covers only products whose shipping to Israel is paid. "
+                                "Products on your list with free shipping keep arriving in the daily digest.",
+        "weekly_tip_title":     "💡 Good to know",
+        "weekly_tip_body":      "The totals above are what Amazon shows before checkout — item, shipping and taxes "
+                                "together. Amazon charges it all upfront, so no extra bill arrives with the parcel.",
+        "plain_weekly_header":  "📦 Weekly digest — products with paid shipping\n",
+        "btn_view":             "View on Amazon",
+        "paid_since":           "🚚 Paid shipping for {days} days",
+        "trend_flat":           "⟷ Unchanged since last week",
+        "trend_price_down":     "▼ Down ILS {delta} since last week",
+        "trend_price_up":       "▲ Up ILS {delta} since last week",
+        "trend_ship_down":      "▼ Shipping down ILS {delta} since last week",
+        "trend_ship_up":        "▲ Shipping up ILS {delta} since last week",
     },
 }
 
@@ -196,6 +230,51 @@ def _israel_cost_note(product, is_rtl: bool) -> str:
     # sits beside two other figures, and without a subject it reads as ambiguous.
     return (f"+ {extra:.2f}₪ {label_he} · סה\"כ {total}₪ ({subject_he} היא {pct}% ממחיר המוצר)" if is_rtl
             else f"+ ILS {extra:.2f} {label_en} · total ILS {total} ({subject_en} is {pct}% of the item price)")
+
+
+def _num(raw) -> float | None:
+    """The same digits-only parse _israel_cost_note does, as a reusable helper."""
+    if raw in (None, ""):
+        return None
+    try:
+        return float(re.sub(r"[^\d.]", "", str(raw)))
+    except (ValueError, TypeError):
+        return None
+
+
+def _price_trend(product, prev, lang: str, txt_align: str, txt_dir: str) -> str:
+    """Week-over-week movement line, comparing the product against a price_history row.
+
+    Returns '' when there is no comparison point — the expected state until a full
+    week of history has accumulated. The card must read correctly without this line.
+    """
+    if prev is None:
+        return ""
+
+    now_price = _num(getattr(product, "last_price", None))
+    was_price = _num(getattr(prev, "price", None))
+    now_ship = _num(getattr(product, "israel_extra_cost", None)) or 0.0
+    was_ship = _num(getattr(prev, "israel_extra_cost", None)) or 0.0
+
+    key, delta = None, 0.0
+    if now_price is not None and was_price is not None and abs(now_price - was_price) >= 0.01:
+        key = "trend_price_down" if now_price < was_price else "trend_price_up"
+        delta = abs(now_price - was_price)
+    elif abs(now_ship - was_ship) >= 0.01:
+        key = "trend_ship_down" if now_ship < was_ship else "trend_ship_up"
+        delta = abs(now_ship - was_ship)
+
+    if key is None:
+        # Nothing moved — only worth saying when we actually had a price to compare.
+        if now_price is None or was_price is None:
+            return ""
+        return (f'<p style="margin:0 0 6px;font-size:12px;color:#767676;text-align:{txt_align};" {txt_dir}>'
+                f'{_t(lang, "trend_flat")}</p>')
+
+    color = "#007600" if key.endswith("_down") else "#B12704"
+    txt = _t(lang, key, delta=f"{delta:.2f}")
+    return (f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:{color};'
+            f'text-align:{txt_align};" {txt_dir}>{txt}</p>')
 
 
 def _t(lang: str, key: str, **kw) -> str:
@@ -814,6 +893,199 @@ def send_daily_summary(user, free_products: list, pause_warnings: dict = None) -
 </html>"""
 
     html_body = html_body.replace("</body>", f"{_open_pixel(user.id, 'daily_summary')}\n</body>")
+
+    unsubscribe_url = _pause_url(user.id)
+    headers = {
+        "List-Unsubscribe": f"<{unsubscribe_url}>",
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        "List-Id": "Amazon Israel Alert <alerts.amzfreeil.com>",
+    }
+    return _send_via_resend(recipient, subject, html_body, text_body, extra_headers=headers)
+
+
+# ── Weekly PAID summary ───────────────────────────────────────────────────────
+
+def send_weekly_paid_summary(user, paid_products: list, history: dict | None = None) -> bool:
+    """
+    Weekly digest for products whose shipping to Israel costs money.
+
+    These products never appear in the daily summary — it only fires on FREE — so for
+    users holding only PAID products this is the single email they get from us.
+
+    paid_products: list of (Product, custom_name) tuples, same shape as send_daily_summary.
+    history:       optional {product_id: PriceHistory} of the newest row at least a week
+                   old, used for the movement line. Missing entries render without it.
+    """
+    if not paid_products:
+        return False
+
+    lang = getattr(user, "language", "he") or "he"
+    recipient = user.notify_email
+    affiliate_tag = os.environ.get("AMAZON_AFFILIATE_TAG", "").strip()
+    logo_url = os.environ.get("LOGO_URL", "").strip()
+    history = history or {}
+    checked_ats = [p.last_checked for p, _ in paid_products if getattr(p, "last_checked", None)]
+    checked_at = (max(checked_ats) if checked_ats else datetime.now()).strftime("%d/%m/%Y %H:%M")
+    n = len(paid_products)
+
+    is_rtl = lang == "he"
+    txt_dir = 'dir="rtl"' if is_rtl else ""
+    txt_align = "right" if is_rtl else "left"
+    body_dir = ' dir="rtl"' if is_rtl else ""
+
+    subject = _t(lang, "subject_weekly_paid", n=n)
+    names = _display_names([cn or p.name or p.asin for p, cn in paid_products])
+
+    # Plain text
+    lines = [_t(lang, "plain_weekly_header"), _t(lang, "weekly_scope_note"), ""]
+    for i, (p, _cn) in enumerate(paid_products):
+        url = _tracking_url(user.id, p.asin)
+        lines.append(f"• {names[i]}")
+        if getattr(p, "last_price", None):
+            note = _israel_cost_note(p, is_rtl)
+            lines.append(f"  {p.last_price}" + (f" · {note}" if note else ""))
+        lines.append(f"  {url}")
+        lines.append("")
+    lines.append(_t(lang, "plain_footer", checked_at=checked_at))
+    text_body = "\n".join(lines)
+
+    disclosure_row = ""
+    if affiliate_tag:
+        disclosure_row = f"""<tr>
+          <td style="padding:12px 24px 4px; text-align:{txt_align};" {txt_dir}>
+            <p style="margin:0; font-size:12px; color:#666; font-style:italic;">{_t(lang, "disclosure")}</p>
+          </td>
+        </tr>"""
+
+    product_rows = ""
+    now = datetime.now()
+    for i, (p, _cn) in enumerate(paid_products):
+        name = names[i]
+        url = _tracking_url(user.id, p.asin)
+        # No images-na fallback here: that legacy URL answers 200 with a 43-byte pixel
+        # instead of 404, so onerror never fires and the reader sees an empty square.
+        img_html = ""
+        if getattr(p, "image_url", None):
+            img_html = f"""<tr>
+            <td class="prod-img-td" style="padding:14px 16px 4px;text-align:{txt_align};">
+              <a href="{url}">
+                <img src="{p.image_url}" width="100" height="100"
+                     style="display:inline-block;border-radius:8px;border:1px solid #eeeeee;"
+                     alt="{name}">
+              </a>
+            </td>
+          </tr>"""
+
+        price_html = ""
+        if getattr(p, "last_price", None):
+            price_note = _israel_cost_note(p, is_rtl) or (
+                "(מחיר באמזון — לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl
+                else "(Amazon price, excl. shipping, taxes & fees)"
+            )
+            price_html = f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {p.last_price} <span style="font-size:11px;color:#888;font-weight:normal;">{price_note}</span></p>'
+
+        trend_html = _price_trend(p, history.get(p.id), lang, txt_align, txt_dir)
+
+        since_html = ""
+        since = getattr(p, "status_since", None)
+        if since:
+            days = (now - since.replace(tzinfo=None)).days
+            if days >= 1:
+                since_html = (f'<p style="margin:0 0 10px;font-size:12px;color:#767676;'
+                              f'text-align:{txt_align};" {txt_dir}>{_t(lang, "paid_since", days=days)}</p>')
+
+        product_rows += f"""
+        <table width="100%" cellpadding="0" cellspacing="0"
+               style="background:#ffffff;border:1px solid #e8e8e8;border-radius:10px;margin-bottom:12px;">
+          {img_html}
+          <tr>
+            <td valign="top" style="padding:6px 16px 14px;">
+              <p class="product-name" style="margin:0 0 4px;font-size:15px;font-weight:bold;line-height:1.4;text-align:{txt_align};word-wrap:break-word;overflow-wrap:break-word;" {txt_dir}>
+                <a href="{url}" style="color:#111111;text-decoration:none;">{name}</a>
+              </p>
+              <p style="margin:0 0 8px;font-size:12px;color:#666;text-align:{txt_align};">ASIN: {p.asin}</p>
+              {price_html}
+              {trend_html}
+              {since_html}
+              <div style="text-align:{txt_align};">{_cta_btn(url, _t(lang, "btn_view"), txt_align)}</div>
+            </td>
+          </tr>
+        </table>"""
+
+    header_brand = (
+        f'<img src="{logo_url}" width="180" alt="Amazon Free shipping to Israel Alert"'
+        f' style="display:block; margin:0 auto 12px; max-width:180px;">'
+        if logo_url
+        else f'<h1 style="margin:0 0 6px;color:#e47911;font-size:22px;font-weight:bold;" {txt_dir}>{_t(lang, "header_weekly_paid")}</h1>'
+    )
+
+    html_body = f"""<!DOCTYPE html>
+<html{body_dir}>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    @media only screen and (max-width:600px){{
+      .email-container{{width:100% !important;}}
+      .email-container img{{max-width:100% !important;height:auto !important;}}
+      .product-name{{font-size:14px !important;}}
+      .prod-img-td img{{width:80px !important;height:80px !important;}}
+    }}
+  </style>
+</head>
+<body{body_dir} style="margin:0;padding:0;background:#f3f3f3;font-family:Arial,'Segoe UI',sans-serif;">
+  <div style="display:none;max-height:0;overflow:hidden;">{_t(lang, "header_weekly_sub", n=n)}</div>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f3f3;padding:24px 12px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" class="email-container" style="max-width:600px;width:100%;">
+        <tr>
+          <td style="background:#ffffff;border-radius:10px 10px 0 0;border-bottom:2px solid #FF9900;padding:24px 24px 18px;text-align:center;">
+            {header_brand}
+            <p style="margin:0 0 8px;color:#555;font-size:14px;" {txt_dir}>{_t(lang, "header_weekly_sub", n=n)}</p>
+            <p style="margin:0;color:#767676;font-size:12px;line-height:1.5;" {txt_dir}>{_t(lang, "weekly_scope_note")}</p>
+          </td>
+        </tr>
+        {disclosure_row}
+        <tr>
+          <td style="background:#f8f8f8;padding:20px 20px 6px;">
+            {product_rows}
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f8f8f8;padding:0 20px 20px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff8e1;border-radius:8px;border:1px solid #ffe0a3;">
+              <tr>
+                <td style="padding:12px 16px;text-align:{txt_align};" {txt_dir}>
+                  <p style="margin:0 0 3px;font-size:13px;font-weight:bold;color:#8a5a00;">{_t(lang, "weekly_tip_title")}</p>
+                  <p style="margin:0;font-size:12px;color:#8a5a00;line-height:1.5;">{_t(lang, "weekly_tip_body")}</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f8f8f8;padding:16px 24px 8px;text-align:center;">
+            <a href="https://app.amzfreeil.com/dashboard"
+               style="display:inline-block;background:#FF9900;color:#111111;font-size:14px;font-weight:bold;
+                      text-decoration:none;padding:11px 32px;border-radius:8px;">
+              {'כניסה לחשבון' if is_rtl else 'Go to My Account'}
+            </a>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f8f8f8;border-radius:0 0 10px 10px;padding:8px 24px 14px;text-align:center;">
+            <p style="margin:0 0 6px;color:#888;font-size:12px;" {txt_dir}>{_t(lang, "footer", checked_at=checked_at)}</p>
+            <p style="margin:0 0 4px;color:#bbb;font-size:11px;">Amazon Free Shipping to Israel Alert</p>
+            <p style="margin:0;font-size:11px;"><a href="{_pause_url(user.id)}" style="color:#aaa;text-decoration:underline;">הפסק לקבל עדכונים</a></p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
+    html_body = html_body.replace("</body>", f"{_open_pixel(user.id, 'weekly_paid')}\n</body>")
 
     unsubscribe_url = _pause_url(user.id)
     headers = {

@@ -1150,6 +1150,29 @@ async function sendTestNewsletter() {
   }
 }
 
+async function sendTestWeeklyPaid() {
+  const btn = document.getElementById("run-weekly-paid-btn");
+  const msg = document.getElementById("test-msg");
+  const to = document.getElementById("test-target-email")?.value.trim();
+  const asins = document.getElementById("test-summary-asins")?.value.trim();
+  btn.disabled = true; btn.textContent = "שולח...";
+  const qs = new URLSearchParams();
+  if (to) qs.set("to", to);
+  if (asins) qs.set("asins", asins);
+  const url = "/admin/send-test-weekly-paid" + (qs.toString() ? `?${qs}` : "");
+  const res = await apiFetch(url, { method: "POST" });
+  btn.disabled = false; btn.textContent = "📦 שלח סיכום שבועי (PAID)";
+  if (res && res.ok) {
+    const data = await res.json().catch(() => ({}));
+    // The endpoint answers 200 with ok:false when the user has no PAID products.
+    msg.textContent = data.message || "✅ נשלח";
+    setTimeout(() => { msg.textContent = ""; }, 8000);
+  } else {
+    msg.textContent = "❌ שגיאה בשליחה";
+    setTimeout(() => { msg.textContent = ""; }, 4000);
+  }
+}
+
 async function seedNewsletterTemplate() {
   const res = await apiFetch("/admin/seed-newsletter-template", { method: "POST" });
   if (!res || !res.ok) { alert("שגיאה ביצירת התבנית"); return; }
