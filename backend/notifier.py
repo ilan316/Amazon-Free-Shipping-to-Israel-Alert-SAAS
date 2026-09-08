@@ -62,10 +62,10 @@ _STRINGS = {
         "btn_view":             "צפה באמזון",
         "paid_since":           "🚚 במשלוח בתשלום כבר {days} ימים",
         "trend_flat":           "⟷ המחיר לא זז מאז השבוע שעבר",
-        "trend_price_down":     "▼ ירד ב-{delta}₪ מאז השבוע שעבר",
-        "trend_price_up":       "▲ עלה ב-{delta}₪ מאז השבוע שעבר",
-        "trend_ship_down":      "▼ עלות המשלוח ירדה ב-{delta}₪ מאז השבוע שעבר",
-        "trend_ship_up":        "▲ עלות המשלוח עלתה ב-{delta}₪ מאז השבוע שעבר",
+        "trend_price_down":     "▼ ירד ב-₪{delta} מאז השבוע שעבר",
+        "trend_price_up":       "▲ עלה ב-₪{delta} מאז השבוע שעבר",
+        "trend_ship_down":      "▼ עלות המשלוח ירדה ב-₪{delta} מאז השבוע שעבר",
+        "trend_ship_up":        "▲ עלות המשלוח עלתה ב-₪{delta} מאז השבוע שעבר",
     },
     "en": {
         "subject_single":       "✅ FREE Shipping to Israel: {name}",
@@ -153,13 +153,36 @@ def _daily_tip(lang: str) -> str:
     return tips[idx]
 
 
-def _israel_cost_note(product, is_rtl: bool) -> str:
+def _ils_amount(raw, ils_prefix: bool = False) -> str:
+    """Render an amount in shekels: '₪18.22' with the sign to the left of the digits.
+
+    Amazon hands us the price as 'ILS 18.22'; that string next to a '46.77₪ משלוח' made
+    the reader take the ILS figure for the shipping fee. Only ILS values are rewritten —
+    a dollar price is left exactly as Amazon quoted it.
+    """
+    if raw in (None, ""):
+        return ""
+    s = str(raw).strip()
+    if "ILS" not in s.upper() and "₪" not in s:
+        return s
+    digits = re.sub(r"[^\d.,]", "", s).strip(",.")  # keep a thousands comma, drop 'ILS'/'₪'
+    if not digits:
+        return s
+    return f"₪{digits}" if ils_prefix else f"{digits}₪"
+
+
+def _israel_cost_note(product, is_rtl: bool, ils_prefix: bool = False) -> str:
     """The Israel cost note shown next to the price, e.g. '+ 154.28₪ מכס · סה"כ 840.79₪'.
 
     Returns '' when nothing was extracted from the product page, in which case callers
     fall back to the existing generic "price excludes shipping/taxes" wording — a
     disclaimer that says costs exist but never how much.
     """
+    # '₪46.77' in the weekly digest, '46.77₪' in the daily summary — the daily email's
+    # wording is unchanged, so callers opt in.
+    def ils(v: str) -> str:
+        return f"₪{v}" if ils_prefix else f"{v}₪"
+
     kind = getattr(product, "israel_cost_kind", None)
     price_raw = getattr(product, "last_price", None)
     if not price_raw:
@@ -188,9 +211,9 @@ def _israel_cost_note(product, is_rtl: bool) -> str:
             threshold = 0.0
         if threshold > price:
             gap = threshold - price
-            alone_he = f" · לקנייה בודדת +{extra:.2f}₪" if extra > 0 else ""
+            alone_he = f" · לקנייה בודדת +{ils(f'{extra:.2f}')}" if extra > 0 else ""
             alone_en = f" · ILS {extra:.2f} if bought alone" if extra > 0 else ""
-            return (f"משלוח חינם בהזמנה מעל {threshold:.2f}₪ — חסרים עוד {gap:.2f}₪{alone_he}" if is_rtl
+            return (f"משלוח חינם בהזמנה מעל {ils(f'{threshold:.2f}')} — חסרים עוד {ils(f'{gap:.2f}')}{alone_he}" if is_rtl
                     else f"Free delivery on orders over ILS {threshold:.2f} — ILS {gap:.2f} to go{alone_en}")
 
     if not kind:
@@ -207,7 +230,7 @@ def _israel_cost_note(product, is_rtl: bool) -> str:
         # "משלוח חינם" leads: it's the good news and the reason the product is in the email
         # at all. Opening with "+ 149.50₪" made the line read as a charge before the reader
         # reached the word that explains it isn't shipping.
-        return (f"משלוח חינם + {extra:.2f}₪ מכס · סה\"כ {total}₪" if is_rtl
+        return (f"משלוח חינם + {ils(f'{extra:.2f}')} מכס · סה\"כ {ils(total)}" if is_rtl
                 else f"Free shipping + ILS {extra:.2f} import charges · total ILS {total}")
 
     # A FREE product can still quote a shipping fee in the global block: its free delivery
@@ -228,7 +251,7 @@ def _israel_cost_note(product, is_rtl: bool) -> str:
         subject_he, subject_en = "עלות המשלוח והמכס", "Shipping & import"
     # Spelled out rather than a bare "(57% מהמחיר)", matching dashboard.js: the percentage
     # sits beside two other figures, and without a subject it reads as ambiguous.
-    return (f"+ {extra:.2f}₪ {label_he} · סה\"כ {total}₪ ({subject_he} היא {pct}% ממחיר המוצר)" if is_rtl
+    return (f"+ {ils(f'{extra:.2f}')} {label_he} · סה\"כ {ils(total)} ({subject_he} היא {pct}% ממחיר המוצר)" if is_rtl
             else f"+ ILS {extra:.2f} {label_en} · total ILS {total} ({subject_en} is {pct}% of the item price)")
 
 
@@ -942,8 +965,9 @@ def send_weekly_paid_summary(user, paid_products: list, history: dict | None = N
         url = _tracking_url(user.id, p.asin)
         lines.append(f"• {names[i]}")
         if getattr(p, "last_price", None):
-            note = _israel_cost_note(p, is_rtl)
-            lines.append(f"  {p.last_price}" + (f" · {note}" if note else ""))
+            note = _israel_cost_note(p, is_rtl, ils_prefix=is_rtl)
+            disp = _ils_amount(p.last_price, ils_prefix=True) if is_rtl else p.last_price
+            lines.append(f"  {disp}" + (f" · {note}" if note else ""))
         lines.append(f"  {url}")
         lines.append("")
     lines.append(_t(lang, "plain_footer", checked_at=checked_at))
@@ -978,11 +1002,12 @@ def send_weekly_paid_summary(user, paid_products: list, history: dict | None = N
 
         price_html = ""
         if getattr(p, "last_price", None):
-            price_note = _israel_cost_note(p, is_rtl) or (
+            price_note = _israel_cost_note(p, is_rtl, ils_prefix=is_rtl) or (
                 "(מחיר באמזון — לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl
                 else "(Amazon price, excl. shipping, taxes & fees)"
             )
-            price_html = f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {p.last_price} <span style="font-size:11px;color:#888;font-weight:normal;">{price_note}</span></p>'
+            price_disp = _ils_amount(p.last_price, ils_prefix=True) if is_rtl else p.last_price
+            price_html = f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {price_disp} <span style="font-size:11px;color:#888;font-weight:normal;">{price_note}</span></p>'
 
         trend_html = _price_trend(p, history.get(p.id), lang, txt_align, txt_dir)
 
