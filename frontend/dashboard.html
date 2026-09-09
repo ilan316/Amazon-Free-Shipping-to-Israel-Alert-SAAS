@@ -53,17 +53,25 @@
       <!-- The "מוצרים עם משלוח חינם" card used to sit here. It sent users off-site to a
            page with no track button; the catalog strip below now shows the same products
            in-app, with one. -->
+      <!-- Row 1: the tools. Row 2: the channels. The grid is 3 columns, so DOM order
+           is the row order (right-to-left under RTL). -->
+      <div id="ext-banner" class="ext-banner">
+        <div class="ext-banner-inner"><span class="ext-banner-icon">🧩</span><strong>תוסף כרום</strong></div>
+        <p class="ext-banner-desc">הוסף מוצרים ישירות מדפי אמזון — בלחיצה אחת</p>
+        <a href="https://chromewebstore.google.com/detail/amazon-israel-free-ship-a/mbickhgdhofaefhibfbgpacejhbelddn"
+           target="_blank" class="btn-ext">הורד לכרום</a>
+      </div>
+
       <div class="ext-banner">
         <div class="ext-banner-inner"><span class="ext-banner-icon">🔍</span><strong>חיפוש מוצרים</strong></div>
         <p class="ext-banner-desc">מנוע חיפוש ישיר באמזון — מסנן רק מוצרים עם משלוח חינם לישראל</p>
         <a href="https://www.amzfreeil.com/search.html" target="_blank" class="btn-ext">חפש מוצרים</a>
       </div>
 
-      <div id="ext-banner" class="ext-banner">
-        <div class="ext-banner-inner"><span class="ext-banner-icon">🧩</span><strong>תוסף כרום</strong></div>
-        <p class="ext-banner-desc">הוסף מוצרים ישירות מדפי אמזון — בלחיצה אחת</p>
-        <a href="https://chromewebstore.google.com/detail/amazon-israel-free-ship-a/mbickhgdhofaefhibfbgpacejhbelddn"
-           target="_blank" class="btn-ext">הורד לכרום</a>
+      <div class="ext-banner">
+        <div class="ext-banner-inner"><span class="ext-banner-icon">📝</span><strong>סקירת מוצרים</strong></div>
+        <p class="ext-banner-desc">קרא סקירות מפורטות על המוצרים הפופולריים ביותר</p>
+        <a href="https://www.amzfreeil.com/prices.html" target="_blank" class="btn-ext">לסקירות</a>
       </div>
 
       <div class="ext-banner">
@@ -79,19 +87,20 @@
       </div>
 
       <div class="ext-banner">
-        <div class="ext-banner-inner"><span class="ext-banner-icon">📝</span><strong>סקירת מוצרים</strong></div>
-        <p class="ext-banner-desc">קרא סקירות מפורטות על המוצרים הפופולריים ביותר</p>
-        <a href="https://www.amzfreeil.com/prices.html" target="_blank" class="btn-ext">לסקירות</a>
+        <div class="ext-banner-inner"><span class="ext-banner-icon">📷</span><strong>אינסטגרם</strong></div>
+        <p class="ext-banner-desc">מוצרים עם משלוח חינם בתמונות — ישירות לפיד שלך</p>
+        <a href="https://www.instagram.com/amzfreeil/" target="_blank" class="btn-ext">לעמוד</a>
       </div>
     </div>
 
-    <!-- Compact mobile tool grid -->
+    <!-- Compact mobile tool grid — same order as the desktop grid above -->
     <div class="grid-2x2 mobile-only">
-      <a href="https://www.amzfreeil.com/search.html" target="_blank" class="mini-card"><span class="ico">🔍</span><span class="lbl">חיפוש מוצרים</span></a>
       <a href="https://chromewebstore.google.com/detail/amazon-israel-free-ship-a/mbickhgdhofaefhibfbgpacejhbelddn" target="_blank" class="mini-card"><span class="ico">🧩</span><span class="lbl">תוסף כרום</span></a>
+      <a href="https://www.amzfreeil.com/search.html" target="_blank" class="mini-card"><span class="ico">🔍</span><span class="lbl">חיפוש מוצרים</span></a>
+      <a href="https://www.amzfreeil.com/prices.html" target="_blank" class="mini-card"><span class="ico">📝</span><span class="lbl">סקירת מוצרים</span></a>
       <a href="https://t.me/amzfreeil" target="_blank" class="mini-card"><span class="ico">✈️</span><span class="lbl">ערוץ טלגרם</span></a>
       <a href="https://www.facebook.com/AmzFreeIL/" target="_blank" class="mini-card"><span class="ico">📘</span><span class="lbl">פייסבוק</span></a>
-      <a href="https://www.amzfreeil.com/prices.html" target="_blank" class="mini-card"><span class="ico">📝</span><span class="lbl">סקירת מוצרים</span></a>
+      <a href="https://www.instagram.com/amzfreeil/" target="_blank" class="mini-card"><span class="ico">📷</span><span class="lbl">אינסטגרם</span></a>
     </div>
 
     <div class="dashboard-header">
