@@ -515,11 +515,11 @@ function _catalogCard(p, atLimit) {
     : `<button class="btn-outline" style="flex:1;padding:6px;font-size:0.78rem;white-space:nowrap;"
          onclick="addSuggested('${p.asin}', this)">➕ עקוב</button>`;
   return `
-    <div style="border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;background:#fff;display:flex;flex-direction:column;">
+    <div style="border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;background:var(--surface);display:flex;flex-direction:column;">
       <img src="${_escAttr(p.image)}" alt="" loading="lazy" style="width:100%;height:110px;object-fit:contain;margin-bottom:8px;">
       <div style="font-size:0.78rem;line-height:1.35;min-height:4.05em;margin-bottom:6px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;overflow:hidden;">${_escAttr(name)}</div>
       ${price}
-      <div style="font-size:0.72rem;color:#1a7f37;font-weight:600;margin-bottom:2px;">משלוח חינם ✓</div>
+      <div style="font-size:0.72rem;color:var(--success);font-weight:600;margin-bottom:2px;">משלוח חינם ✓</div>
       ${cat}
       <div style="display:flex;gap:6px;margin-top:auto;padding-top:10px;">
         <a href="/go/dash/${p.asin}" target="_blank" rel="noopener"
@@ -578,13 +578,13 @@ function openCatalogModal() {
 
   const cats = [...new Set(catalogItems.map(p => p.category_he).filter(Boolean))].sort();
   modal.innerHTML = `
-    <div style="background:#fff;border-radius:12px;max-width:900px;width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">
-      <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <div style="background:var(--bg);border-radius:12px;border-top:4px solid var(--brand);max-width:900px;width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow);">
+      <div style="padding:14px 16px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
         <strong style="margin-inline-end:auto;">כל המוצרים עם משלוח חינם</strong>
         <input id="catalog-search" type="search" placeholder="חיפוש..." oninput="renderCatalogModalList()"
-               style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;min-width:160px;">
+               style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;min-width:160px;background:var(--surface);color:var(--text);">
         <select id="catalog-cat" onchange="renderCatalogModalList()"
-                style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;">
+                style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);">
           <option value="">כל הקטגוריות</option>
           ${cats.map(c => `<option value="${_escAttr(c)}">${_escAttr(c)}</option>`).join("")}
         </select>
