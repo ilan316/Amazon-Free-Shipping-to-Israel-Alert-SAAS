@@ -1332,7 +1332,7 @@ async def send_test_weekly_paid(
     EmailSendLog: a test send should not move the delivery metrics.
     """
     from backend.models import Product, UserProduct
-    from backend.notifier import send_weekly_paid_summary
+    from backend.notifier import send_weekly_paid_summary, week_old_history
 
     target = admin
     if to:
@@ -1364,19 +1364,8 @@ async def send_test_weekly_paid(
 
     # Newest history row that is at least a week old, one row per product. Returns
     # nothing until a full week has accumulated — the email renders fine without it.
-    history = {}
     pids = [p.id for p, _ in products if getattr(p, "id", None)]
-    if pids:
-        hist_rows = (await db.execute(
-            text("""SELECT DISTINCT ON (product_id) product_id, price, israel_extra_cost,
-                           israel_cost_kind, last_status, recorded_at
-                      FROM price_history
-                     WHERE product_id = ANY(:pids)
-                       AND recorded_at < NOW() - INTERVAL '6 days'
-                  ORDER BY product_id, recorded_at DESC"""),
-            {"pids": pids},
-        )).all()
-        history = {r.product_id: r for r in hist_rows}
+    history = await week_old_history(db, pids)
 
     dest = to or target.notify_email or target.email
     target.notify_email = dest

@@ -296,6 +296,32 @@ def price_moves(product, prev) -> list[tuple[str, float]]:
     return moves
 
 
+async def week_old_history(db, product_ids: list[int]) -> dict:
+    """Newest price_history row that is at least a week old, one row per product.
+
+    The comparison point price_moves() expects, as a single query for a whole batch.
+    Lives here rather than in each caller because three surfaces read it — the weekly
+    email job, the manual admin send, and the dashboard — and the moment the window
+    or the ordering drifts between them, a user sees ▼ on the site and ⟷ in the mail.
+
+    Returns {} for an empty id list, and for any product with no row old enough —
+    the normal state for anything tracked under a week.
+    """
+    if not product_ids:
+        return {}
+    from sqlalchemy import text as _sql_text  # local: this module is otherwise DB-free
+    rows = (await db.execute(
+        _sql_text("""SELECT DISTINCT ON (product_id) product_id, price, israel_extra_cost,
+                            israel_cost_kind, last_status, recorded_at
+                       FROM price_history
+                      WHERE product_id = ANY(:pids)
+                        AND recorded_at < NOW() - INTERVAL '6 days'
+                   ORDER BY product_id, recorded_at DESC"""),
+        {"pids": product_ids},
+    )).all()
+    return {r.product_id: r for r in rows}
+
+
 def _price_trend(product, prev, lang: str, txt_align: str, txt_dir: str) -> str:
     """Week-over-week movement line, comparing the product against a price_history row.
 

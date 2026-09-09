@@ -160,8 +160,12 @@ def _upsert_job(func, job_id: str, kwargs: dict):
                 logger.debug(f"Kept existing interval job schedule (unchanged): {job_id}")
         else:
             from apscheduler.triggers.cron import CronTrigger
+            # day_of_week / day must survive the rebuild. Without them a weekly job
+            # registers correctly on its first deploy (the add_job path below keeps
+            # every kwarg) and then silently becomes daily on the next one, because
+            # reschedule_job would get a trigger with no day constraint at all.
             trigger_kwargs = {k: v for k, v in kwargs.items()
-                             if k in ("hour", "minute", "second", "timezone")}
+                             if k in ("day_of_week", "day", "hour", "minute", "second", "timezone")}
             scheduler.reschedule_job(job_id, trigger=CronTrigger(**trigger_kwargs))
             logger.debug(f"Rescheduled existing job: {job_id}")
     else:
@@ -179,7 +183,7 @@ async def lifespan(app: FastAPI):
 
     # Import here to avoid circular imports at module level
     from backend.checker import browser_manager
-    from backend.scheduler import run_global_check_cycle, run_daily_summary
+    from backend.scheduler import run_global_check_cycle, run_daily_summary, run_weekly_paid_summary
 
     await browser_manager.startup()
 
@@ -215,6 +219,15 @@ async def lifespan(app: FastAPI):
 
     _upsert_job(run_daily_summary, "daily_summary", dict(
         trigger="cron", hour=daily_hour, minute=0, timezone="Asia/Jerusalem", misfire_grace_time=600
+    ))
+    # Weekly PAID summary — Thursday 09:30. 08:00 is the daily summary and the Telegram
+    # report, 08:10 the Hebrew backfill, 09:00 the automation emails, so 09:30 is the
+    # first clear slot in that morning. The two-hour misfire grace (rather than the
+    # ten minutes a daily job gets) is because a Railway restart at 09:30 on a Thursday
+    # would otherwise cost a full week, not a day.
+    _upsert_job(run_weekly_paid_summary, "weekly_paid_summary", dict(
+        trigger="cron", day_of_week="thu", hour=9, minute=30,
+        timezone="Asia/Jerusalem", misfire_grace_time=7200
     ))
     _upsert_job(run_inactivity_check, "inactivity_check", dict(
         trigger="cron", hour=3, minute=0, timezone="Asia/Jerusalem", misfire_grace_time=600

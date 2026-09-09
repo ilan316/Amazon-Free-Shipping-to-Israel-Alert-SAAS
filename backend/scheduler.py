@@ -308,6 +308,23 @@ async def run_daily_summary():
         cutoff_pause = now - timedelta(days=5)
         cutoff_warn  = now - timedelta(days=3)
 
+        # Release pauses whose end date has passed. Nothing else in the system clears
+        # is_paused — only the manual toggle in routes/products.py does — so without
+        # this a product paused "until 05/09" stays flagged forever: the dashboard
+        # keeps calling it paused while the checker and the emails treat it as active.
+        # An open-ended pause (paused_until IS NULL) is the user's own decision and is
+        # never touched here.
+        resumed = (await db.execute(text("""
+            UPDATE user_products
+               SET is_paused = FALSE, paused_until = NULL, paused_reason = NULL
+             WHERE is_paused = TRUE
+               AND paused_until IS NOT NULL
+               AND paused_until <= NOW()
+        """))).rowcount
+        if resumed:
+            await db.commit()
+            logger.info(f"Auto-resumed {resumed} product(s) whose pause window expired")
+
         # Auto-pause: countdown = max(free_since, last_click_at). A click resets the 5-day window.
         auto_pause_rows = (await db.execute(text("""
             SELECT up.id, up.user_id, p.asin
@@ -425,6 +442,94 @@ async def run_daily_summary():
             await db.commit()
 
     logger.info(f"=== Daily summary complete — {sent} email(s) sent, {auto_paused} product(s) auto-paused ===")
+
+
+async def run_weekly_paid_summary():
+    """Send one weekly summary email per user listing all their PAID products.
+
+    The counterpart to run_daily_summary(): that one fires on FREE products, which are
+    news. These are the ones with no news — so the email reports week-over-week price
+    movement instead, and goes out once a week (Thursday 09:30 Israel) rather than daily.
+
+    Until now this email had no scheduled job at all; the only way it ever went out was
+    the manual admin route, which deliberately logs nothing. This one logs like any
+    real send.
+    """
+    from backend.notifier import send_weekly_paid_summary, week_old_history
+
+    logger.info("=== Weekly PAID summary started ===")
+    sent = 0
+    async with AsyncSessionLocal() as db:
+        now = datetime.now(timezone.utc)
+
+        users = (await db.execute(
+            select(User).where(
+                User.is_active == True,
+                User.vacation_mode == False,
+                User.notify_email_bounced == False,
+                User.is_admin == False,
+            )
+        )).scalars().all()
+
+        recipients_buffer = []
+
+        for user in users:
+            paid_products = (await db.execute(
+                select(Product, UserProduct.custom_name)
+                .join(UserProduct, Product.id == UserProduct.product_id)
+                .where(
+                    UserProduct.user_id == user.id,
+                    # An expired pause window counts as active. run_daily_summary()
+                    # clears those at 08:00, but this covers the gap between the
+                    # moment a pause expires and that next cleanup run.
+                    or_(
+                        UserProduct.is_paused == False,
+                        (UserProduct.paused_until != None) & (UserProduct.paused_until <= now),
+                    ),
+                    Product.last_status == ShippingStatus.PAID.value,
+                )
+            )).all()
+
+            if not paid_products:
+                continue
+
+            history = await week_old_history(db, [p.id for p, _ in paid_products])
+            success = send_weekly_paid_summary(user, paid_products, history)
+            recipients_buffer.append((user, success))
+
+            for product, _ in paid_products:
+                db.add(NotificationLog(
+                    user_id=user.id,
+                    product_id=product.id,
+                    status=ShippingStatus.PAID.value,
+                    email_to=user.notify_email,
+                    success=success,
+                    error_msg=None if success else "send failed",
+                ))
+
+            if success:
+                sent += 1
+                logger.info(f"[user {user.id}] Weekly summary sent — {len(paid_products)} paid product(s), {len(history)} with history.")
+
+            await db.commit()
+
+        if recipients_buffer:
+            failed_count = sum(1 for _, ok in recipients_buffer if not ok)
+            send_log = EmailSendLog(
+                template_id=None,
+                template_name="weekly_paid_summary",
+                sent_at=now,
+                audience="all",
+                sent_count=sent,
+                failed_count=failed_count,
+            )
+            db.add(send_log)
+            await db.flush()
+            for user, ok in recipients_buffer:
+                db.add(EmailSendRecipient(send_log_id=send_log.id, user_id=user.id, email=user.notify_email, success=ok))
+            await db.commit()
+
+    logger.info(f"=== Weekly PAID summary complete — {sent} email(s) sent ===")
 
 
 async def _notify_admin_of_errors(failed_items: list):

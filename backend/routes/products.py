@@ -6,14 +6,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func, text
+from sqlalchemy import select, and_, func
 from sqlalchemy.orm import selectinload
 
 from backend.database import get_db
 from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting
 from backend.auth import get_current_user
 from backend.schemas import AddProductRequest, ProductResponse, MessageResponse, PriceTrendMove
-from backend.notifier import price_moves
+from backend.notifier import price_moves, week_old_history
 from backend.checker import extract_free_shipping_threshold
 
 DEFAULT_MAX_PRODUCTS = 10
@@ -106,21 +106,10 @@ async def list_products(
         )
         last_notified_map = {row.product_id: row.last_sent for row in notif_rows}
 
-    # Week-over-week comparison point, one query for the whole page. Same window and
-    # same ordering as the weekly summary email (backend/routes/admin.py:1370) so the
-    # dashboard can never show ▼ for a product the email calls unchanged.
-    history_map: dict = {}
-    if product_ids:
-        hist_rows = (await db.execute(
-            text("""SELECT DISTINCT ON (product_id) product_id, price, israel_extra_cost,
-                           israel_cost_kind, last_status, recorded_at
-                      FROM price_history
-                     WHERE product_id = ANY(:pids)
-                       AND recorded_at < NOW() - INTERVAL '6 days'
-                  ORDER BY product_id, recorded_at DESC"""),
-            {"pids": product_ids},
-        )).all()
-        history_map = {r.product_id: r for r in hist_rows}
+    # Week-over-week comparison point, one query for the whole page. The same helper
+    # the weekly summary email uses, so the dashboard can never show ▼ for a product
+    # the email calls unchanged.
+    history_map = await week_old_history(db, product_ids)
 
     items = []
     for up in user_products:
