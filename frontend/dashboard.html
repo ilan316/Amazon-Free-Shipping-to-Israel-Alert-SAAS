@@ -132,6 +132,10 @@
       <p style="font-size:0.78rem; color:var(--text-muted); margin-top:8px;">
         הבדיקה הבאה תתבצע אוטומטית · <span id="add-card-next-check"></span>
       </p>
+      <!-- Signpost to the catalog further down the page. Filled by
+           renderCatalogStrip() so the count is what this user can still add,
+           and hidden until it has one. -->
+      <p id="catalog-hint" style="display:none;font-size:0.82rem;margin-top:6px;"></p>
     </div>
 
     <!-- Search + Filter bar -->
@@ -196,7 +200,7 @@
   </footer>
 
   <script src="/static/app.js?v=13"></script>
-  <script src="/static/dashboard.js?v=28"></script>
+  <script src="/static/dashboard.js?v=29"></script>
   <script>
     requireAuth();
 

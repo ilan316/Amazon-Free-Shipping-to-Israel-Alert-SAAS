@@ -531,6 +531,26 @@ function _catalogCard(p, atLimit) {
     </div>`;
 }
 
+// The catalog sits below the user's own list, so nothing above the fold hints
+// that it exists. This one line in the add-product card does — that card is
+// where someone stands when they want to track something and have no ASIN in
+// hand, which is exactly who the catalog is for.
+function _renderCatalogHint(count) {
+  const hint = document.getElementById("catalog-hint");
+  if (!hint) return;
+  if (!count) { hint.style.display = "none"; return; }
+  hint.style.display = "";
+  hint.innerHTML =
+    `✨ <a href="#catalog-strip" onclick="_scrollToCatalog();return false;">` +
+    `אין לך מוצר מוכן? ${count} מוצרים שנשלחים חינם לישראל מחכים למטה ↓</a>`;
+}
+
+function _scrollToCatalog() {
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  document.getElementById("catalog-strip")
+    ?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+}
+
 async function renderCatalogStrip() {
   const box = document.getElementById("catalog-strip");
   if (!box) return;
@@ -545,6 +565,7 @@ async function renderCatalogStrip() {
 
   const tracked = new Set(products.map(p => p.asin));
   const available = catalogItems.filter(p => !tracked.has(p.asin));
+  _renderCatalogHint(available.length);
   if (!available.length) { box.innerHTML = ""; return; }
 
   const atLimit = _atProductLimit();
