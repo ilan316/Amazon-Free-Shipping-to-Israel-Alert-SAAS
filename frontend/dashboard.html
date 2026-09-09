@@ -134,9 +134,6 @@
       </p>
     </div>
 
-    <!-- Free-shipping catalog: filled by renderCatalogStrip() in dashboard.js -->
-    <div id="catalog-strip"></div>
-
     <!-- Search + Filter bar -->
     <div id="filter-bar" class="filter-bar" style="display:none;">
       <input
@@ -156,6 +153,14 @@
 
     <!-- Product list -->
     <div id="products-list" class="products-list"></div>
+
+    <!-- Free-shipping catalog: filled by renderCatalogStrip() in dashboard.js.
+         It sits below the user's own list on purpose — this page is "המוצרים שלי",
+         and above the list the widget pushed the user's products under the fold on
+         every visit. The median user tracks 3 products, so the catalog is barely a
+         scroll away; the users furthest from it are the 10+ ones, who are already at
+         the product limit and see no track buttons anyway. -->
+    <div id="catalog-strip"></div>
 
     <!-- FAQ accordion -->
     <div class="faq-section" style="display:none;">
