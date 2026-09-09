@@ -489,14 +489,10 @@ function _escAttr(s) {
   return String(s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }
 
-function _checkedAgo(iso) {
-  if (!iso) return "";
-  const hours = Math.floor((Date.now() - new Date(iso)) / 3600000);
-  if (hours < 1)  return "נבדק לפני פחות משעה";
-  if (hours < 24) return `נבדק לפני ${hours} שעות`;
-  const days = Math.floor(hours / 24);
-  return days === 1 ? "נבדק אתמול" : `נבדק לפני ${days} ימים`;
-}
+// "נבדק לפני X" used to sit on every card. It was misleading: scanner products
+// nobody tracks are only re-checked when the Telegram/Facebook poster happens to
+// draw them (~21 a day out of 277), so most of the catalog reads days old while
+// the list, sorted by last_checked, shows only the fresh ones first.
 
 function _atProductLimit() {
   return userLimit !== null && products.length >= userLimit;
@@ -517,8 +513,7 @@ function _catalogCard(p, atLimit) {
       ${price}
       <div style="font-size:0.72rem;color:#1a7f37;font-weight:600;margin-bottom:2px;">משלוח חינם ✓</div>
       ${cat}
-      <div style="font-size:0.68rem;color:var(--text-muted);margin-bottom:8px;">${_checkedAgo(p.last_checked)}</div>
-      <div style="display:flex;gap:6px;margin-top:auto;">
+      <div style="display:flex;gap:6px;margin-top:auto;padding-top:10px;">
         <a href="/go/dash/${p.asin}" target="_blank" rel="noopener"
            class="btn-outline" style="flex:1;padding:6px;font-size:0.78rem;text-decoration:none;white-space:nowrap;">🌐 לאמזון</a>
         ${track}
