@@ -494,12 +494,14 @@ function _escAttr(s) {
 // draw them (~21 a day out of 277), so most of the catalog reads days old while
 // the list, sorted by last_checked, shows only the fresh ones first.
 
-// last_price arrives pre-formatted from Amazon, e.g. "ILS 253.89". Show the
-// Hebrew currency after the number so RTL puts it on the left of the digits.
-// Anything that isn't an ILS string (a USD price, say) passes through as-is.
+// last_price arrives pre-formatted from Amazon, e.g. "ILS 253.89". Mirrors
+// formatPrice() in app.js so the tracked list and the catalog on the same
+// screen render the shekel identically: '253.89 ₪', the sign on the left of
+// the digits under RTL. A USD price passes through as-is — the $ is a signal
+// that the check never got an Israeli price, not a price to prettify.
 function _fmtPrice(s) {
-  const m = String(s || "").match(/^\s*ILS\s*([\d.,]+)\s*$/);
-  return m ? `${m[1]} ש"ח` : String(s || "");
+  const m = String(s || "").match(/^\s*(?:ILS|₪)\s*([\d.,]+)\s*$/i);
+  return m ? `${m[1]} ₪` : String(s || "");
 }
 
 function _atProductLimit() {
