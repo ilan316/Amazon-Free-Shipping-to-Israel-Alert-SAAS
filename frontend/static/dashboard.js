@@ -26,10 +26,15 @@ function israelCostLine(p) {
   const threshold = parseFloat(String(p.israel_free_threshold || '').replace(/[^\d.]/g, ''));
   if (p.last_status === 'FREE' && isFinite(threshold) && threshold > price) {
     const gap = (threshold - price).toFixed(2);
+    // Four amounts in one run read as noise, and the one thing to *do* — put more in the
+    // cart — sat buried in the middle. So: the action alone on the first line with a single
+    // number, and the figures that merely explain it (the minimum, which is anyway just
+    // price + gap, and the solo shipping fee) demoted to a quiet second line.
     // The single-purchase fee only appears alongside the minimum that explains it.
     const alone = isFinite(extra) && extra > 0
-      ? ` · לקנייה בודדת +₪${extra.toFixed(2)}` : '';
-    return `<span style="color:#555;font-size:13px;margin-right:4px;">משלוח חינם בהזמנה מעל ₪${threshold.toFixed(2)} — <b>חסרים עוד ₪${gap}</b>${alone}</span>`;
+      ? ` · לקנייה בודדת משלוח ₪${extra.toFixed(2)}` : '';
+    return `<span style="color:#007600;font-size:13px;margin-right:4px;"><b>הוסף עוד ₪${gap} לעגלה</b> — והמשלוח חינם</span>` +
+           `<span style="display:block;color:#888;font-size:11px;margin-top:2px;">מינימום להזמנה ₪${threshold.toFixed(2)}${alone}</span>`;
   }
 
   if (!p.israel_cost_kind) return '';
