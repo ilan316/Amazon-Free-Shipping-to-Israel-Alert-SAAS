@@ -75,6 +75,12 @@ class AddProductRequest(BaseModel):
     custom_name: str | None = None
 
 
+class PriceTrendMove(BaseModel):
+    """One week-over-week movement, as computed by backend.notifier.price_moves()."""
+    kind: str    # "price_down" | "price_up" | "ship_down" | "ship_up"
+    delta: str   # two decimals, same formatting as the weekly email
+
+
 class ProductResponse(BaseModel):
     asin: str
     name: str
@@ -97,6 +103,9 @@ class ProductResponse(BaseModel):
     israel_free_threshold: str | None = None
     status_since: datetime | None = None
     image: str | None = None
+    # Week-over-week movements. Empty whenever there is no history row old enough
+    # to compare against — the normal state for a product tracked under a week.
+    trend: list[PriceTrendMove] = []
 
     model_config = {"from_attributes": True}
 

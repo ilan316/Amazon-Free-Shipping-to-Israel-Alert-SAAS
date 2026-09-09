@@ -60,6 +60,28 @@ function israelCostLine(p) {
   return `<span style="color:#555;font-size:13px;margin-right:4px;">+ ${extra.toFixed(2)}₪ ${label} · <b>סה"כ ${total}₪</b> <span style="color:#888;">(${pctSubject} היא ${pct}% ממחיר המוצר)</span></span>`;
 }
 
+// Week-over-week movement, the same comparison the weekly summary email prints.
+// The server sends only real movements (backend/notifier.py price_moves), so an empty
+// list means either nothing moved or there's no week-old row yet — in both cases the
+// card stays quiet rather than adding a "no change" line to an already dense row.
+const TREND_TEXT = {
+  price_down: d => `▼ מחיר המוצר ירד ב-${d}₪ מאז השבוע שעבר`,
+  price_up:   d => `▲ מחיר המוצר עלה ב-${d}₪ מאז השבוע שעבר`,
+  ship_down:  d => `▼ עלות המשלוח ירדה ב-${d}₪ מאז השבוע שעבר`,
+  ship_up:    d => `▲ עלות המשלוח עלתה ב-${d}₪ מאז השבוע שעבר`,
+};
+
+function priceTrendLine(p) {
+  if (!Array.isArray(p.trend) || !p.trend.length) return '';
+  return p.trend.map(m => {
+    const render = TREND_TEXT[m.kind];
+    if (!render) return '';
+    // Same colours as the email: a drop is good news, a rise is not.
+    const color = m.kind.endsWith('_down') ? '#007600' : '#B12704';
+    return `<span style="color:${color};font-size:12px;font-weight:bold;margin-right:4px;">${escHtml(render(m.delta))}</span>`;
+  }).join('');
+}
+
 function nextCheckLabel(p) {
   if (!p.status_since || !['PAID', 'NO_SHIP'].includes(p.last_status)) return null;
   const cycle = p.last_status === 'PAID' ? 14 : 21;
@@ -298,6 +320,7 @@ function renderProducts() {
         ${p.last_price && !['NO_SHIP','NOT_FOUND'].includes(p.last_status) ? `<div class="card-row-price" style="margin-top:3px;font-size:12px;">
           <span style="color:#B12704;font-weight:bold;">💰 <bdi>${escHtml(formatPrice(p.last_price))}</bdi></span>
           ${israelCostLine(p) || `<span style="color:#999;font-size:12px;margin-right:4px;">${p.last_status === 'FREE' ? '(כולל משלוח חינם — לא כולל מכס ומע"מ במידה וחל)' : '(מחיר המוצר בלבד - לא כולל משלוח, מיסים ועלויות שונות)'}</span>`}
+          ${priceTrendLine(p)}
         </div>` : ''}
 
         <!-- שורה 3: סטטוס | השהה | בדוק | הסר -->

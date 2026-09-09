@@ -267,17 +267,19 @@ def _num(raw) -> float | None:
         return None
 
 
-def _price_trend(product, prev, lang: str, txt_align: str, txt_dir: str) -> str:
-    """Week-over-week movement line, comparing the product against a price_history row.
+def price_moves(product, prev) -> list[tuple[str, float]]:
+    """Week-over-week movements between a product and a price_history row.
 
-    Returns '' when there is no comparison point — the expected state until a full
-    week of history has accumulated. The card must read correctly without this line.
+    The comparison itself, with no rendering — the weekly email and the dashboard
+    card both read from here so a user can never see ▼ in one and ⟷ in the other.
+    Returns [] when nothing moved; the caller decides whether "nothing moved" is
+    worth saying. Keys are the _STRINGS keys, so the email can translate directly.
     """
-    if prev is None:
-        return ""
-
     now_price = _num(getattr(product, "last_price", None))
     was_price = _num(getattr(prev, "price", None))
+    # An unreadable shipping cost counts as 0 here. In practice the checker keeps the
+    # previous value rather than clearing it (backend/scheduler.py:104), so this only
+    # bites a product that never had a cost on either side — where 0 is correct.
     now_ship = _num(getattr(product, "israel_extra_cost", None)) or 0.0
     was_ship = _num(getattr(prev, "israel_extra_cost", None)) or 0.0
 
@@ -291,8 +293,23 @@ def _price_trend(product, prev, lang: str, txt_align: str, txt_dir: str) -> str:
     if abs(now_ship - was_ship) >= 0.01:
         moves.append(("trend_ship_down" if now_ship < was_ship else "trend_ship_up",
                       abs(now_ship - was_ship)))
+    return moves
+
+
+def _price_trend(product, prev, lang: str, txt_align: str, txt_dir: str) -> str:
+    """Week-over-week movement line, comparing the product against a price_history row.
+
+    Returns '' when there is no comparison point — the expected state until a full
+    week of history has accumulated. The card must read correctly without this line.
+    """
+    if prev is None:
+        return ""
+
+    moves = price_moves(product, prev)
 
     if not moves:
+        now_price = _num(getattr(product, "last_price", None))
+        was_price = _num(getattr(prev, "price", None))
         # Nothing moved — only worth saying when we actually had a price to compare.
         if now_price is None or was_price is None:
             return ""
