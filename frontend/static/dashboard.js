@@ -331,7 +331,9 @@ function renderProducts() {
           <span class="card-meta-asin" dir="ltr">ASIN: ${p.asin}</span>
         </div>
         ${p.last_price && !['NO_SHIP','NOT_FOUND'].includes(p.last_status) ? `<div class="card-row-price" style="margin-top:3px;font-size:12px;">
-          <span style="color:#B12704;font-weight:bold;">💰 <bdi>${escHtml(formatPrice(p.last_price))}</bdi></span>
+          <!-- The 💰 alone didn't say what the number is: next to the shipping figures on
+               the same row it read as just one more amount. The word "מחיר" names it. -->
+          <span style="color:#B12704;font-weight:bold;">💰 מחיר <bdi>${escHtml(formatPrice(p.last_price))}</bdi></span>
           ${israelCostLine(p) || `<span style="color:#999;font-size:12px;margin-right:4px;">${p.last_status === 'FREE' ? '(כולל משלוח חינם — לא כולל מכס ומע"מ במידה וחל)' : '(מחיר המוצר בלבד - לא כולל משלוח, מיסים ועלויות שונות)'}</span>`}
           ${priceTrendLine(p)}
         </div>` : ''}
