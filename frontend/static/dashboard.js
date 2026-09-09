@@ -4,6 +4,8 @@ let products = [];
 let checkingAsins = new Set();
 let currentFilter = 'ALL';
 let userLimit = null;
+let userId = null;
+let catalogItems = [];   // full free-shipping catalog, fetched once per page load
 
 // Builds the "final cost to Israel" line under the price.
 // The point of the percentage: shipping to Israel is close to flat (~46-52₪ in our data),
@@ -109,10 +111,14 @@ async function loadUserLimit() {
   const res = await apiFetch("/me");
   if (!res || !res.ok) return;
   const user = await res.json();
+  userId = user.id ?? null;   // seeds the daily catalog draw
   if (user.effective_product_limit != null) {
     userLimit = user.effective_product_limit;
     updateLimitBadge();
   }
+  // This resolves in parallel with the first product load, so the strip may already
+  // have drawn with a null seed and without knowing the limit. Redraw once we know.
+  renderCatalogStrip();
 }
 
 function updateLimitBadge() {
@@ -212,15 +218,17 @@ function renderProducts() {
 
   updateLimitBadge();
 
+  // The catalog strip lives in its own container above the list and is rendered on
+  // every pass, empty list or not — it is what turns a free product into a tracked one.
+  renderCatalogStrip();
+
   if (products.length === 0) {
     list.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">📦</div>
         <p>עדיין לא הוספת מוצרים למעקב</p>
         <p style="font-size:0.85rem; margin-top:8px;">הדבק URL של מוצר אמזון או ASIN בתיבה למעלה</p>
-      </div>
-      <div id="empty-suggestions"></div>`;
-    renderEmptySuggestions();
+      </div>`;
     return;
   }
 
@@ -441,33 +449,176 @@ function escHtml(str) {
 
 // ── Add product (single + bulk) ───────────────────────────────────────────────
 
-// A blank dashboard is where signups die: two activation emails already told
-// these users to paste a URL and they still had nothing to paste. Show real
-// products that ship free right now, one click to track.
-async function renderEmptySuggestions() {
-  const box = document.getElementById("empty-suggestions");
+// The catalog of products that ship free right now is the only inventory we have
+// that a user can adopt in one click. It used to render only for an empty list and
+// vanish for good after the first ASIN — which is why, with 277 free products in the
+// catalog, not one had ever been adopted. It is now permanent.
+
+// Deterministic draw: the same six products all day, a different six tomorrow.
+// Re-randomising per page load would make the dashboard look broken; tying it to the
+// scanner run would rotate on an unpredictable cadence.
+function _catalogSeed() {
+  const day = new Date().toISOString().slice(0, 10);
+  const key = `${userId ?? 0}-${day}`;
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function _seededPick(items, count, seed) {
+  // Fisher-Yates over a copy, driven by mulberry32 so the order is reproducible.
+  const arr = [...items];
+  let s = seed;
+  const rand = () => {
+    s |= 0; s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr.slice(0, count);
+}
+
+function _escAttr(s) {
+  return String(s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+function _checkedAgo(iso) {
+  if (!iso) return "";
+  const hours = Math.floor((Date.now() - new Date(iso)) / 3600000);
+  if (hours < 1)  return "נבדק לפני פחות משעה";
+  if (hours < 24) return `נבדק לפני ${hours} שעות`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "נבדק אתמול" : `נבדק לפני ${days} ימים`;
+}
+
+function _atProductLimit() {
+  return userLimit !== null && products.length >= userLimit;
+}
+
+function _catalogCard(p, atLimit) {
+  const name = p.name_he || p.name;
+  const price = p.last_price ? `<div style="font-weight:700;font-size:0.9rem;margin-bottom:4px;">${_escAttr(p.last_price)}</div>` : "";
+  const cat = p.category_he ? `<div style="font-size:0.7rem;color:var(--text-muted);">${_escAttr(p.category_he)}</div>` : "";
+  const track = atLimit
+    ? ""
+    : `<button class="btn-outline" style="flex:1;padding:6px;font-size:0.78rem;"
+         onclick="addSuggested('${p.asin}', this)">➕ עקוב</button>`;
+  return `
+    <div style="border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;background:#fff;display:flex;flex-direction:column;">
+      <img src="${_escAttr(p.image)}" alt="" loading="lazy" style="width:100%;height:110px;object-fit:contain;margin-bottom:8px;">
+      <div style="font-size:0.78rem;line-height:1.35;height:3.4em;overflow:hidden;margin-bottom:6px;">${_escAttr(name)}</div>
+      ${price}
+      <div style="font-size:0.72rem;color:#1a7f37;font-weight:600;margin-bottom:2px;">משלוח חינם ✓</div>
+      ${cat}
+      <div style="font-size:0.68rem;color:var(--text-muted);margin-bottom:8px;">${_checkedAgo(p.last_checked)}</div>
+      <div style="display:flex;gap:6px;margin-top:auto;">
+        <a href="/go/dash/${p.asin}" target="_blank" rel="noopener"
+           class="btn-outline" style="flex:1;padding:6px;font-size:0.78rem;text-decoration:none;">🌐 לאמזון</a>
+        ${track}
+      </div>
+    </div>`;
+}
+
+async function renderCatalogStrip() {
+  const box = document.getElementById("catalog-strip");
   if (!box) return;
-  let items = [];
-  try {
-    const res = await fetch("/api/public/free-products");
-    if (!res.ok) return;
-    items = (await res.json()).slice(0, 6);
-  } catch { return; }
-  if (!items.length) return;
+
+  if (!catalogItems.length) {
+    try {
+      const res = await fetch("/api/public/free-products");
+      if (!res.ok) return;
+      catalogItems = await res.json();
+    } catch { return; }
+  }
+
+  const tracked = new Set(products.map(p => p.asin));
+  const available = catalogItems.filter(p => !tracked.has(p.asin));
+  if (!available.length) { box.innerHTML = ""; return; }
+
+  const atLimit = _atProductLimit();
+  const items = _seededPick(available, 6, _catalogSeed());
 
   box.innerHTML = `
-    <div style="margin-top:8px;">
-      <p style="font-weight:700;margin-bottom:4px;">✨ נשלחים חינם לישראל ממש עכשיו</p>
-      <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px;">לחיצה אחת ונתחיל לעקוב עבורך</p>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;">
-        ${items.map(p => `
-          <div style="border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;background:#fff;">
-            <img src="${p.image}" alt="" loading="lazy" style="width:100%;height:110px;object-fit:contain;margin-bottom:8px;">
-            <div style="font-size:0.78rem;line-height:1.35;height:3.4em;overflow:hidden;margin-bottom:8px;">${p.name_he || p.name}</div>
-            <button class="btn-outline" style="width:100%;padding:6px;font-size:0.8rem;"
-              onclick="addSuggested('${p.asin}', this)">➕ עקוב</button>
-          </div>`).join("")}
+    <div style="margin:16px 0;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <p style="font-weight:700;margin-bottom:4px;">✨ נשלחים חינם לישראל ממש עכשיו</p>
+        <a href="#" onclick="openCatalogModal();return false;" style="font-size:0.85rem;">לכל ${available.length} המוצרים ←</a>
       </div>
+      <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px;">
+        ${atLimit ? `הגעת למגבלת ${userLimit} המוצרים — פנה לתמיכה להגדלת המגבלה`
+                  : "לחיצה אחת ונתחיל לעקוב עבורך"}</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;">
+        ${items.map(p => _catalogCard(p, atLimit)).join("")}
+      </div>
+    </div>`;
+}
+
+// ── Full catalog modal ────────────────────────────────────────────────────────
+// Everything is client-side over catalogItems, which is already in memory.
+
+function openCatalogModal() {
+  let modal = document.getElementById("catalog-modal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "catalog-modal";
+    modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;";
+    modal.addEventListener("click", e => { if (e.target === modal) closeCatalogModal(); });
+    document.body.appendChild(modal);
+  }
+
+  const cats = [...new Set(catalogItems.map(p => p.category_he).filter(Boolean))].sort();
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:12px;max-width:900px;width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">
+      <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <strong style="margin-inline-end:auto;">כל המוצרים עם משלוח חינם</strong>
+        <input id="catalog-search" type="search" placeholder="חיפוש..." oninput="renderCatalogModalList()"
+               style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;min-width:160px;">
+        <select id="catalog-cat" onchange="renderCatalogModalList()"
+                style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;">
+          <option value="">כל הקטגוריות</option>
+          ${cats.map(c => `<option value="${_escAttr(c)}">${_escAttr(c)}</option>`).join("")}
+        </select>
+        <button class="btn-outline" style="padding:6px 12px;" onclick="closeCatalogModal()">סגור</button>
+      </div>
+      <div id="catalog-modal-list" style="overflow-y:auto;padding:14px 16px;"></div>
+    </div>`;
+  renderCatalogModalList();
+}
+
+function closeCatalogModal() {
+  const modal = document.getElementById("catalog-modal");
+  if (modal) modal.remove();
+}
+
+function renderCatalogModalList() {
+  const listEl = document.getElementById("catalog-modal-list");
+  if (!listEl) return;
+  const q = (document.getElementById("catalog-search")?.value || "").trim().toLowerCase();
+  const cat = document.getElementById("catalog-cat")?.value || "";
+  const tracked = new Set(products.map(p => p.asin));
+  const atLimit = _atProductLimit();
+
+  const rows = catalogItems.filter(p => {
+    if (tracked.has(p.asin)) return false;
+    if (cat && p.category_he !== cat) return false;
+    if (!q) return true;
+    return `${p.name_he || ""} ${p.name || ""} ${p.asin}`.toLowerCase().includes(q);
+  });
+
+  if (!rows.length) {
+    listEl.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:20px;">לא נמצאו מוצרים</p>`;
+    return;
+  }
+  listEl.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;">
+      ${rows.map(p => _catalogCard(p, atLimit)).join("")}
     </div>`;
 }
 
@@ -489,6 +640,7 @@ async function addSuggested(asin, btn) {
   checkingAsins.add(newProduct.asin);
   products.unshift(newProduct);
   renderProducts();
+  renderCatalogModalList();   // no-op unless the full-catalog modal is open
   showToast(`✅ מוצר ${newProduct.asin} נוסף — בודק סטטוס...`, "success");
   apiFetch("/me/products/check-new", { method: "POST" }).catch(() => {});
   _pollForChecked([newProduct.asin], document.getElementById("add-alert"));

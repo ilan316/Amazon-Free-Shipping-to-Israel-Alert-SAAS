@@ -50,12 +50,9 @@
 
     <!-- Feature Grid -->
     <div class="feature-grid desktop-only">
-      <div class="ext-banner">
-        <div class="ext-banner-inner"><span class="ext-banner-icon">🎁</span><strong>מוצרים עם משלוח חינם</strong></div>
-        <p class="ext-banner-desc">רשימה מעודכנת של מוצרים שנשלחים לישראל בחינם — ללא מינימום</p>
-        <a href="https://www.amzfreeil.com/free-products.html" target="_blank" class="btn-ext">לרשימה המלאה</a>
-      </div>
-
+      <!-- The "מוצרים עם משלוח חינם" card used to sit here. It sent users off-site to a
+           page with no track button; the catalog strip below now shows the same products
+           in-app, with one. -->
       <div class="ext-banner">
         <div class="ext-banner-inner"><span class="ext-banner-icon">🔍</span><strong>חיפוש מוצרים</strong></div>
         <p class="ext-banner-desc">מנוע חיפוש ישיר באמזון — מסנן רק מוצרים עם משלוח חינם לישראל</p>
@@ -90,7 +87,6 @@
 
     <!-- Compact mobile tool grid -->
     <div class="grid-2x2 mobile-only">
-      <a href="https://www.amzfreeil.com/free-products.html" target="_blank" class="mini-card"><span class="ico">🎁</span><span class="lbl">משלוח חינם</span></a>
       <a href="https://www.amzfreeil.com/search.html" target="_blank" class="mini-card"><span class="ico">🔍</span><span class="lbl">חיפוש מוצרים</span></a>
       <a href="https://chromewebstore.google.com/detail/amazon-israel-free-ship-a/mbickhgdhofaefhibfbgpacejhbelddn" target="_blank" class="mini-card"><span class="ico">🧩</span><span class="lbl">תוסף כרום</span></a>
       <a href="https://t.me/amzfreeil" target="_blank" class="mini-card"><span class="ico">✈️</span><span class="lbl">ערוץ טלגרם</span></a>
@@ -128,6 +124,9 @@
         הבדיקה הבאה תתבצע אוטומטית · <span id="add-card-next-check"></span>
       </p>
     </div>
+
+    <!-- Free-shipping catalog: filled by renderCatalogStrip() in dashboard.js -->
+    <div id="catalog-strip"></div>
 
     <!-- Search + Filter bar -->
     <div id="filter-bar" class="filter-bar" style="display:none;">
@@ -183,7 +182,7 @@
   </footer>
 
   <script src="/static/app.js?v=13"></script>
-  <script src="/static/dashboard.js?v=21"></script>
+  <script src="/static/dashboard.js?v=22"></script>
   <script>
     requireAuth();
 

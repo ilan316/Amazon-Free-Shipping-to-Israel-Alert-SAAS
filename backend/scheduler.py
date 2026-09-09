@@ -299,7 +299,7 @@ async def run_global_check_cycle():
 async def run_daily_summary():
     """Send one daily summary email per user listing all their FREE products.
 
-    Pre-step: auto-pause products free for 5+ days since last click (or free_since if never clicked).
+    Pre-step: auto-pause products free for 5+ days since the user last engaged with them.
     A click resets the 5-day countdown. Warning badges shown at days 3-4.
     """
     logger.info("=== Daily summary started ===")
@@ -325,7 +325,16 @@ async def run_daily_summary():
             await db.commit()
             logger.info(f"Auto-resumed {resumed} product(s) whose pause window expired")
 
-        # Auto-pause: countdown = max(free_since, last_click_at). A click resets the 5-day window.
+        # Auto-pause: countdown = max(free_since, added_at, last_click_at). A click resets
+        # the 5-day window.
+        #
+        # added_at belongs in here because free_since is a column on the *product*, not on
+        # the user's tracking row: it records when the ASIN turned FREE in the world, and
+        # _update_product() only rewrites it on a not-free → free transition. A product
+        # adopted straight from the free-shipping catalog has been FREE for weeks, so
+        # without added_at the countdown is already spent the moment the user adds it —
+        # the product would arrive in tomorrow's digest carrying "will be paused
+        # tomorrow", or be auto-paused in this very run, before the user ever saw it once.
         auto_pause_rows = (await db.execute(text("""
             SELECT up.id, up.user_id, p.asin
             FROM user_products up
@@ -336,7 +345,7 @@ async def run_daily_summary():
               AND p.free_since IS NOT NULL
               AND u.is_active = TRUE
               AND u.is_admin = FALSE
-              AND GREATEST(p.free_since, COALESCE(
+              AND GREATEST(p.free_since, up.added_at, COALESCE(
                   (SELECT MAX(ec.clicked_at) FROM email_clicks ec
                    WHERE ec.user_id = up.user_id AND ec.asin = p.asin),
                   p.free_since
@@ -377,6 +386,17 @@ async def run_daily_summary():
             )).all()
             last_click_map = {r.asin: r.last_click for r in click_rows}
 
+            # When this user started tracking each ASIN. free_since is a product-level
+            # column and can predate the tracking by weeks (a catalog product that was
+            # already FREE when it was added), so the countdown has to start from the
+            # later of the two — otherwise the first digest already warns about a pause.
+            added_rows = (await db.execute(
+                select(Product.asin, UserProduct.added_at)
+                .join(UserProduct, Product.id == UserProduct.product_id)
+                .where(UserProduct.user_id == user.id)
+            )).all()
+            added_at_map = {r.asin: r.added_at for r in added_rows}
+
             free_products_result = await db.execute(
                 select(Product, UserProduct.custom_name)
                 .join(UserProduct, Product.id == UserProduct.product_id)
@@ -394,13 +414,16 @@ async def run_daily_summary():
             if not free_products:
                 continue
 
-            # Build pause warnings: countdown starts from max(free_since, last_click)
+            # Build pause warnings: countdown starts from max(free_since, added_at, last_click)
             pause_warnings = {}
             for product, _ in free_products:
                 if not product.free_since:
                     continue
-                last_click = last_click_map.get(product.asin)
-                countdown_start = max(product.free_since, last_click) if last_click else product.free_since
+                candidates = [product.free_since]
+                for extra in (added_at_map.get(product.asin), last_click_map.get(product.asin)):
+                    if extra:
+                        candidates.append(extra)
+                countdown_start = max(candidates)
                 if countdown_start <= cutoff_warn:
                     days_elapsed = (now - countdown_start).days
                     days_until_pause = max(1, 5 - days_elapsed)
