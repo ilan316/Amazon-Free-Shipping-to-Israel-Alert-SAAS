@@ -306,6 +306,10 @@ function renderProducts() {
         : `<span class="status-badge badge-${p.last_status}" title="${tooltip}">${statusLabel(p.last_status)}</span>`
     ;
 
+    // Read once: the price label needs to know whether a cost line follows it, so the
+    // two amounts are joined by a comma instead of running together as one phrase.
+    const costLine = israelCostLine(p);
+
     return `
       <div class="product-card status-${badgeStatus} ${p.is_paused ? 'card-paused' : ''}" id="card-${p.asin}">
 
@@ -332,9 +336,9 @@ function renderProducts() {
         </div>
         ${p.last_price && !['NO_SHIP','NOT_FOUND'].includes(p.last_status) ? `<div class="card-row-price" style="margin-top:3px;font-size:12px;">
           <!-- The 💰 alone didn't say what the number is: next to the shipping figures on
-               the same row it read as just one more amount. The word "מחיר" names it. -->
-          <span style="color:#B12704;font-weight:bold;">💰 מחיר <bdi>${escHtml(formatPrice(p.last_price))}</bdi></span>
-          ${israelCostLine(p) || `<span style="color:#999;font-size:12px;margin-right:4px;">${p.last_status === 'FREE' ? '(כולל משלוח חינם — לא כולל מכס ומע"מ במידה וחל)' : '(מחיר המוצר בלבד - לא כולל משלוח, מיסים ועלויות שונות)'}</span>`}
+               the same row it read as just one more amount. "עלות המוצר" names it. -->
+          <span style="color:#B12704;font-weight:bold;">💰 עלות המוצר <bdi>${escHtml(formatPrice(p.last_price))}</bdi>${costLine ? ',' : ''}</span>
+          ${costLine || `<span style="color:#999;font-size:12px;margin-right:4px;">${p.last_status === 'FREE' ? '(כולל משלוח חינם — לא כולל מכס ומע"מ במידה וחל)' : '(לא כולל משלוח, מיסים ועלויות שונות)'}</span>`}
           ${priceTrendLine(p)}
         </div>` : ''}
 
