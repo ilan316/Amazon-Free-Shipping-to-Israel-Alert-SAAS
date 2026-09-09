@@ -494,13 +494,21 @@ function _escAttr(s) {
 // draw them (~21 a day out of 277), so most of the catalog reads days old while
 // the list, sorted by last_checked, shows only the fresh ones first.
 
+// last_price arrives pre-formatted from Amazon, e.g. "ILS 253.89". Show the
+// Hebrew currency after the number so RTL puts it on the left of the digits.
+// Anything that isn't an ILS string (a USD price, say) passes through as-is.
+function _fmtPrice(s) {
+  const m = String(s || "").match(/^\s*ILS\s*([\d.,]+)\s*$/);
+  return m ? `${m[1]} ש"ח` : String(s || "");
+}
+
 function _atProductLimit() {
   return userLimit !== null && products.length >= userLimit;
 }
 
 function _catalogCard(p, atLimit) {
   const name = p.name_he || p.name;
-  const price = p.last_price ? `<div style="font-weight:700;font-size:0.9rem;margin-bottom:4px;">${_escAttr(p.last_price)}</div>` : "";
+  const price = p.last_price ? `<div style="font-weight:700;font-size:0.9rem;margin-bottom:4px;">${_escAttr(_fmtPrice(p.last_price))}</div>` : "";
   const cat = p.category_he ? `<div style="font-size:0.7rem;color:var(--text-muted);">${_escAttr(p.category_he)}</div>` : "";
   const track = atLimit
     ? ""
