@@ -750,7 +750,7 @@ function adminIsraelCost(p) {
     return '<span style="color:var(--text-muted);" title="לא חולץ מדף המוצר">—</span>';
   }
   if (kind === 'free') {
-    return '<span dir="ltr" style="color:#007600;white-space:nowrap;" title="ללא עלות נוספת מעבר למחיר המוצר">0.00 ₪</span>';
+    return '<span dir="ltr" style="color:#007600;white-space:nowrap;" title="ללא עלות נוספת מעבר למחיר המוצר">₪0.00</span>';
   }
 
   const extra = parseFloat(String(p.israel_extra_cost || '').replace(/[^\d.]/g, ''));
@@ -759,16 +759,16 @@ function adminIsraelCost(p) {
   }
 
   const price = parseFloat(String(p.last_price || '').replace(/[^\d.]/g, ''));
-  const totalTip = isFinite(price) && price > 0 ? ` · סה"כ ${(price + extra).toFixed(2)}₪` : '';
+  const totalTip = isFinite(price) && price > 0 ? ` · סה"כ ₪${(price + extra).toFixed(2)}` : '';
   // הסכום עצמו אחיד בכל השורות — הפירוט (משלוח / מכס / שניהם) עובר ל-tooltip בלבד.
   const tip = {
-    shipping_only:   `משלוח בלבד ${extra.toFixed(2)}₪`,
-    shipping_import: `משלוח ומכס ${extra.toFixed(2)}₪`,
-    import_only:     `מכס בלבד ${extra.toFixed(2)}₪ · משלוח חינם`,
-    combined:        `${extra.toFixed(2)}₪ — סכום ממוזג, אמזון לא מפצלת משלוח ממכס`,
+    shipping_only:   `משלוח בלבד ₪${extra.toFixed(2)}`,
+    shipping_import: `משלוח ומכס ₪${extra.toFixed(2)}`,
+    import_only:     `מכס בלבד ₪${extra.toFixed(2)} · משלוח חינם`,
+    combined:        `₪${extra.toFixed(2)} — סכום ממוזג, אמזון לא מפצלת משלוח ממכס`,
   }[kind] || `kind לא מוכר: ${kind}`;
 
-  return `<span dir="ltr" title="${tip}${totalTip}" style="cursor:help;white-space:nowrap;">${extra.toFixed(2)} ₪</span>`;
+  return `<span dir="ltr" title="${tip}${totalTip}" style="cursor:help;white-space:nowrap;">₪${extra.toFixed(2)}</span>`;
 }
 
 function renderAdminProducts() {

@@ -28,8 +28,8 @@ function israelCostLine(p) {
     const gap = (threshold - price).toFixed(2);
     // The single-purchase fee only appears alongside the minimum that explains it.
     const alone = isFinite(extra) && extra > 0
-      ? ` · לקנייה בודדת +${extra.toFixed(2)}₪` : '';
-    return `<span style="color:#555;font-size:13px;margin-right:4px;">משלוח חינם בהזמנה מעל ${threshold.toFixed(2)}₪ — <b>חסרים עוד ${gap}₪</b>${alone}</span>`;
+      ? ` · לקנייה בודדת +₪${extra.toFixed(2)}` : '';
+    return `<span style="color:#555;font-size:13px;margin-right:4px;">משלוח חינם בהזמנה מעל ₪${threshold.toFixed(2)} — <b>חסרים עוד ₪${gap}</b>${alone}</span>`;
   }
 
   if (!p.israel_cost_kind) return '';
@@ -43,9 +43,9 @@ function israelCostLine(p) {
   const pct = Math.round((extra / price) * 100);
 
   if (p.israel_cost_kind === 'import_only') {
-    // "משלוח חינם" leads — it's the good news, and opening with "+ 149.50₪" read as a
+    // "משלוח חינם" leads — it's the good news, and opening with "+ ₪149.50" read as a
     // charge before the reader reached the word that explains it isn't shipping.
-    return `<span style="color:#555;font-size:13px;margin-right:4px;">משלוח חינם + ${extra.toFixed(2)}₪ מכס · <b>סה"כ ${total}₪</b></span>`;
+    return `<span style="color:#555;font-size:13px;margin-right:4px;">משלוח חינם + ₪${extra.toFixed(2)} מכס · <b>סה"כ ₪${total}</b></span>`;
   }
   // A FREE product can still quote a shipping fee here: its free delivery is conditional
   // on an order minimum, and the fee is what you'd pay buying it alone. Printing it next
@@ -59,7 +59,7 @@ function israelCostLine(p) {
   // Spelled out rather than "(57% מהמחיר)": the bare percentage next to two other numbers
   // reads as ambiguous — percentage of what — and generated support questions.
   const pctSubject = p.israel_cost_kind === 'shipping_only' ? 'עלות המשלוח' : 'עלות המשלוח והמכס';
-  return `<span style="color:#555;font-size:13px;margin-right:4px;">+ ${extra.toFixed(2)}₪ ${label} · <b>סה"כ ${total}₪</b> <span style="color:#888;">(${pctSubject} היא ${pct}% ממחיר המוצר)</span></span>`;
+  return `<span style="color:#555;font-size:13px;margin-right:4px;">+ ₪${extra.toFixed(2)} ${label} · <b>סה"כ ₪${total}</b> <span style="color:#888;">(${pctSubject} היא ${pct}% ממחיר המוצר)</span></span>`;
 }
 
 // Week-over-week movement, the same comparison the weekly summary email prints.
@@ -67,10 +67,10 @@ function israelCostLine(p) {
 // list means either nothing moved or there's no week-old row yet — in both cases the
 // card stays quiet rather than adding a "no change" line to an already dense row.
 const TREND_TEXT = {
-  price_down: d => `▼ מחיר המוצר ירד ב-${d}₪ מאז השבוע שעבר`,
-  price_up:   d => `▲ מחיר המוצר עלה ב-${d}₪ מאז השבוע שעבר`,
-  ship_down:  d => `▼ עלות המשלוח ירדה ב-${d}₪ מאז השבוע שעבר`,
-  ship_up:    d => `▲ עלות המשלוח עלתה ב-${d}₪ מאז השבוע שעבר`,
+  price_down: d => `▼ מחיר המוצר ירד ב-₪${d} מאז השבוע שעבר`,
+  price_up:   d => `▲ מחיר המוצר עלה ב-₪${d} מאז השבוע שעבר`,
+  ship_down:  d => `▼ עלות המשלוח ירדה ב-₪${d} מאז השבוע שעבר`,
+  ship_up:    d => `▲ עלות המשלוח עלתה ב-₪${d} מאז השבוע שעבר`,
 };
 
 function priceTrendLine(p) {
@@ -496,12 +496,14 @@ function _escAttr(s) {
 
 // last_price arrives pre-formatted from Amazon, e.g. "ILS 253.89". Mirrors
 // formatPrice() in app.js so the tracked list and the catalog on the same
-// screen render the shekel identically: '253.89 ₪', the sign on the left of
-// the digits under RTL. A USD price passes through as-is — the $ is a signal
-// that the check never got an Israeli price, not a price to prettify.
+// screen render the shekel identically: '₪253.89', the sign glued to the left
+// of the digits. With a space ('253.89 ₪') bidi puts the sign on the right of
+// the number, which is what this replaced. A USD price passes through as-is —
+// the $ is a signal that the check never got an Israeli price, not a price to
+// prettify.
 function _fmtPrice(s) {
   const m = String(s || "").match(/^\s*(?:ILS|₪)\s*([\d.,]+)\s*$/i);
-  return m ? `${m[1]} ₪` : String(s || "");
+  return m ? `₪${m[1]}` : String(s || "");
 }
 
 function _atProductLimit() {

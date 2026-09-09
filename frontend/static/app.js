@@ -51,13 +51,14 @@ function statusLabel(status) {
   return map[status] || status;
 }
 
-// המחיר נשמר כפי שאמזון מציגה אותו — 'ILS 159.76'. בתצוגה מציגים שקלים: '159.76 ₪'.
+// המחיר נשמר כפי שאמזון מציגה אותו — 'ILS 159.76'. בתצוגה מציגים שקלים: '₪159.76'.
+// הסימן צמוד לספרות ולפניהן — '159.76 ₪' עם רווח נשבר ב-bidi ומוצג מימין למספר.
 // מחיר דולרי נשאר עם $ במכוון: הוא סימן שהבדיקה לא קיבלה מחיר ישראלי, לא מחיר להצגה.
 function formatPrice(raw) {
   const s = String(raw ?? "").trim();
   if (!s) return "";
   const m = s.match(/^(?:ILS|₪)\s*([\d,]+(?:\.\d+)?)$/i);
-  return m ? `${m[1]} ₪` : s;
+  return m ? `₪${m[1]}` : s;
 }
 
 function formatDate(iso) {

@@ -1061,10 +1061,11 @@ def _get_image_urls(product: Product) -> list[str]:
 
 
 def _format_price(raw: str | None) -> str:
-    """Normalize Amazon price string to 'X.XX ש"ח' format."""
+    """Normalize Amazon price string to '₪X.XX' — the sign left of the digits,
+    the one shekel notation used across the product (never 'ILS', never 'ש"ח')."""
     p = (raw or "").strip()
     p = p.replace("ILS", "").replace("₪", "").strip()
-    return f'{p} ש"ח' if p else ""
+    return f"₪{p}" if p else ""
 
 
 def _escape_md(text: str) -> str:

@@ -86,10 +86,11 @@ def _wrap(draw, text: str, font, max_w: int, max_lines: int = 2) -> list[str]:
 
 
 def _clean_price(raw: str | None) -> str:
-    """'ILS 82.50' -> '82.50 ₪'. Same normalization as scheduler._format_price,
-    but the shekel sign rather than 'ש"ח' — this is a numeric badge, not prose."""
+    """'ILS 82.50' -> '₪82.50'. Same normalization as scheduler._format_price,
+    but the shekel sign rather than 'ש"ח' — this is a numeric badge, not prose.
+    The sign is glued to the left of the digits, as everywhere else in the product."""
     p = (raw or "").replace("ILS", "").replace("₪", "").strip()
-    return f"{p} ₪" if re.search(r"\d", p) else ""
+    return f"₪{p}" if re.search(r"\d", p) else ""
 
 
 def draw_bars(canvas: Image.Image, name: str | None, price: str | None,
