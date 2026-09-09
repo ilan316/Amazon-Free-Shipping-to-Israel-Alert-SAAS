@@ -548,9 +548,24 @@ async function renderCatalogStrip() {
   if (!available.length) { box.innerHTML = ""; return; }
 
   const atLimit = _atProductLimit();
-  const items = _seededPick(available, 6, _catalogSeed());
 
+  // The count has to divide evenly into the column count or the last row is a
+  // stranded card. auto-fill decided the columns for us and landed on 5 inside
+  // .page (max-width 860px), which left 6 items as 5+1 — so the columns are
+  // pinned below instead, to 4 and 2, and the count is 8: two full rows on
+  // desktop, four on mobile. Only the tail of the catalog can go under 8.
+  let n = Math.min(8, available.length);
+  if (n >= 4) n -= n % 4;
+  const items = _seededPick(available, n, _catalogSeed());
+
+  // Media queries can't live in a style attribute, and the CSS files are off
+  // limits here (they're cached separately from this file's ?v= bust), so the
+  // grid rules ship inline with the markup they style.
   box.innerHTML = `
+    <style>
+      .catalog-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+      @media (min-width:640px) { .catalog-grid { grid-template-columns:repeat(4,1fr); } }
+    </style>
     <div style="margin:16px 0;">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">
         <p style="font-weight:700;margin-bottom:4px;">✨ נשלחים חינם לישראל ממש עכשיו</p>
@@ -559,7 +574,7 @@ async function renderCatalogStrip() {
       <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px;">
         ${atLimit ? `הגעת למגבלת ${userLimit} המוצרים — פנה לתמיכה להגדלת המגבלה`
                   : "לחיצה אחת ונתחיל לעקוב עבורך"}</p>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;">
+      <div class="catalog-grid">
         ${items.map(p => _catalogCard(p, atLimit)).join("")}
       </div>
     </div>`;
