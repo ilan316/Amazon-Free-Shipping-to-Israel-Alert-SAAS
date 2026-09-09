@@ -30,11 +30,15 @@ function israelCostLine(p) {
     // cart — sat buried in the middle. So: the action alone on the first line with a single
     // number, and the figures that merely explain it (the minimum, which is anyway just
     // price + gap, and the solo shipping fee) demoted to a quiet second line.
-    // The single-purchase fee only appears alongside the minimum that explains it.
+    // The second line is phrased around eligibility, not around the purchase: "לקנייה
+    // בודדת משלוח ₪46.76" read as a table header and prompted "what does that mean?".
+    // Naming the two states — eligible above the minimum, otherwise this fee — is what
+    // the reader is actually deciding between.
+    // The fee only appears alongside the minimum that explains it.
     const alone = isFinite(extra) && extra > 0
-      ? ` · לקנייה בודדת משלוח ₪${extra.toFixed(2)}` : '';
+      ? ` · בלי זכאות — משלוח ₪${extra.toFixed(2)}` : '';
     return `<span style="color:#007600;font-size:13px;margin-right:4px;"><b>הוסף עוד ₪${gap} לעגלה</b> — והמשלוח חינם</span>` +
-           `<span style="display:block;color:#888;font-size:11px;margin-top:2px;">מינימום להזמנה ₪${threshold.toFixed(2)}${alone}</span>`;
+           `<span style="display:block;color:#888;font-size:11px;margin-top:2px;">זכאות למשלוח חינם מהזמנה של ₪${threshold.toFixed(2)}${alone}</span>`;
   }
 
   if (!p.israel_cost_kind) return '';
