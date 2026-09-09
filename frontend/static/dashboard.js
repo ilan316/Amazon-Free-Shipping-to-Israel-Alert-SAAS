@@ -508,19 +508,19 @@ function _catalogCard(p, atLimit) {
   const cat = p.category_he ? `<div style="font-size:0.7rem;color:var(--text-muted);">${_escAttr(p.category_he)}</div>` : "";
   const track = atLimit
     ? ""
-    : `<button class="btn-outline" style="flex:1;padding:6px;font-size:0.78rem;"
+    : `<button class="btn-outline" style="flex:1;padding:6px;font-size:0.78rem;white-space:nowrap;"
          onclick="addSuggested('${p.asin}', this)">➕ עקוב</button>`;
   return `
     <div style="border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;background:#fff;display:flex;flex-direction:column;">
       <img src="${_escAttr(p.image)}" alt="" loading="lazy" style="width:100%;height:110px;object-fit:contain;margin-bottom:8px;">
-      <div style="font-size:0.78rem;line-height:1.35;height:3.4em;overflow:hidden;margin-bottom:6px;">${_escAttr(name)}</div>
+      <div style="font-size:0.78rem;line-height:1.35;min-height:4.05em;margin-bottom:6px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;overflow:hidden;">${_escAttr(name)}</div>
       ${price}
       <div style="font-size:0.72rem;color:#1a7f37;font-weight:600;margin-bottom:2px;">משלוח חינם ✓</div>
       ${cat}
       <div style="font-size:0.68rem;color:var(--text-muted);margin-bottom:8px;">${_checkedAgo(p.last_checked)}</div>
       <div style="display:flex;gap:6px;margin-top:auto;">
         <a href="/go/dash/${p.asin}" target="_blank" rel="noopener"
-           class="btn-outline" style="flex:1;padding:6px;font-size:0.78rem;text-decoration:none;">🌐 לאמזון</a>
+           class="btn-outline" style="flex:1;padding:6px;font-size:0.78rem;text-decoration:none;white-space:nowrap;">🌐 לאמזון</a>
         ${track}
       </div>
     </div>`;
