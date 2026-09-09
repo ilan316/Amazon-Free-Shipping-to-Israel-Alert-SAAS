@@ -494,6 +494,15 @@ async def run_weekly_paid_summary():
                 continue
 
             history = await week_old_history(db, [p.id for p, _ in paid_products])
+            if not history:
+                # No comparison point for a single product, so every card would render
+                # without a movement line — the same list the dashboard already shows.
+                # Week-over-week movement is the entire reason this email exists, so
+                # there is nothing to say yet. Normal for a user whose products were all
+                # added in the last week, and for everyone on the very first run.
+                logger.info(f"[user {user.id}] Skipped — no product has a week of history yet.")
+                continue
+
             success = send_weekly_paid_summary(user, paid_products, history)
             recipients_buffer.append((user, success))
 
