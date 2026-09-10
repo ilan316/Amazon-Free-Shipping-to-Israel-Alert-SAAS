@@ -172,12 +172,16 @@ def _ils_amount(raw, ils_prefix: bool = False) -> str:
     return f"₪{digits}" if ils_prefix else f"{digits}₪"
 
 
-def _israel_cost_note(product, is_rtl: bool, ils_prefix: bool = False) -> str:
+def _israel_cost_note(product, is_rtl: bool, ils_prefix: bool = False, html: bool = False) -> str:
     """The Israel cost note shown next to the price, e.g. '+ 154.28₪ מכס · סה"כ 840.79₪'.
 
     Returns '' when nothing was extracted from the product page, in which case callers
     fall back to the existing generic "price excludes shipping/taxes" wording — a
     disclaimer that says costs exist but never how much.
+
+    `html=True` lets the conditional-free case split into the two lines dashboard.js
+    renders — the action first, the figures that explain it demoted underneath. The
+    plain-text body of the weekly email is the one caller that leaves it False.
     """
     # Hebrew puts the sign to the left of the digits ('₪46.77'); English keeps 'ILS 46.77'.
     # Callers opt in, so the flag tracks the recipient's language, not the email type.
@@ -212,10 +216,26 @@ def _israel_cost_note(product, is_rtl: bool, ils_prefix: bool = False) -> str:
             threshold = 0.0
         if threshold > price:
             gap = threshold - price
-            alone_he = f" · לקנייה בודדת +{ils(f'{extra:.2f}')}" if extra > 0 else ""
-            alone_en = f" · ILS {extra:.2f} if bought alone" if extra > 0 else ""
-            return (f"משלוח חינם בהזמנה מעל {ils(f'{threshold:.2f}')} — חסרים עוד {ils(f'{gap:.2f}')}{alone_he}" if is_rtl
-                    else f"Free delivery on orders over ILS {threshold:.2f} — ILS {gap:.2f} to go{alone_en}")
+            # Same split dashboard.js settled on: four amounts in one run read as noise,
+            # and the one thing to *do* — put more in the cart — got buried. Action alone
+            # with a single number, then the eligibility figures underneath in grey.
+            # The solo-purchase fee only appears alongside the minimum that explains it.
+            alone_he = f" · בלי זכאות — משלוח {ils(f'{extra:.2f}')}" if extra > 0 else ""
+            alone_en = f" · without it — ILS {extra:.2f} shipping" if extra > 0 else ""
+            if is_rtl:
+                action = f"<b>הוסף עוד {ils(f'{gap:.2f}')} לעגלה</b> — והמשלוח חינם" if html \
+                    else f"הוסף עוד {ils(f'{gap:.2f}')} לעגלה — והמשלוח חינם"
+                detail = f"זכאות למשלוח חינם מהזמנה של {ils(f'{threshold:.2f}')}{alone_he}"
+            else:
+                action = f"<b>Add ILS {gap:.2f} more to your cart</b> — and shipping is free" if html \
+                    else f"Add ILS {gap:.2f} more to your cart — and shipping is free"
+                detail = f"Free shipping on orders from ILS {threshold:.2f}{alone_en}"
+            if not html:
+                return f"{action} · {detail}"
+            # <br> rather than display:block on a span — Outlook's Word engine drops the
+            # latter and the two lines run together.
+            return (f'<span style="color:#007600;">{action}</span>'
+                    f'<br><span style="color:#888;font-size:11px;">{detail}</span>')
 
     if not kind:
         return ""
@@ -707,10 +727,14 @@ def send_user_alert(user, product, result) -> bool:
     # "price excludes shipping/taxes" wording stays exactly as it was.
     # The generic fallback carries its own parentheses; the real cost note doesn't, because
     # it can already end in "(257% מהמחיר)" and wrapping it would nest parentheses.
-    price_note = _israel_cost_note(product, is_rtl, ils_prefix=is_rtl) or (
-        "(מחיר באמזון — לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl
-        else "(Amazon price, excl. shipping, taxes & fees)"
+    # Read once: the price label needs to know whether a real cost line follows it, so the
+    # two amounts are joined by a comma instead of running together as one phrase.
+    cost_note = _israel_cost_note(product, is_rtl, ils_prefix=is_rtl, html=True)
+    price_note = cost_note or (
+        "(לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl
+        else "(excl. shipping, taxes & fees)"
     )
+    price_label = "עלות המוצר" if is_rtl else "Item cost"
     price_raw = getattr(product, "last_price", None)
     price_disp = _ils_amount(price_raw, ils_prefix=True) if is_rtl else price_raw
 
@@ -750,7 +774,7 @@ def send_user_alert(user, product, result) -> bool:
                     <a href="{url}" style="color:#111111;text-decoration:none;">{name}</a>
                   </p>
                   <p style="margin:0 0 10px;font-size:13px;color:#666;text-align:{txt_align};">ASIN: {asin}</p>
-                  {f'<p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {price_disp} <span style="font-size:13px;color:#888;font-weight:normal;">{price_note}</span></p>' if price_raw else ""}
+                  {f'<p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {price_label} <bdi>{price_disp}</bdi>{"," if cost_note else ""} <span style="font-size:13px;color:#888;font-weight:normal;">{price_note}</span></p>' if price_raw else ""}
                   <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#007600;text-align:{txt_align};" {txt_dir}>{_t(lang, "shipping_badge")}</p>
                   <div style="text-align:{txt_align};">{_cta_btn(url, _t(lang, "btn_buy"), txt_align)}</div>
                   <p style="margin:8px 0 4px;font-size:13px;color:#555;font-style:italic;text-align:{txt_align};" {txt_dir}>{_t(lang, "urgency")}</p>
@@ -854,12 +878,14 @@ def send_daily_summary(user, free_products: list, pause_warnings: dict = None) -
         img_url = p.image_url or f"https://images-na.ssl-images-amazon.com/images/P/{p.asin}.01._SL100_.jpg"
         price_html = ""
         if getattr(p, "last_price", None):
-            price_note = _israel_cost_note(p, is_rtl, ils_prefix=is_rtl) or (
-                "(מחיר באמזון — לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl
-                else "(Amazon price, excl. shipping, taxes & fees)"
+            cost_note = _israel_cost_note(p, is_rtl, ils_prefix=is_rtl, html=True)
+            price_note = cost_note or (
+                "(לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl
+                else "(excl. shipping, taxes & fees)"
             )
+            price_label = "עלות המוצר" if is_rtl else "Item cost"
             price_disp = _ils_amount(p.last_price, ils_prefix=True) if is_rtl else p.last_price
-            price_html = f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {price_disp} <span style="font-size:13px;color:#888;font-weight:normal;">{price_note}</span></p>'
+            price_html = f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {price_label} <bdi>{price_disp}</bdi>{"," if cost_note else ""} <span style="font-size:13px;color:#888;font-weight:normal;">{price_note}</span></p>'
         checked_html = ""
         if getattr(p, "last_checked", None):
             p_checked = p.last_checked.strftime("%d/%m/%Y %H:%M")
@@ -1058,12 +1084,14 @@ def send_weekly_paid_summary(user, paid_products: list, history: dict | None = N
 
         price_html = ""
         if getattr(p, "last_price", None):
-            price_note = _israel_cost_note(p, is_rtl, ils_prefix=is_rtl) or (
-                "(מחיר באמזון — לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl
-                else "(Amazon price, excl. shipping, taxes & fees)"
+            cost_note = _israel_cost_note(p, is_rtl, ils_prefix=is_rtl, html=True)
+            price_note = cost_note or (
+                "(לא כולל משלוח, מיסים ועלויות שונות)" if is_rtl
+                else "(excl. shipping, taxes & fees)"
             )
+            price_label = "עלות המוצר" if is_rtl else "Item cost"
             price_disp = _ils_amount(p.last_price, ils_prefix=True) if is_rtl else p.last_price
-            price_html = f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {price_disp} <span style="font-size:13px;color:#888;font-weight:normal;">{price_note}</span></p>'
+            price_html = f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:#B12704;text-align:{txt_align};" {txt_dir}>💰 {price_label} <bdi>{price_disp}</bdi>{"," if cost_note else ""} <span style="font-size:13px;color:#888;font-weight:normal;">{price_note}</span></p>'
 
         trend_html = _price_trend(p, history.get(p.id), lang, txt_align, txt_dir)
 
