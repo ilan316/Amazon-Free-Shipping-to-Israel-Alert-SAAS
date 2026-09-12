@@ -895,6 +895,15 @@ _TRANSIENT_LOG_PATTERNS = (
     "httpx→playwright fallback",
     "final retry via curl_cffi",
 )
+# Lines that trip the keyword filter but carry no actionable signal, ever. Unlike the
+# transient patterns above these are never counted — there is nothing to recover from.
+_IGNORED_LOG_PATTERNS = (
+    # Teardown on an already-dead browser/context. The log line says "(ignored)" itself.
+    "browser shutdown error (ignored)",
+    # A state line, not an event: it re-fires every cycle for a stuck product, and the
+    # same products are already reported under DB Health → "שגיאות רצופות".
+    "consecutive errors.",
+)
 _ASIN_RE = re.compile(r"\[([A-Z0-9]{10})\]")
 # Matches the per-product result line from the check cycle (see run_check_cycle):
 #   [12/99] [B072JK9GX6] → PAID
@@ -916,6 +925,9 @@ def _triage_log_errors(logs):
     line in the window. The ordering check matters: without it a failure at the end of
     the window would be masked by a success from that morning.
 
+    _IGNORED_LOG_PATTERNS lines are dropped outright — they are structurally benign and
+    never counted in either bucket.
+
     Returns (errors, transient) as lists of truncated message strings.
     """
     keywords = ("error", "fatal", "crash", "exception", "unhandled", "timeout")
@@ -935,6 +947,8 @@ def _triage_log_errors(logs):
         message = entry.get("message", "")
         lowered = message.lower()
         if not any(k in lowered for k in keywords) or "NO_SHIP" in message:
+            continue
+        if any(p in lowered for p in _IGNORED_LOG_PATTERNS):
             continue
 
         recovered = False
