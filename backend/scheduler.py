@@ -17,6 +17,7 @@ import asyncio
 import httpx
 import logging
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from backend.models import SystemSetting
 
@@ -886,6 +887,69 @@ async def send_telegram(message: str) -> bool:
         return False
 
 
+# Log lines from the httpx→Playwright fallback path. On their own these say nothing —
+# the fallback exists precisely to recover from them. They only matter if the ASIN never
+# got a clean result afterwards.
+_TRANSIENT_LOG_PATTERNS = (
+    "curl_cffi exception",
+    "httpx→playwright fallback",
+    "final retry via curl_cffi",
+)
+_ASIN_RE = re.compile(r"\[([A-Z0-9]{10})\]")
+# Matches the per-product result line from the check cycle (see run_check_cycle):
+#   [12/99] [B072JK9GX6] → PAID
+_RESOLVED_RE = re.compile(r"\[\d+/\d+\] \[([A-Z0-9]{10})\] → (\S+)")
+
+
+def _parse_log_ts(raw: str):
+    """Railway log timestamp → aware datetime, or None if unparseable."""
+    try:
+        return datetime.fromisoformat((raw or "").replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _triage_log_errors(logs):
+    """Split keyword-matched log lines into real errors vs. recovered transient blips.
+
+    A transient line is suppressed only when the same ASIN has a later non-ERROR result
+    line in the window. The ordering check matters: without it a failure at the end of
+    the window would be masked by a success from that morning.
+
+    Returns (errors, transient) as lists of truncated message strings.
+    """
+    keywords = ("error", "fatal", "crash", "exception", "unhandled", "timeout")
+
+    # Latest clean result per ASIN
+    resolved: dict[str, datetime] = {}
+    for entry in logs:
+        m = _RESOLVED_RE.search(entry.get("message", ""))
+        if not m or m.group(2) in ("ERROR", "UNKNOWN"):
+            continue
+        ts = _parse_log_ts(entry.get("timestamp", ""))
+        if ts and ts > resolved.get(m.group(1), datetime.min.replace(tzinfo=timezone.utc)):
+            resolved[m.group(1)] = ts
+
+    errors, transient = [], []
+    for entry in logs:
+        message = entry.get("message", "")
+        lowered = message.lower()
+        if not any(k in lowered for k in keywords) or "NO_SHIP" in message:
+            continue
+
+        recovered = False
+        if any(p in lowered for p in _TRANSIENT_LOG_PATTERNS):
+            asin_match = _ASIN_RE.search(message)
+            ts = _parse_log_ts(entry.get("timestamp", ""))
+            if asin_match and ts:
+                clean_ts = resolved.get(asin_match.group(1))
+                recovered = bool(clean_ts and clean_ts > ts)
+
+        (transient if recovered else errors).append(message[:120])
+
+    return errors, transient
+
+
 async def run_telegram_report():
     """Daily Telegram status report — mirrors the GitHub Actions railway-monitor workflow.
     Queries Railway GraphQL for deployments + log errors in the last 24h."""
@@ -954,10 +1018,18 @@ async def run_telegram_report():
             all_logs = [l for l in all_logs if l.get("timestamp") and
                         datetime.fromisoformat(l["timestamp"].replace("Z", "+00:00")) >= since]
 
-            keywords = ["error", "fatal", "crash", "exception", "unhandled", "timeout"]
-            errors_found = [l.get("message", "")[:120] for l in all_logs
-                            if any(k in l.get("message", "").lower() for k in keywords)
-                            and "NO_SHIP" not in l.get("message", "")]
+            # Pagination re-fetches from the last page's timestamp, so page boundaries
+            # repeat lines. Drop exact duplicates before counting anything.
+            seen = set()
+            deduped = []
+            for l in all_logs:
+                key = (l.get("timestamp"), l.get("message"))
+                if key not in seen:
+                    seen.add(key)
+                    deduped.append(l)
+            all_logs = deduped
+
+            errors_found, transient_found = _triage_log_errors(all_logs)
 
         # DB health checks
         db_issues = []
@@ -1001,6 +1073,9 @@ async def run_telegram_report():
         has_warning = bool(failed or errors_found or has_db_issues)
         status = "WARNING" if has_warning else "OK"
 
+        # Kept visible even at OK — a spike in recovered blips is itself a signal.
+        transient_line = f"Transient (recovered): {len(transient_found)}\n" if transient_found else ""
+
         if not has_warning:
             message = (
                 f"Railway Monitor - aware-wisdom\n\n"
@@ -1009,6 +1084,7 @@ async def run_telegram_report():
                 f"Total logs checked: {len(all_logs)}\n"
                 f"Deployments: {len(recent)} total, 0 failed\n"
                 f"Errors in logs: None\n"
+                f"{transient_line}"
                 f"{db_section}\n"
                 f"Time: {current_time}"
             )
@@ -1021,13 +1097,17 @@ async def run_telegram_report():
                 f"Total logs checked: {len(all_logs)}\n"
                 f"Deployments: {len(recent)} total, {len(failed)} failed\n"
                 f"Errors in logs: {len(errors_found)}\n"
+                f"{transient_line}"
                 f"Top issues:\n{top_errors}\n"
                 f"{db_section}\n"
                 f"Time: {current_time}"
             )
 
         await send_telegram(message)
-        logger.info(f"=== Telegram report sent — {len(all_logs)} logs checked, {len(errors_found)} errors, db_issues={has_db_issues} ===")
+        logger.info(
+            f"=== Telegram report sent — {len(all_logs)} logs checked, "
+            f"{len(errors_found)} errors, {len(transient_found)} transient, db_issues={has_db_issues} ==="
+        )
 
     except Exception as e:
         msg = f"Railway Monitor - aware-wisdom\n\nStatus: ERROR\nFailed: {str(e)}\nTime: {current_time}"
