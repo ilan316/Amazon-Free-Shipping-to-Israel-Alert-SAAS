@@ -282,6 +282,7 @@ async def backfill_hebrew(db: Annotated[AsyncSession, Depends(get_db)]):
 
     import anthropic
     from backend.blog_utils import claude_text
+    from backend.name_he import MAX_TOKENS, build_prompt, sanitize_name_he
     client = anthropic.Anthropic(api_key=api_key)
 
     result = await db.execute(
@@ -293,6 +294,7 @@ async def backfill_hebrew(db: Annotated[AsyncSession, Depends(get_db)]):
     products = result.scalars().all()
 
     updated = 0
+    rejected = 0
     for p in products:
         if not p.name:
             continue
@@ -300,19 +302,26 @@ async def backfill_hebrew(db: Annotated[AsyncSession, Depends(get_db)]):
             msg = await asyncio.to_thread(
                 lambda name=p.name: client.messages.create(
                     model="claude-sonnet-5",
-                    max_tokens=200,
+                    max_tokens=MAX_TOKENS,
                     thinking={"type": "disabled"},
-                    messages=[{"role": "user", "content": f"תרגם לעברית קצרה ומובנת (עד 7 מילים, שמור את שם המותג, ללא מרכאות): {name}"}],
+                    messages=[{"role": "user", "content": build_prompt(name)}],
                 )
             )
-            p.name_he = claude_text(msg).strip()
+            # Same gate as the scheduled backfill — a rejected reply leaves
+            # name_he empty so the next run retries it.
+            name_he = sanitize_name_he(claude_text(msg))
+            if not name_he:
+                rejected += 1
+                logger.warning(f"[{p.asin}] Hebrew name rejected by gate — will retry next run.")
+                continue
+            p.name_he = name_he
             updated += 1
         except Exception as e:
             logger.warning(f"[{p.asin}] Hebrew name generation failed: {e}")
 
     await db.commit()
-    logger.info(f"backfill-hebrew: updated {updated}/{len(products)} products")
-    return {"updated": updated, "total_missing": len(products)}
+    logger.info(f"backfill-hebrew: updated {updated}/{len(products)} products ({rejected} rejected)")
+    return {"updated": updated, "rejected": rejected, "total_missing": len(products)}
 
 
 class HubWarningsRequest(BaseModel):
