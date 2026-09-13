@@ -875,7 +875,7 @@ def send_daily_summary(user, free_products: list, pause_warnings: dict = None) -
     for i, (p, custom_name) in enumerate(free_products):
         name = names[i]
         url = _tracking_url(user.id, p.asin)
-        img_url = p.image_url or f"https://images-na.ssl-images-amazon.com/images/P/{p.asin}.01._SL100_.jpg"
+        img_url = p.image_url or ""
         price_html = ""
         if getattr(p, "last_price", None):
             cost_note = _israel_cost_note(p, is_rtl, ils_prefix=is_rtl, html=True)
@@ -898,9 +898,9 @@ def send_daily_summary(user, free_products: list, pause_warnings: dict = None) -
             else:
                 warn_txt = "Will be paused tomorrow if not clicked" if days_left == 1 else f"Will be paused in {days_left} days if not clicked"
             warning_html = f'<p style="margin:0 0 8px;font-size:12px;font-weight:bold;color:#E47911;text-align:{txt_align};" {txt_dir}>⏰ {warn_txt}</p>'
-        product_rows += f"""
-        <table width="100%" cellpadding="0" cellspacing="0"
-               style="background:#ffffff;border:1px solid #e8e8e8;border-radius:10px;margin-bottom:12px;">
+        # No image in the DB — drop the row entirely. An empty src renders as a
+        # broken-image icon in most mail clients, which looks worse than no image.
+        img_row = f"""
           <tr>
             <td class="prod-img-td" style="padding:14px 16px 4px;text-align:{txt_align};">
               <a href="{url}">
@@ -909,7 +909,11 @@ def send_daily_summary(user, free_products: list, pause_warnings: dict = None) -
                      alt="{name}">
               </a>
             </td>
-          </tr>
+          </tr>""" if img_url else ""
+        product_rows += f"""
+        <table width="100%" cellpadding="0" cellspacing="0"
+               style="background:#ffffff;border:1px solid #e8e8e8;border-radius:10px;margin-bottom:12px;">
+          {img_row}
           <tr>
             <td valign="top" style="padding:6px 16px 14px;">
               <p class="product-name" style="margin:0 0 4px;font-size:15px;font-weight:bold;line-height:1.4;text-align:{txt_align};word-wrap:break-word;overflow-wrap:break-word;" {txt_dir}>

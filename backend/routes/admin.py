@@ -464,7 +464,7 @@ async def list_products(
             # unlike the user dashboard, so a bad extraction is visible rather than hidden.
             "israel_extra_cost": p.israel_extra_cost or "",
             "israel_cost_kind": p.israel_cost_kind or "",
-            "image_url": p.image_url or f"https://images-na.ssl-images-amazon.com/images/P/{p.asin}.01._SL100_.jpg",
+            "image_url": p.image_url or "",
             "screenshot_path": os.path.basename(p.screenshot_path) if p.screenshot_path else None,
             "status_since": p.status_since.isoformat() if p.status_since else None,
             "notification_count": notif_map.get(p.id, 0),

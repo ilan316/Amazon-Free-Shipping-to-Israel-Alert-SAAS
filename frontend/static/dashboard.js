@@ -535,7 +535,9 @@ function _catalogCard(p, atLimit) {
          onclick="addSuggested('${p.asin}', this)">➕ עקוב</button>`;
   return `
     <div style="border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;background:var(--surface);display:flex;flex-direction:column;">
-      <img src="${_escAttr(p.image)}" alt="" loading="lazy" style="width:100%;height:110px;object-fit:contain;margin-bottom:8px;">
+      ${p.image
+        ? `<img src="${_escAttr(p.image)}" alt="" loading="lazy" style="width:100%;height:110px;object-fit:contain;margin-bottom:8px;">`
+        : `<div style="width:100%;height:110px;margin-bottom:8px;border-radius:8px;background:var(--surface-2,#f4f4f5);"></div>`}
       <div style="font-size:0.78rem;line-height:1.35;min-height:4.05em;margin-bottom:6px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;overflow:hidden;">${_escAttr(name)}</div>
       ${price}
       <div style="font-size:0.72rem;color:var(--success);font-weight:600;margin-bottom:2px;">משלוח חינם ✓</div>

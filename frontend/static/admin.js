@@ -825,7 +825,9 @@ function renderAdminProducts() {
     <tr>
       <td style="text-align:center;"><input type="checkbox" class="product-checkbox" value="${p.id}" onchange="updateBulkDeleteBtn()"></td>
       <td class="ltr"><a href="${p.url}" target="_blank">${p.asin}</a></td>
-      <td style="text-align:center;padding:3px 6px;"><img src="${p.image_url}" alt="" width="60" height="60" style="object-fit:contain;border-radius:6px;border:1px solid #eee;display:block;" onerror="this.style.display='none'"></td>
+      <td style="text-align:center;padding:3px 6px;">${p.image_url
+        ? `<img src="${p.image_url}" alt="" width="60" height="60" style="object-fit:contain;border-radius:6px;border:1px solid #eee;display:block;" onerror="this.style.display='none'">`
+        : `<span title="אין תמונה ב-DB" style="display:block;width:60px;height:60px;line-height:60px;border-radius:6px;border:1px dashed #ddd;color:#bbb;font-size:11px;">—</span>`}</td>
       <td class="truncate">${p.name || "—"}</td>
       <td style="padding:10px 6px;">${p.paused_watchers > 0 && p.paused_watchers === p.watchers
         ? '<span class="status-badge" style="background:#f0f0f0;color:#888;border:1px solid #ccc;" title="כל העוקבים של מוצר זה בהשהייה — לא נעשית בדיקה">⏸ בהשהייה</span>'
