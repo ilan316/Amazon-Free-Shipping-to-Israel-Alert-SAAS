@@ -128,6 +128,13 @@ def reschedule_check_job(hour: int, minute: int):
     logger.info(f"global_check scheduled daily at {hour:02d}:{minute:02d} Israel time")
 
 _db_url = os.environ.get("DATABASE_URL", "")
+# ה-jobstore של APScheduler סינכרוני ולכן משתמש ב-psycopg2, לא ב-asyncpg של
+# database.py. מ-SQLAlchemy 2.1 ברירת המחדל של postgresql:// היא psycopg v3
+# (שלא מותקן) — לכן הדרייבר מצוין במפורש, בדיוק כמו הנרמול ב-database.py.
+if _db_url.startswith("postgresql://"):
+    _db_url = _db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+elif _db_url.startswith("postgres://"):
+    _db_url = _db_url.replace("postgres://", "postgresql+psycopg2://", 1)
 _jobstores = {"default": SQLAlchemyJobStore(url=_db_url)} if _db_url else {}
 scheduler = AsyncIOScheduler(timezone="UTC", jobstores=_jobstores)
 
