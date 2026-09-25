@@ -405,13 +405,9 @@ def build_post_html(product: dict, content: dict, israel_price: float | None, am
             "brand": {"@type": "Brand", "name": product.get("brand") or product["title"].split()[0]},
             "category": product.get("category", ""),
             "sku": asin,
-            "offers": {
-                "@type": "Offer",
-                "url": aff_url,
-                "priceCurrency": "ILS",
-                "availability": "https://schema.org/InStock",
-                "seller": {"@type": "Organization", "name": "Amazon"},
-            },
+            "image": image,
+            # אין offers בכוונה: הדף סטטי ומחירי אמזון זזים יומית, ו-Offer בלי price
+            # הוא שגיאה קריטית ב-Product snippets. מחיר תקוע יהיה גרוע יותר.
         },
         {
             "@context": "https://schema.org",
