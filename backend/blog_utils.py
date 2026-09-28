@@ -291,7 +291,8 @@ async def _parse_claude_json(raw: str, client: "anthropic.AsyncAnthropic", _atte
 
 
 def build_post_html(product: dict, content: dict, israel_price: float | None, amazon_price: float, min_order_49: bool = False, voltage_warning: bool = False) -> str:
-    partner_tag = os.getenv("AMAZON_AFFILIATE_TAG") or os.getenv("AMAZON_PARTNER_TAG", "amzfreeil-20")
+    # Tracking ID נפרד לדפי סקירה (פילוח בדוח Associates); fallback לתג הראשי
+    partner_tag = os.getenv("REVIEW_AFFILIATE_TAG") or os.getenv("AMAZON_AFFILIATE_TAG") or os.getenv("AMAZON_PARTNER_TAG", "amzfreeil-20")
     today = date.today()
     today_he = f"{today.day} ב{MONTHS_HE[today.month - 1]} {today.year}"
     today_iso = today.isoformat()
@@ -770,7 +771,8 @@ async def add_to_prices_page(
         sha = data["sha"]
         current = base64.b64decode(data["content"]).decode("utf-8")
 
-    partner_tag = os.getenv("AMAZON_AFFILIATE_TAG") or os.getenv("AMAZON_PARTNER_TAG", "amzfreeil-20")
+    # Tracking ID נפרד ל-prices.html (פילוח בדוח Associates); fallback לתג הראשי
+    partner_tag = os.getenv("PRICES_AFFILIATE_TAG") or os.getenv("AMAZON_AFFILIATE_TAG") or os.getenv("AMAZON_PARTNER_TAG", "amzfreeil-20")
     today_display = date.today().strftime("%d/%m/%Y")
     aff_url = f"https://www.amazon.com/dp/{asin}?tag={partner_tag}"
     # הצג מחיר שלם בלי ".0" (91 במקום 91.0)
