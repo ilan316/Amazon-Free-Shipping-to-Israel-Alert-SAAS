@@ -1302,13 +1302,22 @@ async def _send_telegram_product_message(product: Product) -> bool:
     caption = await asyncio.to_thread(_telegram_caption, product)
     image_url = product.image_url
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(timeout=30) as client:
             if image_url:
-                resp = await client.post(
-                    f"https://api.telegram.org/bot{token}/sendPhoto",
-                    data={"chat_id": chat_id, "photo": image_url,
-                          "caption": caption, "parse_mode": "Markdown"},
-                )
+                # Padded square first: Telegram mobile center-crops tall raw images.
+                # Fall back to the raw URL so a padding failure never drops the post.
+                app_base_url = os.environ.get("APP_BASE_URL", "https://app.amzfreeil.com").rstrip("/")
+                padded_url = f"{app_base_url}/tg-image/{product.asin}.jpg"
+                for photo in (padded_url, image_url):
+                    resp = await client.post(
+                        f"https://api.telegram.org/bot{token}/sendPhoto",
+                        data={"chat_id": chat_id, "photo": photo,
+                              "caption": caption, "parse_mode": "Markdown"},
+                    )
+                    if resp.status_code == 200:
+                        break
+                    logger.warning(f"[telegram_product] sendPhoto failed for {product.asin} "
+                                   f"with {photo}: {resp.text[:200]}")
             else:
                 resp = await client.post(
                     f"https://api.telegram.org/bot{token}/sendMessage",

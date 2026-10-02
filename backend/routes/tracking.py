@@ -242,6 +242,23 @@ async def ig_image(asin: str, db: Annotated[AsyncSession, Depends(get_db)]):
                                      name=product.name_he, price=product.last_price)
 
 
+@router.get("/tg-image/{asin}.jpg", include_in_schema=False)
+async def tg_image(asin: str, db: Annotated[AsyncSession, Depends(get_db)]):
+    """Plain white-padded square of a scanner product image, for Telegram. The mobile
+    app caps photo height and center-crops tall images (bottles lose lid and base),
+    so pad instead. No brand bars — the caption already carries name and price."""
+    import re
+    from backend.models import Product
+
+    if not re.fullmatch(r"[A-Z0-9]{10}", asin.upper()):
+        return Response(status_code=404)
+    result = await db.execute(select(Product).where(Product.asin == asin.upper()))
+    product = result.scalar_one_or_none()
+    if not product or not product.image_url:
+        return Response(status_code=404)
+    return await _normalized_ig_jpeg(product.image_url, f"tg:{asin}")
+
+
 @router.get("/track/click", include_in_schema=False)
 async def track_click(
     request: Request,
