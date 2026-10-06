@@ -908,6 +908,12 @@ _ASIN_RE = re.compile(r"\[([A-Z0-9]{10})\]")
 # Matches the per-product result line from the check cycle (see run_check_cycle):
 #   [12/99] [B072JK9GX6] → PAID
 _RESOLVED_RE = re.compile(r"\[\d+/\d+\] \[([A-Z0-9]{10})\] → (\S+)")
+# Checks outside the cycle (e.g. telegram_product) never emit the line above — only the
+# checker's own result line:  [B0H2VPT5Y9] httpx: PAID | price=...
+# Statuses are whitelisted: "httpx: productTitle not found" must not count as a result.
+_CHECKER_RESOLVED_RE = re.compile(
+    r"\[([A-Z0-9]{10})\] (?:httpx|Playwright): (FREE|PAID|NO_SHIP|NOT_FOUND)\b"
+)
 
 
 def _parse_log_ts(raw: str):
@@ -935,7 +941,8 @@ def _triage_log_errors(logs):
     # Latest clean result per ASIN
     resolved: dict[str, datetime] = {}
     for entry in logs:
-        m = _RESOLVED_RE.search(entry.get("message", ""))
+        message = entry.get("message", "")
+        m = _RESOLVED_RE.search(message) or _CHECKER_RESOLVED_RE.search(message)
         if not m or m.group(2) in ("ERROR", "UNKNOWN"):
             continue
         ts = _parse_log_ts(entry.get("timestamp", ""))
