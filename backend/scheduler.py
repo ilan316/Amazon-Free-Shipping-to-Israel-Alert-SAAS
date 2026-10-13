@@ -167,26 +167,35 @@ async def run_global_check_cycle():
             logger.warning("Location refresh failed — checks may show USD prices instead of ILS")
     async with AsyncSessionLocal() as db:
         now = datetime.now(timezone.utc)
+        active_tracker = or_(
+            UserProduct.is_paused == False,
+            (UserProduct.paused_until != None) & (UserProduct.paused_until <= now),
+        )
+
+        def _tracked_ids(tracker_filter):
+            return (
+                select(UserProduct.product_id)
+                .join(User, UserProduct.user_id == User.id)
+                .where(
+                    User.is_active == True,
+                    User.vacation_mode == False,
+                    User.is_admin == False,
+                    tracker_filter,
+                )
+                .distinct()
+            )
+
+        # Auto-paused products are still checked (weekly, below) so run_daily_summary
+        # can see them go back to PAID/NO_SHIP and release the pause. Without this
+        # their status stays frozen at FREE and the pause never ends.
         result = await db.execute(
             select(Product).where(
                 Product.last_status != ShippingStatus.NOT_FOUND.value,
-                Product.id.in_(
-                    select(UserProduct.product_id)
-                    .join(User, UserProduct.user_id == User.id)
-                    .where(
-                        User.is_active == True,
-                        User.vacation_mode == False,
-                        User.is_admin == False,
-                        or_(
-                            UserProduct.is_paused == False,
-                            (UserProduct.paused_until != None) & (UserProduct.paused_until <= now),
-                        ),
-                    )
-                    .distinct()
-                )
+                Product.id.in_(_tracked_ids(or_(active_tracker, UserProduct.paused_reason == "auto"))),
             )
         )
         products = result.scalars().all()
+        actively_tracked = set((await db.execute(_tracked_ids(active_tracker))).scalars().all())
 
         if not products:
             logger.info("No products to check.")
@@ -207,6 +216,9 @@ async def run_global_check_cycle():
                         error_message=f"Product blocked after {MAX_CONSECUTIVE_ERRORS} consecutive errors — no longer being checked.")))
                     product.consecutive_errors += 1
                     await db.commit()
+            elif (product.id not in actively_tracked and product.last_checked
+                  and now - product.last_checked < timedelta(days=7)):
+                logger.debug(f"[{product.asin}] Skipping — auto-paused only, checked within 7 days")
             elif product.last_status in ("PAID", "NO_SHIP") and product.status_since:
                 # Alternating check schedule:
                 # PAID:    7 days check / 7 days skip  (cycle=14)
@@ -325,6 +337,22 @@ async def run_daily_summary():
         if resumed:
             await db.commit()
             logger.info(f"Auto-resumed {resumed} product(s) whose pause window expired")
+
+        # Release auto-pauses once the product is no longer free: the pause was about
+        # ignored FREE emails, and when the product turns FREE again _update_product
+        # resets free_since, so the user is notified and the 5-day countdown restarts.
+        released = (await db.execute(text("""
+            UPDATE user_products up
+               SET is_paused = FALSE, paused_reason = NULL
+              FROM products p
+             WHERE p.id = up.product_id
+               AND up.is_paused = TRUE
+               AND up.paused_reason = 'auto'
+               AND p.last_status IN ('PAID', 'NO_SHIP')
+        """))).rowcount
+        if released:
+            await db.commit()
+            logger.info(f"Auto-released {released} auto-paused product(s) no longer free")
 
         # Auto-pause: countdown = max(free_since, added_at, last_click_at). A click resets
         # the 5-day window.

@@ -303,7 +303,7 @@ function renderProducts() {
 
     const badgeHtml = p.is_paused
       ? (isAutoPaused
-          ? '<span class="status-badge badge-auto-paused">⏸ הושהה אוטומטית <button class="btn-info" onclick="showInfoPopup(\'המוצר היה חינם 5 ימים ולא לחצת על הקישור — המערכת השהתה את המעקב אוטומטית. לחץ ▶ חדש מעקב כדי לחזור לעקוב.\')">?</button></span>'
+          ? '<span class="status-badge badge-auto-paused">⏸ הושהה אוטומטית <button class="btn-info" onclick="showInfoPopup(\'המוצר היה חינם 5 ימים ולא לחצת על הקישור — המערכת השהתה את המעקב אוטומטית. לחץ ▶ חדש מעקב כדי לחזור לעקוב. בינתיים נמשיך לבדוק פעם בשבוע: אם המוצר יחזור להיות בתשלום, המעקב יתחדש לבד ותקבל מייל כשיחזור להיות חינם.\')">?</button></span>'
           : '<span class="status-badge badge-paused" title="המוצר בהשהייה ידנית">⏸ מושהה</span>')
       : (isChecking || p.last_status === 'UNKNOWN' || p.last_status === 'ERROR')
         ? '<span class="status-badge badge-UNKNOWN">טרם נבדק</span>'
