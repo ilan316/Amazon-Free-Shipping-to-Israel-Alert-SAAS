@@ -82,7 +82,9 @@ async def get_stats(
         func.count().filter(User.is_admin == True).label("total_admins"),
         func.count().filter(and_(User.is_admin == False, User.is_verified == False)).label("unverified"),
     ).select_from(User)
-    prod_stmt = select(func.count()).select_from(Product).where(Product.source == "user")
+    prod_stmt = select(func.count()).select_from(Product).where(
+        or_(Product.source == "user", Product.id.in_(select(UserProduct.product_id).distinct()))
+    )
     notif_stmt = select(func.count()).select_from(NotificationLog).where(NotificationLog.sent_at >= today)
 
     user_row, total_products, notifs_today = await asyncio.gather(
@@ -402,7 +404,14 @@ async def list_products(
     admin: Annotated[User, Depends(get_current_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    result = await db.execute(select(Product).where(Product.source == "user").order_by(Product.last_checked.desc().nullslast()))
+    # Scanner sync stamps source='scanner' on any ASIN it finds, including ones a user
+    # tracks — so include every tracked product, not just source='user'.
+    tracked = select(UserProduct.product_id).distinct()
+    result = await db.execute(
+        select(Product)
+        .where(or_(Product.source == "user", Product.id.in_(tracked)))
+        .order_by(Product.last_checked.desc().nullslast())
+    )
     products = result.scalars().all()
 
     # Batch-fetch watcher counts (one query instead of N)
