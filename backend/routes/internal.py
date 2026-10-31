@@ -58,13 +58,23 @@ async def sync_products(
     """
     Full-replace sync from local scanner.
     - Upserts all incoming products with source='scanner', last_status='FREE'.
+      For ASINs a user tracks, only content fields are refreshed — status, price,
+      last_checked and error count belong to the checker.
     - Deletes scanner products whose ASIN is not in the incoming list.
     """
     now = datetime.now(timezone.utc)
     incoming_asins = {p.asin for p in body.products}
 
+    # The scanner's FREE comes from a catalog crawl up to 3 days old; for a tracked
+    # product it would overwrite the checker's verdict and could trigger a false
+    # FREE email in the next daily summary.
+    tracked_asins = set((await db.execute(
+        select(Product.asin).where(Product.id.in_(select(UserProduct.product_id)))
+    )).scalars().all())
+
     added = 0
     synced = 0
+    kept_status = 0
 
     for p in body.products:
         url = p.url or f"https://www.amazon.com/dp/{p.asin}"
@@ -85,23 +95,26 @@ async def sync_products(
             amazon_category=p.amazon_category or None,
             description=p.description or None,
         )
-        stmt = stmt.on_conflict_do_update(
-            index_elements=["asin"],
-            set_={
+        set_ = {
+            "source": "scanner",
+            "image_url": stmt.excluded.image_url,
+            "image_urls": stmt.excluded.image_urls,
+            "name_he": func.left(stmt.excluded.name_he, 290),
+            "amazon_category": stmt.excluded.amazon_category,
+            "description": stmt.excluded.description,
+        }
+        if p.asin in tracked_asins:
+            kept_status += 1
+        else:
+            set_.update({
                 "name": stmt.excluded.name,
                 "url": stmt.excluded.url,
                 "last_status": "FREE",
                 "last_checked": now,
-                "source": "scanner",
                 "consecutive_errors": 0,
                 "last_price": stmt.excluded.last_price,
-                "image_url": stmt.excluded.image_url,
-                "image_urls": stmt.excluded.image_urls,
-                "name_he": func.left(stmt.excluded.name_he, 290),
-                "amazon_category": stmt.excluded.amazon_category,
-                "description": stmt.excluded.description,
-            },
-        )
+            })
+        stmt = stmt.on_conflict_do_update(index_elements=["asin"], set_=set_)
         result = await db.execute(stmt)
         if result.rowcount and result.inserted_primary_key:
             added += 1
@@ -141,8 +154,8 @@ async def sync_products(
 
     await db.commit()
 
-    logger.info(f"sync-products: synced={synced}, removed={removed}, kept_tracked={kept}")
-    return {"synced": synced, "removed": removed, "kept_tracked": kept}
+    logger.info(f"sync-products: synced={synced}, removed={removed}, kept_tracked={kept}, kept_checker_status={kept_status}")
+    return {"synced": synced, "removed": removed, "kept_tracked": kept, "kept_checker_status": kept_status}
 
 
 @router.get("/product-stats", dependencies=[Depends(_require_secret)])
