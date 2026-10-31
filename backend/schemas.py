@@ -81,6 +81,21 @@ class PriceTrendMove(BaseModel):
     delta: str   # two decimals, same formatting as the weekly email
 
 
+class HistoryPeriod(BaseModel):
+    """One stretch in a single shipping status, as built by backend.notifier.summarize_history()."""
+    status: str
+    start: datetime
+    end: datetime | None = None   # None = still in this status
+    price: str | None = None      # price when the period began
+
+
+class ProductHistory(BaseModel):
+    since: datetime
+    pct: dict[str, int]           # share of time since `since`, per status
+    free_entries: int
+    periods: list[HistoryPeriod]
+
+
 class ProductResponse(BaseModel):
     asin: str
     name: str
@@ -106,6 +121,8 @@ class ProductResponse(BaseModel):
     # Week-over-week movements. Empty whenever there is no history row old enough
     # to compare against — the normal state for a product tracked under a week.
     trend: list[PriceTrendMove] = []
+    # Status periods since price_history began (08/09/26) or since the first check.
+    history: ProductHistory | None = None
 
     model_config = {"from_attributes": True}
 

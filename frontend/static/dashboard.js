@@ -93,6 +93,65 @@ function priceTrendLine(p) {
   }).join('');
 }
 
+// Status history (backend/notifier.py summarize_history). Kept open across re-renders —
+// polling redraws every card, and a list that snaps shut mid-read is worse than none.
+const openHistory = new Set();
+
+const HISTORY_SHORT = { FREE: 'חינם', PAID: 'בתשלום', NO_SHIP: 'לא נשלח', NOT_FOUND: 'לא קיים' };
+
+function _fmtDuration(ms) {
+  const days = ms / 86400000;
+  if (days >= 1) return `${days.toFixed(days < 10 ? 1 : 0)} ימים`;
+  const hours = Math.max(1, Math.round(ms / 3600000));
+  return `${hours} שעות`;
+}
+
+function historyLine(p) {
+  const h = p.history;
+  if (!h) return '';
+  const isOpen = openHistory.has(p.asin);
+  const since = new Date(h.since);
+  // Under three days the percentage is mostly "how long ago was it added" — leave it out.
+  let summary = 'היסטוריית משלוח';
+  if (Date.now() - since >= 3 * 86400000) {
+    const sinceStr = since.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' });
+    summary = `מאז ${sinceStr}: חינם ${h.pct.FREE || 0}% מהזמן`;
+    if (h.free_entries > 0) {
+      summary += ` · עבר לחינם ${h.free_entries === 1 ? 'פעם אחת' : `${h.free_entries} פעמים`}`;
+    }
+  }
+  const title = 'מבוסס על הבדיקות שלנו — מוצר בתשלום או שלא נשלח לארץ נבדק לסירוגין, כך שחלון קצר של משלוח חינם עלול לא להירשם';
+  return `
+    <div class="card-row-history" style="margin-top:4px;font-size:12px;">
+      <button type="button" onclick="toggleHistory('${p.asin}')" title="${title}"
+        style="background:none;border:none;padding:0;cursor:pointer;color:#555;font-size:12px;font-family:inherit;text-align:right;">
+        📊 ${summary} ${isOpen ? '▴' : '▾'}
+      </button>
+      ${isOpen ? historyPanel(h) : ''}
+    </div>`;
+}
+
+function historyPanel(h) {
+  const rows = [...h.periods].reverse().map(per => {
+    const start = new Date(per.start);
+    const end = per.end ? new Date(per.end) : null;
+    const range = `${formatDate(per.start)} — ${end ? formatDate(per.end) : 'עד עכשיו'}`;
+    const price = per.price ? ` · <bdi>${escHtml(formatPrice(per.price))}</bdi>` : '';
+    return `
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:4px 0;border-top:1px solid #f0f0f0;">
+        <span class="status-badge badge-${escHtml(per.status)}" style="padding:2px 8px;font-size:11px;">${escHtml(HISTORY_SHORT[per.status] || per.status)}</span>
+        <span style="color:#555;">${range}</span>
+        <span style="color:#888;">(${_fmtDuration((end || new Date()) - start)})${price}</span>
+      </div>`;
+  }).join('');
+  return `<div style="margin-top:4px;padding:2px 8px;background:#fafafa;border-radius:6px;">${rows}</div>`;
+}
+
+function toggleHistory(asin) {
+  if (openHistory.has(asin)) openHistory.delete(asin); else openHistory.add(asin);
+  renderProducts();
+}
+
 function nextCheckLabel(p) {
   if (!p.status_since || !['PAID', 'NO_SHIP'].includes(p.last_status)) return null;
   const cycle = p.last_status === 'PAID' ? 14 : 21;
@@ -345,6 +404,7 @@ function renderProducts() {
           ${costLine || `<span style="color:#999;font-size:12px;margin-right:4px;">${p.last_status === 'FREE' ? '(כולל משלוח חינם — לא כולל מכס ומע"מ במידה וחל)' : '(לא כולל משלוח, מיסים ועלויות שונות)'}</span>`}
           ${priceTrendLine(p)}
         </div>` : ''}
+        ${historyLine(p)}
 
         <!-- שורה 3: סטטוס | השהה | בדוק | הסר -->
         ${isAutoPaused ? `<div style="font-size:0.78rem;color:#e65100;margin-bottom:4px;">הושהה אוטומטית — לא לחצת על הקישור 5 ימים</div>` : ''}

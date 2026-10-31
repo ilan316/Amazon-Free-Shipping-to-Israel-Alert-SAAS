@@ -851,10 +851,84 @@ function renderAdminProducts() {
         ${p.raw_text ? p.raw_text.substring(0, 40) + (p.raw_text.length > 40 ? '…' : '') : '—'}
       </td>
       <td style="text-align:center;">
-        <button id="chk-${p.id}" class="btn-outline" style="padding:3px 8px;font-size:0.78rem;" title="הרץ בדיקה" onclick="checkSingleProduct(${p.id})">▶</button>
+        <span style="display:inline-flex;gap:4px;">
+          <button id="chk-${p.id}" class="btn-outline" style="padding:3px 8px;font-size:0.78rem;" title="הרץ בדיקה" onclick="checkSingleProduct(${p.id})">▶</button>
+          <button class="btn-outline" style="padding:3px 8px;font-size:0.78rem;" title="היסטוריית סטטוס" onclick="toggleProductHistory(${p.id})">📊</button>
+        </span>
       </td>
     </tr>
+    <tr id="prod-hist-${p.id}" style="display:none;"><td colspan="12" style="background:var(--bg);padding:10px 14px;"></td></tr>
   `).join("");
+}
+
+async function toggleProductHistory(productId) {
+  const expandRow = document.getElementById(`prod-hist-${productId}`);
+  if (!expandRow) return;
+  if (expandRow.dataset.loaded === '1') {
+    expandRow.style.display = expandRow.style.display === 'none' ? '' : 'none';
+    return;
+  }
+  expandRow.style.display = '';
+  const cell = expandRow.querySelector('td');
+  cell.innerHTML = '<span style="color:var(--text-muted);font-size:0.85rem;">טוען...</span>';
+
+  const res = await apiFetch(`/admin/products/${productId}/history`);
+  if (!res || !res.ok) {
+    cell.innerHTML = '<span style="color:var(--error);font-size:0.85rem;">שגיאה בטעינת היסטוריה</span>';
+    return;
+  }
+  const data = await res.json();
+  expandRow.dataset.loaded = '1';
+  const s = data.summary;
+  if (!s) {
+    cell.innerHTML = '<span style="color:var(--text-muted);font-size:0.85rem;">אין היסטוריה (המוצר טרם נבדק בהצלחה)</span>';
+    return;
+  }
+
+  const fmtDur = ms => { const d = ms / 86400000; return d >= 1 ? `${d.toFixed(1)} ימים` : `${Math.max(1, Math.round(ms / 3600000))} שעות`; };
+  const pct = Object.entries(s.pct).map(([st, v]) => `${statusLabel(st)} ${v}%`).join(' · ');
+  const periods = [...s.periods].reverse().map(per => `
+    <tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:4px 8px;"><span class="status-badge badge-${per.status}">${statusLabel(per.status)}</span></td>
+      <td class="ltr" style="padding:4px 8px;">${formatDate(per.start)}</td>
+      <td class="ltr" style="padding:4px 8px;">${per.end ? formatDate(per.end) : 'עד עכשיו'}</td>
+      <td style="padding:4px 8px;">${fmtDur(new Date(per.end || Date.now()) - new Date(per.start))}</td>
+      <td class="ltr" style="padding:4px 8px;">${formatPrice(per.price) || '—'}</td>
+    </tr>`).join('');
+  const raw = data.rows.map(r => `
+    <tr style="border-bottom:1px solid var(--border);">
+      <td class="ltr" style="padding:3px 8px;">${formatDate(r.recorded_at)}</td>
+      <td style="padding:3px 8px;">${statusLabel(r.status)}</td>
+      <td class="ltr" style="padding:3px 8px;">${formatPrice(r.price) || '—'}</td>
+      <td class="ltr" style="padding:3px 8px;">${r.israel_extra_cost ? `${r.israel_extra_cost} (${r.israel_cost_kind || '?'})` : '—'}</td>
+    </tr>`).join('');
+
+  cell.innerHTML = `
+    <div style="font-size:0.82rem;margin-bottom:8px;">
+      📊 <strong>מאז ${formatDate(s.since)}:</strong> ${pct} · כניסות לחינם: ${s.free_entries}
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.82rem;min-width:420px;">
+        <thead><tr style="color:var(--text-muted);border-bottom:2px solid var(--border);">
+          <th style="text-align:right;padding:4px 8px;">סטטוס</th><th style="text-align:right;padding:4px 8px;">מ-</th>
+          <th style="text-align:right;padding:4px 8px;">עד</th><th style="text-align:right;padding:4px 8px;">משך</th>
+          <th style="text-align:right;padding:4px 8px;">מחיר בתחילה</th>
+        </tr></thead>
+        <tbody>${periods}</tbody>
+      </table>
+    </div>
+    <details style="margin-top:8px;font-size:0.8rem;">
+      <summary style="cursor:pointer;color:var(--text-muted);">שורות גולמיות (${data.rows.length})</summary>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;min-width:420px;">
+          <thead><tr style="color:var(--text-muted);">
+            <th style="text-align:right;padding:3px 8px;">נרשם</th><th style="text-align:right;padding:3px 8px;">סטטוס</th>
+            <th style="text-align:right;padding:3px 8px;">מחיר</th><th style="text-align:right;padding:3px 8px;">משלוח לישראל</th>
+          </tr></thead>
+          <tbody>${raw}</tbody>
+        </table>
+      </div>
+    </details>`;
 }
 
 async function exportUsersCSV() {

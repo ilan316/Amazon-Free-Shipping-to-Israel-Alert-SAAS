@@ -342,6 +342,67 @@ async def week_old_history(db, product_ids: list[int]) -> dict:
     return {r.product_id: r for r in rows}
 
 
+async def status_history(db, product_ids: list[int]) -> dict:
+    """Every price_history row per product, oldest first — the input summarize_history() expects.
+
+    One query for a whole batch, like week_old_history(). Rows are append-on-change,
+    so a product sitting in one status for a month is a handful of rows, not thousands.
+    """
+    if not product_ids:
+        return {}
+    from sqlalchemy import text as _sql_text  # local: this module is otherwise DB-free
+    rows = (await db.execute(
+        _sql_text("""SELECT product_id, price, israel_extra_cost, israel_cost_kind,
+                            last_status, recorded_at
+                       FROM price_history
+                      WHERE product_id = ANY(:pids)
+                   ORDER BY product_id, recorded_at, id"""),
+        {"pids": product_ids},
+    )).all()
+    out: dict = {}
+    for r in rows:
+        out.setdefault(r.product_id, []).append(r)
+    return out
+
+
+def summarize_history(rows, now: datetime) -> dict | None:
+    """Collapse change rows into status periods, plus share-of-time per status.
+
+    A row is written whenever price OR status moves, so consecutive rows with the same
+    status are one period — a price change inside a FREE stretch is not a new period.
+    Time is attributed from what we observed: PAID/NO_SHIP products are checked on an
+    on/off cycle (scheduler.py), so a short FREE window during a rest phase never shows.
+
+    free_entries counts transitions *into* FREE after the first period. The first row is
+    the 08/09/26 seed (or the first check), so a product that started FREE was not seen
+    turning free and isn't counted.
+    """
+    if not rows:
+        return None
+    periods: list[dict] = []
+    for r in rows:
+        if periods and periods[-1]["status"] == r.last_status:
+            continue
+        if periods:
+            periods[-1]["end"] = r.recorded_at
+        periods.append({"status": r.last_status, "start": r.recorded_at, "end": None,
+                        "price": r.price or None})
+
+    since = periods[0]["start"]
+    total = max((now - since).total_seconds(), 1.0)
+    seconds: dict[str, float] = {}
+    for p in periods:
+        dur = ((p["end"] or now) - p["start"]).total_seconds()
+        seconds[p["status"]] = seconds.get(p["status"], 0.0) + max(dur, 0.0)
+
+    return {
+        "since": since,
+        "pct": {s: round(v * 100 / total) for s, v in seconds.items()},
+        "free_entries": sum(1 for p in periods[1:] if p["status"] == "FREE"),
+        "periods": periods,
+    }
+
+
 def _price_trend(product, prev, lang: str, txt_align: str, txt_dir: str) -> str:
     """Week-over-week movement line, comparing the product against a price_history row.
 

@@ -776,6 +776,31 @@ async def trigger_check(
     return {"message": "Check cycle triggered"}
 
 
+@router.get("/products/{product_id}/history")
+async def get_product_history(
+    product_id: int,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Status periods (same summary the user's card shows) plus every raw price_history
+    row, so a price change inside one status is visible here even though the card merges it."""
+    from backend.notifier import status_history, summarize_history
+    rows = (await status_history(db, [product_id])).get(product_id, [])
+    return {
+        "summary": summarize_history(rows, datetime.now(timezone.utc)),
+        "rows": [
+            {
+                "status": r.last_status,
+                "price": r.price,
+                "israel_extra_cost": r.israel_extra_cost,
+                "israel_cost_kind": r.israel_cost_kind,
+                "recorded_at": r.recorded_at.isoformat(),
+            }
+            for r in reversed(rows)
+        ],
+    }
+
+
 @router.post("/products/{product_id}/check")
 async def trigger_single_product_check(
     product_id: int,

@@ -13,7 +13,7 @@ from backend.database import get_db
 from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting
 from backend.auth import get_current_user
 from backend.schemas import AddProductRequest, ProductResponse, MessageResponse, PriceTrendMove
-from backend.notifier import price_moves, week_old_history
+from backend.notifier import price_moves, week_old_history, status_history, summarize_history
 from backend.checker import extract_free_shipping_threshold
 
 DEFAULT_MAX_PRODUCTS = 10
@@ -110,6 +110,10 @@ async def list_products(
     # the weekly summary email uses, so the dashboard can never show ▼ for a product
     # the email calls unchanged.
     history_map = await week_old_history(db, product_ids)
+    # Full status history for the card's summary line and its expandable period list.
+    # Same table, append-on-change, so this is a few rows per product.
+    status_map = await status_history(db, product_ids)
+    now = datetime.now(timezone.utc)
 
     items = []
     for up in user_products:
@@ -139,6 +143,7 @@ async def list_products(
                 PriceTrendMove(kind=key.removeprefix("trend_"), delta=f"{delta:.2f}")
                 for key, delta in price_moves(p, history_map.get(p.id))
             ] if history_map.get(p.id) is not None else [],
+            history=summarize_history(status_map.get(p.id), now),
         ))
     return items
 
