@@ -100,8 +100,8 @@ const openHistory = new Set();
 const HISTORY_SHORT = { FREE: 'חינם', PAID: 'בתשלום', NO_SHIP: 'לא נשלח', NOT_FOUND: 'לא קיים' };
 
 function _fmtDuration(ms) {
-  const days = ms / 86400000;
-  if (days >= 1) return `${days.toFixed(days < 10 ? 1 : 0)} ימים`;
+  const days = Math.floor(ms / 86400000);
+  if (days >= 1) return days === 1 ? 'יום אחד' : `${days} ימים`;
   const hours = Math.max(1, Math.round(ms / 3600000));
   return `${hours} שעות`;
 }

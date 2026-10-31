@@ -885,7 +885,7 @@ async function toggleProductHistory(productId) {
     return;
   }
 
-  const fmtDur = ms => { const d = ms / 86400000; return d >= 1 ? `${d.toFixed(1)} ימים` : `${Math.max(1, Math.round(ms / 3600000))} שעות`; };
+  const fmtDur = ms => { const d = Math.floor(ms / 86400000); return d >= 1 ? (d === 1 ? 'יום אחד' : `${d} ימים`) : `${Math.max(1, Math.round(ms / 3600000))} שעות`; };
   const pct = Object.entries(s.pct).map(([st, v]) => `${statusLabel(st)} ${v}%`).join(' · ');
   const periods = [...s.periods].reverse().map(per => `
     <tr style="border-bottom:1px solid var(--border);">
