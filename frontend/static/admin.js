@@ -832,7 +832,7 @@ function renderAdminProducts() {
       <td style="padding:10px 6px;">${p.paused_watchers > 0 && p.paused_watchers === p.watchers
         ? '<span class="status-badge" style="background:#f0f0f0;color:#888;border:1px solid #ccc;" title="כל העוקבים של מוצר זה בהשהייה — לא נעשית בדיקה">⏸ בהשהייה</span>'
         : `<span class="status-badge badge-${p.last_status}" title="${STATUS_TOOLTIP[p.last_status] || ''}">${statusLabel(p.last_status)}</span>`
-      }${p.screenshot_path ? ` <a href="/admin/screenshot/${p.screenshot_path}" target="_blank" title="צפה בצילום מסך מהבדיקה האחרונה" style="text-decoration:none;">📷</a>` : ''}</td>
+      }${(() => { const t = freeThreshold(p); return t ? `<br><span style="font-size:0.75rem;color:var(--text-muted);" title="משלוח חינם רק בהזמנה מעל הסף">מעל ₪${t.toFixed(2)}</span>` : ''; })()}${p.screenshot_path ? ` <a href="/admin/screenshot/${p.screenshot_path}" target="_blank" title="צפה בצילום מסך מהבדיקה האחרונה" style="text-decoration:none;">📷</a>` : ''}</td>
       <td style="text-align:center;font-size:0.82rem;color:#B12704;font-weight:bold;" dir="ltr">${formatPrice(p.last_price) || '—'}</td>
       <td style="text-align:center;font-size:0.8rem;">${adminIsraelCost(p)}</td>
       <td style="text-align:center;">${p.watchers}${p.paused_watchers > 0 ? ` <span title="${p.paused_watchers} עוקבים בהשהייה" style="font-size:0.78rem;color:#888;cursor:help;">⏸${p.paused_watchers}</span>` : ''}</td>
@@ -861,6 +861,13 @@ function renderAdminProducts() {
   `).join("");
 }
 
+// Order minimum for conditional free shipping, or 0 when FREE is unconditional.
+function freeThreshold(p) {
+  const t = parseFloat(String(p.israel_free_threshold || '').replace(/[^\d.]/g, ''));
+  const price = parseFloat(String(p.last_price || '').replace(/[^\d.]/g, ''));
+  return p.last_status === 'FREE' && isFinite(t) && (!isFinite(price) || t > price) ? t : 0;
+}
+
 async function toggleProductHistory(productId) {
   const expandRow = document.getElementById(`prod-hist-${productId}`);
   if (!expandRow) return;
@@ -886,7 +893,11 @@ async function toggleProductHistory(productId) {
   }
 
   const fmtDur = ms => { const d = Math.floor(ms / 86400000); return d >= 1 ? (d === 1 ? 'יום אחד' : `${d} ימים`) : `${Math.max(1, Math.round(ms / 3600000))} שעות`; };
-  const pct = Object.entries(s.pct).map(([st, v]) => `${statusLabel(st)} ${v}%`).join(' · ');
+  // Conditional FREE reads as "free" with no minimum — name the minimum next to the share.
+  const thr = freeThreshold(_allAdminProducts.find(p => p.id === productId) || {});
+  const pct = Object.entries(s.pct).map(([st, v]) => st === 'FREE' && thr
+    ? `חינם בהזמנה מעל ₪${thr.toFixed(2)} — ${v}% מהזמן`
+    : `${statusLabel(st)} ${v}%`).join(' · ');
   const periods = [...s.periods].reverse().map(per => `
     <tr style="border-bottom:1px solid var(--border);">
       <td style="padding:4px 8px;"><span class="status-badge badge-${per.status}">${statusLabel(per.status)}</span></td>
@@ -905,7 +916,7 @@ async function toggleProductHistory(productId) {
 
   cell.innerHTML = `
     <div style="font-size:0.82rem;margin-bottom:8px;">
-      📊 <strong>מאז ${formatDate(s.since)}:</strong> ${pct} · כניסות לחינם: ${s.free_entries}
+      📊 <strong>מאז ${formatDate(s.since)}:</strong> ${pct}${s.free_entries > 0 ? ` · עבר לחינם ${s.free_entries} פעמים` : ''}
     </div>
     <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:0.82rem;min-width:420px;">

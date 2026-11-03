@@ -85,6 +85,7 @@ async def sync_products(
             url=url,
             last_status="FREE",
             last_checked=now,
+            free_since=now,
             source="scanner",
             raw_text="",
             consecutive_errors=0,

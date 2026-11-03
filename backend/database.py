@@ -489,6 +489,20 @@ async def create_tables():
             """)
         )
 
+        # Backfill free_since for FREE products that never got one (scanner inserts
+        # before the fix). NOW() rather than an old date: the countdown starts fresh,
+        # so users get the day 3-4 warning before the day-5 auto-pause instead of an
+        # unannounced pause on the next run. Self-limiting — no rows match after once.
+        res = await conn.execute(
+            __import__("sqlalchemy").text(
+                "UPDATE products SET free_since = NOW() "
+                "WHERE last_status = 'FREE' AND free_since IS NULL"
+            )
+        )
+        if res.rowcount:
+            __import__("logging").getLogger(__name__).info(
+                "Backfilled free_since for %d FREE products", res.rowcount)
+
 
 def _apply_rtl_to_html(body: str) -> str:
     """Add dir=rtl/lang=he to <html>, direction:rtl to <body>, and force RTL on content divs."""

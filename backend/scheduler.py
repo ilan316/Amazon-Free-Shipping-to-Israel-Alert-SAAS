@@ -85,7 +85,11 @@ async def _update_product(db: AsyncSession, product: Product, result: CheckResul
 
     if result.status in (ShippingStatus.FREE, ShippingStatus.PAID, ShippingStatus.NO_SHIP, ShippingStatus.NOT_FOUND):
         # Definitive result — update visible status
-        if result.status == ShippingStatus.FREE and product.last_status != ShippingStatus.FREE.value:
+        # `free_since is None` also covers products that were born FREE (the scanner
+        # inserts them that way) — without it they never got a free_since, and the
+        # auto-pause/warnings, which key on it, skipped them forever.
+        if result.status == ShippingStatus.FREE and (
+                product.last_status != ShippingStatus.FREE.value or product.free_since is None):
             product.free_since = datetime.now(timezone.utc)
         elif result.status != ShippingStatus.FREE:
             product.free_since = None

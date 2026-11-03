@@ -40,6 +40,7 @@ from sqlalchemy import cast, Date
 from backend.models import User, Product, UserProduct, NotificationLog, SystemSetting, EmailClick, EmailTemplate, EmailOpen, EmailSendLog, EmailSendRecipient, BlogPublishedAsin, BlogDismissedAsin, BlogDraft, BlogDraftJob, CategoryTranslation
 from backend.blog_utils import fetch_amazon_product, generate_with_claude, build_post_html, commit_to_github, publish_draft, add_to_prices_page, get_github_file, delete_github_file, remove_from_prices_page
 from backend.scheduler import queue_blog_social_post
+from backend.checker import extract_free_shipping_threshold
 from backend.auth import get_current_admin, hash_password, verify_password, SECRET_KEY, ALGORITHM
 
 
@@ -473,6 +474,8 @@ async def list_products(
             # unlike the user dashboard, so a bad extraction is visible rather than hidden.
             "israel_extra_cost": p.israel_extra_cost or "",
             "israel_cost_kind": p.israel_cost_kind or "",
+            # Conditional free shipping — "FREE" only above this order minimum.
+            "israel_free_threshold": extract_free_shipping_threshold(p.raw_text or ""),
             "image_url": p.image_url or "",
             "screenshot_path": os.path.basename(p.screenshot_path) if p.screenshot_path else None,
             "status_since": p.status_since.isoformat() if p.status_since else None,
