@@ -584,6 +584,7 @@ async function toggleUserProducts(userId, email) {
 
   const metaBar = `
     <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px;font-size:0.82rem;">
+      <span>📣 <strong>מקור:</strong> ${signupSourceLabel(u?.signup_source)}</span>
       <span>🔑 <strong>כניסה אחרונה:</strong> <span dir="ltr">${lastLogin}</span></span>
       <span>📦 <strong>מוצר אחרון נוסף:</strong> <span dir="ltr">${lastAdded}</span></span>
       <span>🖱 <strong>קליק אחרון במייל:</strong> <span dir="ltr">${lastClick}</span></span>
@@ -942,6 +943,17 @@ async function toggleProductHistory(productId) {
     </details>`;
 }
 
+const SIGNUP_SOURCE_LABELS = {
+  tiktok: 'טיקטוק', facebook: 'פייסבוק', instagram: 'אינסטגרם', telegram: 'טלגרם',
+  google: 'חיפוש בגוגל', friend: 'חבר/ה', other: 'אחר', skipped: 'דילג',
+};
+// null = new user who hasn't answered yet; 'legacy' = signed up before the question existed.
+function signupSourceLabel(src, legacyText = '—') {
+  if (src === 'legacy') return legacyText;
+  if (!src) return 'טרם ענה';
+  return SIGNUP_SOURCE_LABELS[src] || src;
+}
+
 async function exportUsersCSV() {
   if (!_allUsers.length) return;
 
@@ -965,7 +977,7 @@ async function exportUsersCSV() {
   if (btn) { btn.textContent = origText; btn.disabled = false; }
 
   const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('he-IL') : '';
-  const headers = ['#', 'אימייל', 'אימייל התראה', 'אימייל התראה שונה', 'מוצרים', 'ASINs', 'סטטוס', 'מעורבות', 'נרשם', 'כניסה אחרונה', 'קליק אחרון', 'מוצר אחרון נוסף', 'מגבלת מוצרים', 'Bounce'];
+  const headers = ['#', 'אימייל', 'אימייל התראה', 'אימייל התראה שונה', 'מוצרים', 'ASINs', 'סטטוס', 'מעורבות', 'נרשם', 'מקור', 'כניסה אחרונה', 'קליק אחרון', 'מוצר אחרון נוסף', 'מגבלת מוצרים', 'Bounce'];
   const rows = _allUsers.map(u => [
     u.id,
     u.email,
@@ -976,6 +988,7 @@ async function exportUsersCSV() {
     !u.is_active ? 'מושהה' : u.vacation_mode ? 'חופשה' : 'פעיל',
     (ENGAGEMENT_LABELS[u.engagement] || ENGAGEMENT_LABELS.unknown).text,
     fmtDate(u.created_at),
+    signupSourceLabel(u.signup_source, ''),
     fmtDate(u.last_login_at),
     fmtDate(u.last_click_at),
     fmtDate(u.last_product_added_at),

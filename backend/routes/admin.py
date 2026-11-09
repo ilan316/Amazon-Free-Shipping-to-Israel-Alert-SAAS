@@ -277,6 +277,7 @@ async def list_users(
             "notify_email_bounced_at": u.notify_email_bounced_at.isoformat() if u.notify_email_bounced_at else None,
             "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
             "last_product_added_at": last_added_map[u.id].isoformat() if last_added_map.get(u.id) else None,
+            "signup_source": u.signup_source,
         }
         for u in users
     ]

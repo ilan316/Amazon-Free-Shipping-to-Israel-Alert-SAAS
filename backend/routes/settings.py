@@ -46,6 +46,25 @@ async def update_settings(
     return current_user
 
 
+SIGNUP_SOURCES = {"tiktok", "facebook", "instagram", "telegram", "google", "friend", "other", "skipped"}
+
+
+@router.patch("/signup-source", response_model=MessageResponse)
+async def set_signup_source(
+    body: dict,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    source = body.get("source")
+    if source not in SIGNUP_SOURCES:
+        raise HTTPException(status_code=400, detail="Invalid source")
+    # First answer wins — never overwrite (also keeps 'legacy' users untouched).
+    if current_user.signup_source is None:
+        current_user.signup_source = source
+        await db.commit()
+    return MessageResponse(message="ok")
+
+
 @router.patch("/password", response_model=MessageResponse)
 async def change_password(
     body: ChangePasswordRequest,

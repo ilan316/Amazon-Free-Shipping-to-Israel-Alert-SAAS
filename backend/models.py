@@ -28,6 +28,7 @@ class User(Base):
     automation_expansion_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     automation_reengagement_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     automation_winback_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    signup_source: Mapped[str | None] = mapped_column(String(20), nullable=True)  # NULL = not asked yet; 'legacy' = pre-launch user
     notify_email_bounced: Mapped[bool] = mapped_column(Boolean, default=False)
     notify_email_bounced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     notify_email_bounce_type: Mapped[str | None] = mapped_column(String(20), nullable=True)

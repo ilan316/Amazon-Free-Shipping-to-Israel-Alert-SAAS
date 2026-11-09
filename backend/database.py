@@ -176,6 +176,19 @@ async def create_tables():
         )
         await conn.execute(
             __import__("sqlalchemy").text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_source VARCHAR(20)"
+            )
+        )
+        # Users who existed before the "how did you hear about us" card launched
+        # are marked 'legacy' so they never see it. Fixed cutoff → idempotent.
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "UPDATE users SET signup_source = 'legacy' "
+                "WHERE signup_source IS NULL AND created_at < '2026-11-09'"
+            )
+        )
+        await conn.execute(
+            __import__("sqlalchemy").text(
                 "ALTER TABLE products ADD COLUMN IF NOT EXISTS last_price VARCHAR(50)"
             )
         )

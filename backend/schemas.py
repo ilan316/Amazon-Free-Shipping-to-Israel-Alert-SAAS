@@ -45,6 +45,7 @@ class UserResponse(BaseModel):
     max_products: int | None = None
     effective_product_limit: int | None = None
     is_google_account: bool = False
+    signup_source: str | None = None
 
     model_config = {"from_attributes": True}
 

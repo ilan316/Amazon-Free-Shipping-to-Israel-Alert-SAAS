@@ -48,6 +48,27 @@
 
     <div id="system-banner" style="display:none; background:#fff3cd; border:1px solid #ffc107; border-radius:8px; padding:10px 20px; text-align:center; font-size:0.9rem; color:#856404; direction:rtl; margin-bottom:16px;"></div>
 
+    <!-- "How did you hear about us" — shown once, only to users whose signup_source is NULL
+         (users created before 09/11/26 are 'legacy' and never see it). -->
+    <div id="source-card" style="display:none; border:1px solid var(--border); border-radius:10px; padding:14px 18px; margin-bottom:16px; direction:rtl; background:var(--card-bg, #fff);">
+      <div id="source-ask">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
+          <strong style="font-size:0.95rem;">איך שמעת עלינו?</strong>
+          <a href="#" onclick="saveSource('skipped'); return false;" style="font-size:0.8rem; color:var(--text-muted);">דלג</a>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          <button class="filter-btn" onclick="saveSource('tiktok')">טיקטוק</button>
+          <button class="filter-btn" onclick="saveSource('facebook')">פייסבוק</button>
+          <button class="filter-btn" onclick="saveSource('instagram')">אינסטגרם</button>
+          <button class="filter-btn" onclick="saveSource('telegram')">טלגרם</button>
+          <button class="filter-btn" onclick="saveSource('google')">חיפוש בגוגל</button>
+          <button class="filter-btn" onclick="saveSource('friend')">חבר/ה</button>
+          <button class="filter-btn" onclick="saveSource('other')">אחר</button>
+        </div>
+      </div>
+      <div id="source-thanks" style="display:none; font-size:0.9rem;">תודה! 🙏</div>
+    </div>
+
     <!-- Feature Grid -->
     <div class="feature-grid desktop-only">
       <!-- The "מוצרים עם משלוח חינם" card used to sit here. It sent users off-site to a
@@ -231,9 +252,24 @@
     apiFetch("/me").then(async res => {
       if (res && res.ok) {
         const user = await res.json();
-        if (user.is_admin) window.location = "/admin";
+        if (user.is_admin) { window.location = "/admin"; return; }
+        if (user.signup_source === null) {
+          document.getElementById("source-card").style.display = "block";
+        }
       }
     });
+
+    function saveSource(source) {
+      // Fire-and-forget: on network failure the card simply returns next visit.
+      apiFetch("/me/signup-source", { method: "PATCH", body: JSON.stringify({ source }) }).catch(() => {});
+      if (source === "skipped") {
+        document.getElementById("source-card").style.display = "none";
+        return;
+      }
+      document.getElementById("source-ask").style.display = "none";
+      document.getElementById("source-thanks").style.display = "block";
+      setTimeout(() => { document.getElementById("source-card").style.display = "none"; }, 1500);
+    }
 
     // Load system banner
     fetch("/system-message").then(r => r.json()).then(data => {
