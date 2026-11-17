@@ -252,6 +252,7 @@
       <button class="admin-tab" onclick="switchTab('analytics', this)">📈 אנליטיקס</button>
       <button class="admin-tab" onclick="switchTab('account', this)">⚙️ הגדרות חשבון</button>
       <button class="admin-tab" onclick="switchTab('blog', this)">✍️ בלוג</button>
+      <button class="admin-tab" onclick="switchTab('videos', this)">🎥 סרטונים <span id="videos-pending-badge"></span></button>
     </div>
 
     <!-- Tab: Dashboard -->
@@ -760,6 +761,19 @@
     </div>
 
     <!-- Tab: Blog -->
+    <div class="tab-panel" id="tab-videos">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+        <h2 style="font-size:1.1rem; margin:0;">🎥 סרטוני מוצר מהסורק</h2>
+        <div id="videos-filter" style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button class="btn-sm" data-vstatus="pending" onclick="loadVideosTab('pending')">ממתינים</button>
+          <button class="btn-sm" data-vstatus="ok" onclick="loadVideosTab('ok')">✓ מתאימים</button>
+          <button class="btn-sm" data-vstatus="bad" onclick="loadVideosTab('bad')">✗ נפסלו</button>
+          <button class="btn-sm" data-vstatus="all" onclick="loadVideosTab('all')">הכל</button>
+        </div>
+      </div>
+      <div id="videos-list"><p style="color:var(--muted)">טוען…</p></div>
+    </div>
+
     <div class="tab-panel" id="tab-blog">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
         <h2 style="font-size:1.1rem; margin:0;">✍️ בלוג</h2>
@@ -815,7 +829,7 @@
   </div>
 
   <script src="/static/app.js?v=14"></script>
-  <script src="/static/admin.js?v=69"></script>
+  <script src="/static/admin.js?v=70"></script>
   <script>
     requireAuth();
     loadAdminData();

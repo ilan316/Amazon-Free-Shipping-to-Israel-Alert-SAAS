@@ -34,7 +34,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; "
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: https:; "
-            "connect-src 'self' https://oauth2.googleapis.com https://accounts.google.com; "
+            "media-src 'self' blob: https://m.media-amazon.com; "
+            "connect-src 'self' https://oauth2.googleapis.com https://accounts.google.com https://m.media-amazon.com; "
             "frame-src https://accounts.google.com; "
             "frame-ancestors 'none'"
         )

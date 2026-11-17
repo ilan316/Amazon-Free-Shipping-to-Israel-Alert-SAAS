@@ -42,6 +42,7 @@ class SyncProduct(BaseModel):
     last_price: str = ""
     image_url: str = ""
     image_urls: list[str] = []
+    videos: list[dict] = []
     name_he: str = ""
     description: str = ""
 
@@ -92,6 +93,7 @@ async def sync_products(
             last_price=p.last_price or None,
             image_url=p.image_url or None,
             image_urls=json.dumps(p.image_urls) if p.image_urls else None,
+            videos=json.dumps(p.videos[:5]) if p.videos else None,
             name_he=name_he,
             amazon_category=p.amazon_category or None,
             description=p.description or None,
@@ -100,6 +102,9 @@ async def sync_products(
             "source": "scanner",
             "image_url": stmt.excluded.image_url,
             "image_urls": stmt.excluded.image_urls,
+            # Keep previously found videos when a scan (or an older scanner build)
+            # sends none. video_review is admin-owned and never touched here.
+            "videos": func.coalesce(stmt.excluded.videos, Product.videos),
             "name_he": func.left(stmt.excluded.name_he, 290),
             "amazon_category": stmt.excluded.amazon_category,
             "description": stmt.excluded.description,

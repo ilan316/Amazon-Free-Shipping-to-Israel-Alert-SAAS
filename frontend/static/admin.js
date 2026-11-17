@@ -33,6 +33,7 @@ function switchTab(name, btn) {
   document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
   document.getElementById("tab-" + name).classList.add("active");
   btn.classList.add("active");
+  if (name === "videos") loadVideosTab(_videoStatus);
   if (name === "analytics" && !_analyticsLoaded) {
     _analyticsLoaded = true;
     loadAnalyticsTab();
@@ -3173,4 +3174,130 @@ async function doPublishBlogDraft(asin, slug, btn, scheduledAt) {
     btn.disabled = false;
     btn.textContent = origText;
   }
+}
+
+
+// ── Product videos review ─────────────────────────────────────────────────────
+// Scanner-collected product videos; admin marks each one ok/bad. Amazon's CDN
+// sends Access-Control-Allow-Origin: *, so HLS plays via hls.js (Chrome has no
+// native HLS) and mp4 plays directly.
+let _videoStatus = "pending";
+let _hlsLoading = null;
+const _hlsPlayers = [];
+
+function _vEsc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+}
+
+function _loadHls() {
+  if (window.Hls) return Promise.resolve();
+  if (_hlsLoading) return _hlsLoading;
+  _hlsLoading = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js";
+    s.onload = resolve;
+    s.onerror = () => { _hlsLoading = null; reject(new Error("hls.js failed to load")); };
+    document.head.appendChild(s);
+  });
+  return _hlsLoading;
+}
+
+function _attachPlayer(video) {
+  const url = video.dataset.src;
+  if (/\.m3u8(\?|$)/.test(url) && !video.canPlayType("application/vnd.apple.mpegurl")) {
+    _loadHls().then(() => {
+      if (!window.Hls || !Hls.isSupported()) return;
+      const hls = new Hls({ autoStartLoad: false });
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      // Don't pull segments for every card up front — only once the admin hits play.
+      video.addEventListener("play", () => hls.startLoad(), { once: true });
+      _hlsPlayers.push(hls);
+    }).catch(() => {
+      video.insertAdjacentHTML("afterend", '<div style="color:#b91c1c;font-size:.8rem">הנגן לא נטען — פתח בכרטיסייה</div>');
+    });
+  } else {
+    video.src = url;
+  }
+}
+
+function _videoCounts(c) {
+  return `${c.pending} ממתינים · ${c.ok} מתאימים · ${c.bad} נפסלו`;
+}
+
+async function loadVideosTab(status) {
+  _videoStatus = status || "pending";
+  document.querySelectorAll("#videos-filter [data-vstatus]").forEach(b => {
+    const on = b.dataset.vstatus === _videoStatus;
+    Object.assign(b.style, {
+      background: on ? "var(--brand)" : "#fff", color: on ? "#fff" : "var(--brand)",
+      border: "1px solid var(--brand)", padding: "6px 14px", borderRadius: "6px", cursor: "pointer",
+    });
+  });
+  while (_hlsPlayers.length) { try { _hlsPlayers.pop().destroy(); } catch (e) {} }
+  const list = document.getElementById("videos-list");
+  list.innerHTML = '<p style="color:var(--muted)">טוען…</p>';
+  const res = await apiFetch(`/admin/videos?status=${_videoStatus}`);
+  if (!res) return;
+  if (!res.ok) { list.innerHTML = '<p style="color:#b91c1c">שגיאה בטעינה</p>'; return; }
+  const data = await res.json();
+  const badge = document.getElementById("videos-pending-badge");
+  if (badge) badge.textContent = data.counts.pending ? `(${data.counts.pending})` : "";
+  if (!data.products.length) {
+    list.innerHTML = `<p style="color:var(--muted)">אין סרטונים בסטטוס הזה. סה"כ: ${_videoCounts(data.counts)}</p>`;
+    return;
+  }
+  const btn = "border:0;padding:5px 12px;border-radius:6px;cursor:pointer";
+  const ghost = "background:#fff;border:1px solid #ccc;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:.8rem";
+  list.innerHTML = `<p style="color:var(--muted);margin:0 0 12px">${_videoCounts(data.counts)}</p>` +
+    data.products.map(p => `
+    <div data-vproduct style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:14px;background:#fff">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
+        ${p.image_url ? `<img src="${_vEsc(p.image_url)}" alt="" style="width:48px;height:48px;object-fit:contain">` : ""}
+        <div style="min-width:0">
+          <div style="font-weight:600">${_vEsc(p.name)}</div>
+          <a href="${_vEsc(p.url)}" target="_blank" rel="noopener" dir="ltr" style="font-size:.8rem">${_vEsc(p.asin)}</a>
+        </div>
+      </div>
+      <div data-vgrid style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
+        ${p.videos.map(v => `
+        <div data-vcard style="border:1px solid #f0f0f0;border-radius:8px;padding:8px">
+          <video controls preload="none" playsinline data-src="${_vEsc(v.url)}" ${v.thumb ? `poster="${_vEsc(v.thumb)}"` : ""}
+                 style="width:100%;max-height:220px;background:#000;border-radius:6px"></video>
+          <div style="font-size:.85rem;margin:6px 0" dir="auto">${_vEsc(v.title || "(ללא כותרת)")}${v.duration ? ` <span style="color:var(--muted)">· ${_vEsc(v.duration)}</span>` : ""}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <button style="background:#16a34a;color:#fff;${btn}" onclick="reviewVideo(this, ${p.id}, 'ok')">✓ מתאים</button>
+            <button style="background:#dc2626;color:#fff;${btn}" onclick="reviewVideo(this, ${p.id}, 'bad')">✗ לא מתאים</button>
+            ${v.status !== "pending" ? `<button style="${ghost}" onclick="reviewVideo(this, ${p.id}, 'pending')">↺ בטל החלטה</button>` : ""}
+            <button style="${ghost}" onclick="navigator.clipboard.writeText(this.closest('[data-vcard]').querySelector('video').dataset.src)">העתק קישור</button>
+            <a href="${_vEsc(v.url)}" target="_blank" rel="noopener" style="font-size:.8rem">פתח בכרטיסייה</a>
+          </div>
+        </div>`).join("")}
+      </div>
+    </div>`).join("");
+  list.querySelectorAll("video[data-src]").forEach(_attachPlayer);
+}
+
+async function reviewVideo(btn, productId, verdict) {
+  const card = btn.closest("[data-vcard]");
+  const url = card.querySelector("video").dataset.src;
+  btn.disabled = true;
+  const res = await apiFetch(`/admin/products/${productId}/video-review`, {
+    method: "POST", body: JSON.stringify({ url, verdict }),
+  });
+  if (!res || !res.ok) { btn.disabled = false; alert("שמירה נכשלה"); return; }
+  if (_videoStatus === "all") { loadVideosTab("all"); return; }
+  card.style.transition = "opacity .2s";
+  card.style.opacity = "0";
+  setTimeout(() => {
+    const grid = card.closest("[data-vgrid]");
+    card.remove();
+    if (!grid.children.length) grid.closest("[data-vproduct]").remove();
+    const badge = document.getElementById("videos-pending-badge");
+    if (badge && (_videoStatus === "pending" || verdict === "pending")) {
+      const cur = parseInt((badge.textContent || "").replace(/\D/g, ""), 10) || 0;
+      const n = Math.max(0, cur + (verdict === "pending" ? 1 : -1));
+      badge.textContent = n ? `(${n})` : "";
+    }
+  }, 200);
 }

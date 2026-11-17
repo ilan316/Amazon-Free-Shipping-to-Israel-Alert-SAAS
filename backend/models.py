@@ -58,6 +58,8 @@ class Product(Base):
     israel_cost_kind: Mapped[str | None] = mapped_column(String(20), nullable=True)
     image_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     image_urls: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list of up to 4 URLs
+    videos: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON [{url,title,thumb,duration}] from scanner
+    video_review: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON {url: "ok"|"bad"}, admin-owned, never synced
     name_he: Mapped[str | None] = mapped_column(String(300), nullable=True)
     amazon_category: Mapped[str | None] = mapped_column(String(100), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)

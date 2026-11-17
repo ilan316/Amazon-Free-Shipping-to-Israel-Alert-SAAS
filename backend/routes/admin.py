@@ -986,6 +986,84 @@ async def delete_orphan_products(
     return {"deleted": [row.asin for row in orphans], "count": len(orphans)}
 
 
+# ── Product videos (scanner-collected, admin review) ─────────────────────────
+
+class VideoReviewRequest(BaseModel):
+    url: str
+    verdict: str  # "ok" | "bad" | "pending" (clears the decision)
+
+
+def _video_state(p) -> tuple[list, dict]:
+    import json as _json
+    try:
+        videos = _json.loads(p.videos) if p.videos else []
+    except ValueError:
+        videos = []
+    try:
+        review = _json.loads(p.video_review) if p.video_review else {}
+    except ValueError:
+        review = {}
+    return videos, review
+
+
+@router.get("/videos")
+async def list_product_videos(
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    status: str = Query("pending", pattern="^(pending|ok|bad|all)$"),
+):
+    """Products that have scanner-found videos, filtered by review status of their videos."""
+    rows = (await db.execute(
+        select(Product)
+        .where(Product.videos.isnot(None), Product.videos != "[]")
+        .order_by(Product.free_since.desc().nullslast())
+    )).scalars().all()
+    out = []
+    counts = {"pending": 0, "ok": 0, "bad": 0}
+    for p in rows:
+        videos, review = _video_state(p)
+        items = []
+        for v in videos:
+            url = (v or {}).get("url")
+            if not url:
+                continue
+            st = review.get(url, "pending")
+            counts[st] = counts.get(st, 0) + 1
+            items.append({**v, "status": st})
+        shown = items if status == "all" else [v for v in items if v["status"] == status]
+        if shown:
+            out.append({
+                "id": p.id, "asin": p.asin, "name": p.name_he or p.name,
+                "url": p.url, "image_url": p.image_url, "videos": shown,
+            })
+    return {"products": out, "counts": counts}
+
+
+@router.post("/products/{product_id}/video-review")
+async def review_product_video(
+    product_id: int,
+    body: VideoReviewRequest,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    import json as _json
+    if body.verdict not in ("ok", "bad", "pending"):
+        raise HTTPException(status_code=400, detail="verdict must be ok, bad or pending")
+    p = await db.get(Product, product_id)
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found")
+    videos, review = _video_state(p)
+    if body.url not in {(v or {}).get("url") for v in videos}:
+        raise HTTPException(status_code=400, detail="Video not found on this product")
+    if body.verdict == "pending":
+        review.pop(body.url, None)
+    else:
+        review[body.url] = body.verdict
+    p.video_review = _json.dumps(review) if review else None
+    await db.commit()
+    return {"ok": True, "url": body.url, "status": body.verdict}
+
+
 # ── Admin profile management ──────────────────────────────────────────────────
 
 @router.patch("/profile/password")

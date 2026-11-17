@@ -345,6 +345,12 @@ async def create_tables():
                 "ALTER TABLE products ADD COLUMN IF NOT EXISTS image_urls TEXT"
             )
         )
+        for col in ("videos", "video_review"):
+            await conn.execute(
+                __import__("sqlalchemy").text(
+                    f"ALTER TABLE products ADD COLUMN IF NOT EXISTS {col} TEXT"
+                )
+            )
         await conn.execute(
             __import__("sqlalchemy").text(
                 "ALTER TABLE blog_drafts ADD COLUMN IF NOT EXISTS title_short VARCHAR(300) NOT NULL DEFAULT ''"
