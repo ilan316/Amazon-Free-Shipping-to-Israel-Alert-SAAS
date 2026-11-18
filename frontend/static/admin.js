@@ -3298,7 +3298,11 @@ async function loadVideosTab(status) {
             </div>
             <div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">${meta}${free}</div>
           </div>
-          <div data-vcount style="font-size:0.8rem;color:var(--text-muted);white-space:nowrap;flex-shrink:0;">🎥 ${p.videos.length} סרטונים</div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">
+            ${p.videos.some(v => v.status !== "bad") ? `<button onclick="rejectVideoProduct(this, ${p.id})"
+              style="background:#dc2626;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.82rem;white-space:nowrap;">✗ מוצר לא מתאים</button>` : ""}
+            <div data-vcount style="font-size:0.8rem;color:var(--text-muted);white-space:nowrap;">🎥 ${p.videos.length} סרטונים</div>
+          </div>
         </div>
         ${lines}
       </div>`;
@@ -3323,6 +3327,28 @@ function toggleVideoPlayer(btn) {
   }
   box.style.display = "block";
   btn.textContent = "■ סגור";
+}
+
+// Rejects every video shown for this product in one go (same per-video verdict as "✗ לא מתאים").
+async function rejectVideoProduct(btn, productId) {
+  const product = btn.closest("[data-vproduct]");
+  const cards = Array.from(product.querySelectorAll("[data-vcard]"));
+  if (!confirm(`לסמן את כל ${cards.length} הסרטונים של המוצר כלא מתאימים?`)) return;
+  btn.disabled = true;
+  const results = await Promise.all(cards.map(c => apiFetch(`/admin/products/${productId}/video-review`, {
+    method: "POST", body: JSON.stringify({ url: c.dataset.src, verdict: "bad" }),
+  })));
+  if (results.some(r => !r || !r.ok)) { alert("חלק מהסרטונים לא נשמרו"); loadVideosTab(_videoStatus); return; }
+  if (_videoStatus !== "pending") { loadVideosTab(_videoStatus); return; }
+  product.style.opacity = "0";
+  setTimeout(() => {
+    product.remove();
+    const badge = document.getElementById("videos-pending-badge");
+    if (badge) {
+      const n = Math.max(0, (parseInt((badge.textContent || "").replace(/\D/g, ""), 10) || 0) - cards.length);
+      badge.textContent = n ? `(${n})` : "";
+    }
+  }, 200);
 }
 
 async function reviewVideo(btn, productId, verdict) {
