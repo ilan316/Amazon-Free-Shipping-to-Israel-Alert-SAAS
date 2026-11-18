@@ -760,19 +760,26 @@
       </div>
     </div>
 
-    <!-- Tab: Blog -->
+    <!-- Tab: Videos -->
     <div class="tab-panel" id="tab-videos">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
-        <h2 style="font-size:1.1rem; margin:0;">🎥 סרטוני מוצר מהסורק</h2>
-        <div id="videos-filter" style="display:flex; gap:6px; flex-wrap:wrap;">
-          <button class="btn-sm" data-vstatus="pending" onclick="loadVideosTab('pending')">ממתינים</button>
-          <button class="btn-sm" data-vstatus="ok" onclick="loadVideosTab('ok')">✓ מתאימים</button>
-          <button class="btn-sm" data-vstatus="bad" onclick="loadVideosTab('bad')">✗ נפסלו</button>
-          <button class="btn-sm" data-vstatus="all" onclick="loadVideosTab('all')">הכל</button>
-        </div>
+        <h2 style="font-size:1.1rem; margin:0;">🎥 סרטונים</h2>
+        <button class="btn-sm" onclick="loadVideosTab(_videoStatus)" style="background:var(--brand);color:#111;border:none;padding:7px 16px;border-radius:6px;cursor:pointer;font-weight:600;">רענן רשימה</button>
       </div>
-      <div id="videos-list"><p style="color:var(--muted)">טוען…</p></div>
+
+      <div id="videos-filter" style="display:flex; gap:6px; margin-bottom:16px; border-bottom:1px solid var(--border); flex-wrap:wrap;">
+        <button data-vstatus="pending" onclick="loadVideosTab('pending')">ממתינים</button>
+        <button data-vstatus="ok" onclick="loadVideosTab('ok')">✓ מתאימים</button>
+        <button data-vstatus="bad" onclick="loadVideosTab('bad')">✗ נפסלו</button>
+        <button data-vstatus="all" onclick="loadVideosTab('all')">הכל</button>
+      </div>
+
+      <p style="font-size:0.85rem; color:var(--text-muted); margin:0 0 6px;">סרטוני מוצר שהסורק מצא — לסמן מה מתאים לפרסום.</p>
+      <div id="videos-status" style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;"></div>
+      <div id="videos-list"></div>
     </div>
+
+    <!-- Tab: Blog -->
 
     <div class="tab-panel" id="tab-blog">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:10px;">

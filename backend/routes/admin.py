@@ -1035,6 +1035,9 @@ async def list_product_videos(
             out.append({
                 "id": p.id, "asin": p.asin, "name": p.name_he or p.name,
                 "url": p.url, "image_url": p.image_url, "videos": shown,
+                "price_ils": _parse_price(p.last_price),
+                "amazon_category": p.amazon_category or "",
+                "last_status": p.last_status or "",
             })
     return {"products": out, "counts": counts}
 

@@ -3227,60 +3227,105 @@ function _videoCounts(c) {
 
 async function loadVideosTab(status) {
   _videoStatus = status || "pending";
+  // Same underline sub-tab look as the blog tab's sub-tabs.
   document.querySelectorAll("#videos-filter [data-vstatus]").forEach(b => {
     const on = b.dataset.vstatus === _videoStatus;
     Object.assign(b.style, {
-      background: on ? "var(--brand)" : "#fff", color: on ? "#fff" : "var(--brand)",
-      border: "1px solid var(--brand)", padding: "6px 14px", borderRadius: "6px", cursor: "pointer",
+      background: "none", border: "none", borderBottom: `2px solid ${on ? "var(--brand)" : "transparent"}`,
+      padding: "9px 4px", marginLeft: "18px", cursor: "pointer", fontWeight: "700", fontSize: "0.9rem",
+      color: on ? "var(--text)" : "var(--text-muted)", borderRadius: "0",
     });
   });
   while (_hlsPlayers.length) { try { _hlsPlayers.pop().destroy(); } catch (e) {} }
+  const statusEl = document.getElementById("videos-status");
   const list = document.getElementById("videos-list");
-  list.innerHTML = '<p style="color:var(--muted)">טוען…</p>';
+  if (statusEl) statusEl.textContent = "טוען...";
+  list.innerHTML = "";
   const res = await apiFetch(`/admin/videos?status=${_videoStatus}`);
   if (!res) return;
-  if (!res.ok) { list.innerHTML = '<p style="color:#b91c1c">שגיאה בטעינה</p>'; return; }
+  if (!res.ok) { if (statusEl) statusEl.textContent = "שגיאה בטעינה"; return; }
   const data = await res.json();
   const badge = document.getElementById("videos-pending-badge");
   if (badge) badge.textContent = data.counts.pending ? `(${data.counts.pending})` : "";
+  if (statusEl) statusEl.textContent = _videoCounts(data.counts);
   if (!data.products.length) {
-    list.innerHTML = `<p style="color:var(--muted)">אין סרטונים בסטטוס הזה. סה"כ: ${_videoCounts(data.counts)}</p>`;
+    list.innerHTML = '<div style="color:var(--text-muted); padding:20px 0;">אין סרטונים בסטטוס הזה כרגע.</div>';
     return;
   }
-  const btn = "border:0;padding:5px 12px;border-radius:6px;cursor:pointer";
-  const ghost = "background:#fff;border:1px solid #ccc;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:.8rem";
-  list.innerHTML = `<p style="color:var(--muted);margin:0 0 12px">${_videoCounts(data.counts)}</p>` +
-    data.products.map(p => `
-    <div data-vproduct style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:14px;background:#fff">
-      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
-        ${p.image_url ? `<img src="${_vEsc(p.image_url)}" alt="" style="width:48px;height:48px;object-fit:contain">` : ""}
-        <div style="min-width:0">
-          <div style="font-weight:600">${_vEsc(p.name)}</div>
-          <a href="${_vEsc(p.url)}" target="_blank" rel="noopener" dir="ltr" style="font-size:.8rem">${_vEsc(p.asin)}</a>
-        </div>
-      </div>
-      <div data-vgrid style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
-        ${p.videos.map(v => `
-        <div data-vcard style="border:1px solid #f0f0f0;border-radius:8px;padding:8px">
-          <video controls preload="none" playsinline data-src="${_vEsc(v.url)}" ${v.thumb ? `poster="${_vEsc(v.thumb)}"` : ""}
-                 style="width:100%;max-height:220px;background:#000;border-radius:6px"></video>
-          <div style="font-size:.85rem;margin:6px 0" dir="auto">${_vEsc(v.title || "(ללא כותרת)")}${v.duration ? ` <span style="color:var(--muted)">· ${_vEsc(v.duration)}</span>` : ""}</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-            <button style="background:#16a34a;color:#fff;${btn}" onclick="reviewVideo(this, ${p.id}, 'ok')">✓ מתאים</button>
-            <button style="background:#dc2626;color:#fff;${btn}" onclick="reviewVideo(this, ${p.id}, 'bad')">✗ לא מתאים</button>
-            ${v.status !== "pending" ? `<button style="${ghost}" onclick="reviewVideo(this, ${p.id}, 'pending')">↺ בטל החלטה</button>` : ""}
-            <button style="${ghost}" onclick="navigator.clipboard.writeText(this.closest('[data-vcard]').querySelector('video').dataset.src)">העתק קישור</button>
-            <a href="${_vEsc(v.url)}" target="_blank" rel="noopener" style="font-size:.8rem">פתח בכרטיסייה</a>
+  // One row per video, laid out exactly like a blog candidate row.
+  list.innerHTML = data.products.flatMap(p => p.videos.map(v => {
+    const thumb = v.thumb || p.image_url || "";
+    const img = thumb
+      ? `<img src="${_vEsc(thumb)}" alt="" style="width:52px;height:52px;object-fit:contain;border-radius:6px;border:1px solid var(--border);background:#fff;flex-shrink:0;">`
+      : `<div style="width:52px;height:52px;border-radius:6px;border:1px solid var(--border);background:var(--surface);flex-shrink:0;"></div>`;
+    const meta = [
+      `<span dir="ltr">${_vEsc(p.asin)}</span>`,
+      p.price_ils ? `₪${Math.round(p.price_ils).toLocaleString()}` : "",
+      _vEsc(p.amazon_category || ""),
+    ].filter(Boolean).join(" &nbsp;·&nbsp; ");
+    const free = p.last_status === "FREE" ? `<span style="color:var(--success);font-weight:600;">&nbsp;·&nbsp;FREE ✓</span>` : "";
+    const verdictTag = v.status === "ok" ? `<span style="color:var(--success);font-weight:600;">✓ מתאים</span>`
+      : v.status === "bad" ? `<span style="color:var(--error,#c00);font-weight:600;">✗ נפסל</span>` : "";
+    const link = "background:none;border:none;padding:0;font-size:0.76rem;color:var(--text-muted);cursor:pointer;text-decoration:underline;";
+    return `
+      <div data-vcard data-src="${_vEsc(v.url)}" style="padding:12px 14px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--surface);transition:opacity .2s;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          ${img}
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${_vEsc(p.name)}">
+              <a href="${_vEsc(p.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${_vEsc(p.name)}</a>
+            </div>
+            <div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">${meta}${free}</div>
+            <div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" dir="auto">
+              🎥 ${_vEsc(v.title || "(ללא כותרת)")}${v.duration ? ` · ${_vEsc(v.duration)}` : ""}${verdictTag ? ` &nbsp;·&nbsp; ${verdictTag}` : ""}
+            </div>
           </div>
-        </div>`).join("")}
-      </div>
-    </div>`).join("");
-  list.querySelectorAll("video[data-src]").forEach(_attachPlayer);
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0;" class="blog-card-actions">
+            <div style="display:flex;gap:6px;">
+              ${v.status !== "ok" ? `<button onclick="reviewVideo(this, ${p.id}, 'ok')"
+                style="background:#167d46;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.82rem;white-space:nowrap;">✓ מתאים</button>` : ""}
+              ${v.status !== "bad" ? `<button onclick="reviewVideo(this, ${p.id}, 'bad')"
+                style="background:#fff;color:var(--error,#c00);border:1px solid var(--error,#c00);padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.82rem;white-space:nowrap;">✗ לא מתאים</button>` : ""}
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button onclick="toggleVideoPlayer(this)" style="${link}">▶ צפה</button>
+              <span style="color:var(--border);font-size:0.76rem;">|</span>
+              <button onclick="navigator.clipboard.writeText(this.closest('[data-vcard]').dataset.src)" style="${link}">העתק קישור</button>
+              <span style="color:var(--border);font-size:0.76rem;">|</span>
+              <a href="${_vEsc(v.url)}" target="_blank" rel="noopener" style="font-size:0.76rem;color:var(--text-muted);">פתח ←</a>
+              ${v.status !== "pending" ? `<span style="color:var(--border);font-size:0.76rem;">|</span>
+              <button onclick="reviewVideo(this, ${p.id}, 'pending')" style="${link}">↺ בטל החלטה</button>` : ""}
+            </div>
+          </div>
+        </div>
+        <div data-vplayer style="display:none;margin-top:10px;"></div>
+      </div>`;
+  })).join("");
+}
+
+// The player is built only when the admin opens it — keeps the list as light as the blog list.
+function toggleVideoPlayer(btn) {
+  const card = btn.closest("[data-vcard]");
+  const box = card.querySelector("[data-vplayer]");
+  if (box.style.display !== "none") {
+    const vid = box.querySelector("video");
+    if (vid) vid.pause();
+    box.style.display = "none";
+    btn.textContent = "▶ צפה";
+    return;
+  }
+  if (!box.firstChild) {
+    box.innerHTML = `<video controls playsinline data-src="${_vEsc(card.dataset.src)}"
+      style="width:100%;max-width:480px;max-height:300px;background:#000;border-radius:6px;display:block;"></video>`;
+    _attachPlayer(box.querySelector("video"));
+  }
+  box.style.display = "block";
+  btn.textContent = "■ סגור";
 }
 
 async function reviewVideo(btn, productId, verdict) {
   const card = btn.closest("[data-vcard]");
-  const url = card.querySelector("video").dataset.src;
+  const url = card.dataset.src;
   btn.disabled = true;
   const res = await apiFetch(`/admin/products/${productId}/video-review`, {
     method: "POST", body: JSON.stringify({ url, verdict }),
@@ -3290,9 +3335,7 @@ async function reviewVideo(btn, productId, verdict) {
   card.style.transition = "opacity .2s";
   card.style.opacity = "0";
   setTimeout(() => {
-    const grid = card.closest("[data-vgrid]");
     card.remove();
-    if (!grid.children.length) grid.closest("[data-vproduct]").remove();
     const badge = document.getElementById("videos-pending-badge");
     if (badge && (_videoStatus === "pending" || verdict === "pending")) {
       const cur = parseInt((badge.textContent || "").replace(/\D/g, ""), 10) || 0;
