@@ -3182,6 +3182,10 @@ async function doPublishBlogDraft(asin, slug, btn, scheduledAt) {
 // sends Access-Control-Allow-Origin: *, so HLS plays via hls.js (Chrome has no
 // native HLS) and mp4 plays directly.
 let _videoStatus = "pending";
+let _videoProducts = [];
+let _videoCategory = null;
+let _videoMinPrice = 0;
+let _videoMaxPrice = null;
 let _hlsLoading = null;
 const _hlsPlayers = [];
 
@@ -3207,17 +3211,24 @@ function _attachPlayer(video) {
   if (/\.m3u8(\?|$)/.test(url) && !video.canPlayType("application/vnd.apple.mpegurl")) {
     _loadHls().then(() => {
       if (!window.Hls || !Hls.isSupported()) return;
-      const hls = new Hls({ autoStartLoad: false });
+      // Player is built only on "▶ צפה", so load right away and start playing once the manifest is in.
+      const hls = new Hls({ enableWorker: false });
+      hls.on(Hls.Events.MANIFEST_PARSED, () => { video.play().catch(() => {}); });
+      hls.on(Hls.Events.ERROR, (_e, d) => {
+        if (!d.fatal) return;
+        try { hls.destroy(); } catch (e) {}
+        if (!video.nextElementSibling) video.insertAdjacentHTML("afterend",
+          `<div style="color:#b91c1c;font-size:.8rem;margin-top:4px">הסרטון לא נטען (${_vEsc(d.details || d.type)}) — פתח בכרטיסייה</div>`);
+      });
       hls.loadSource(url);
       hls.attachMedia(video);
-      // Don't pull segments for every card up front — only once the admin hits play.
-      video.addEventListener("play", () => hls.startLoad(), { once: true });
       _hlsPlayers.push(hls);
     }).catch(() => {
       video.insertAdjacentHTML("afterend", '<div style="color:#b91c1c;font-size:.8rem">הנגן לא נטען — פתח בכרטיסייה</div>');
     });
   } else {
     video.src = url;
+    video.play().catch(() => {});
   }
 }
 
@@ -3236,7 +3247,6 @@ async function loadVideosTab(status) {
       color: on ? "var(--text)" : "var(--text-muted)", borderRadius: "0",
     });
   });
-  while (_hlsPlayers.length) { try { _hlsPlayers.pop().destroy(); } catch (e) {} }
   const statusEl = document.getElementById("videos-status");
   const list = document.getElementById("videos-list");
   if (statusEl) statusEl.textContent = "טוען...";
@@ -3248,14 +3258,70 @@ async function loadVideosTab(status) {
   const badge = document.getElementById("videos-pending-badge");
   if (badge) badge.textContent = data.counts.pending ? `(${data.counts.pending})` : "";
   if (statusEl) statusEl.textContent = _videoCounts(data.counts);
-  if (!data.products.length) {
-    list.innerHTML = '<div style="color:var(--text-muted); padding:20px 0;">אין סרטונים בסטטוס הזה כרגע.</div>';
+  _videoProducts = data.products;
+  _videoCategory = null;
+  applyVideoFilters();
+}
+
+// Price range + category chips — same logic and look as the blog candidates filters.
+function _videoPriceFiltered() {
+  return _videoProducts.filter(p => (p.price_ils || 0) >= _videoMinPrice && (_videoMaxPrice == null || (p.price_ils || 0) <= _videoMaxPrice));
+}
+
+function applyVideoFilters() {
+  const priced = _videoPriceFiltered();
+  buildVideoCategoryFilters(priced);
+  renderVideoList(_videoCategory ? priced.filter(p => blogCategoryFor(p) === _videoCategory) : priced);
+}
+
+function applyVideoPriceFilter() {
+  const minVal = parseFloat(document.getElementById("videos-price-min")?.value);
+  const maxVal = parseFloat(document.getElementById("videos-price-max")?.value);
+  _videoMinPrice = Number.isFinite(minVal) && minVal >= 0 ? minVal : 0;
+  _videoMaxPrice = Number.isFinite(maxVal) && maxVal >= 0 ? maxVal : null;
+  _videoCategory = null;
+  applyVideoFilters();
+}
+
+function applyVideoCategoryFilter(cat) {
+  _videoCategory = cat;
+  applyVideoFilters();
+}
+
+function buildVideoCategoryFilters(products) {
+  const wrap = document.getElementById("videos-category-filters");
+  if (!wrap) return;
+  const counts = {}, catHe = {};
+  products.forEach(p => {
+    const cat = blogCategoryFor(p);
+    if (!cat) return;
+    counts[cat] = (counts[cat] || 0) + 1;
+    if (p.category_he && !catHe[cat]) catHe[cat] = p.category_he;
+  });
+  const cats = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+  if (!cats.length) { wrap.innerHTML = ""; return; }
+  const btnStyle = (active) => `background:${active ? "var(--brand)" : "var(--surface)"};color:${active ? "#111" : "inherit"};border:1px solid var(--border);padding:6px 12px;border-radius:16px;cursor:pointer;font-size:0.8rem;font-weight:${active ? 700 : 500};white-space:nowrap;`;
+  wrap.innerHTML = `<button onclick="applyVideoCategoryFilter(null)" style="${btnStyle(_videoCategory === null)}">הכל (${products.length})</button>`
+    + cats.map(cat => `<button onclick="applyVideoCategoryFilter('${cat.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}')" style="${btnStyle(_videoCategory === cat)}">${_vEsc(BLOG_CATEGORY_LABELS[cat] || catHe[cat] || cat)} (${counts[cat]})</button>`).join("");
+}
+
+// Drops a product from the in-memory list after its last shown video was decided, so the chip counts stay right.
+function _dropVideoProduct(productId) {
+  _videoProducts = _videoProducts.filter(p => p.id !== productId);
+  buildVideoCategoryFilters(_videoPriceFiltered());
+}
+
+function renderVideoList(products) {
+  while (_hlsPlayers.length) { try { _hlsPlayers.pop().destroy(); } catch (e) {} }
+  const list = document.getElementById("videos-list");
+  if (!products.length) {
+    list.innerHTML = `<div style="color:var(--text-muted); padding:20px 0;">${_videoProducts.length ? "אין מוצרים בסינון הזה." : "אין סרטונים בסטטוס הזה כרגע."}</div>`;
     return;
   }
   // One blog-style row per product (product image), its videos as compact lines inside the card.
   const link = "background:none;border:none;padding:0;font-size:0.76rem;color:var(--text-muted);cursor:pointer;text-decoration:underline;";
   const sep = `<span style="color:var(--border);font-size:0.76rem;">|</span>`;
-  list.innerHTML = data.products.map(p => {
+  list.innerHTML = products.map(p => {
     const img = p.image_url
       ? `<img src="${_vEsc(p.image_url.replace(/\._S[XL]\d+_\./g, "._SL400_."))}" alt="" style="width:52px;height:52px;object-fit:contain;border-radius:6px;border:1px solid var(--border);background:#fff;flex-shrink:0;">`
       : `<div style="width:52px;height:52px;border-radius:6px;border:1px solid var(--border);background:var(--surface);flex-shrink:0;"></div>`;
@@ -3343,6 +3409,7 @@ async function rejectVideoProduct(btn, productId) {
   product.style.opacity = "0";
   setTimeout(() => {
     product.remove();
+    _dropVideoProduct(productId);
     const badge = document.getElementById("videos-pending-badge");
     if (badge) {
       const n = Math.max(0, (parseInt((badge.textContent || "").replace(/\D/g, ""), 10) || 0) - cards.length);
@@ -3366,7 +3433,9 @@ async function reviewVideo(btn, productId, verdict) {
     const product = card.closest("[data-vproduct]");
     card.remove();
     const left = product.querySelectorAll("[data-vcard]").length;
-    if (!left) product.remove();
+    const mem = _videoProducts.find(p => p.id === productId);
+    if (mem) mem.videos = mem.videos.filter(v => v.url !== url);
+    if (!left) { product.remove(); _dropVideoProduct(productId); }
     else product.querySelector("[data-vcount]").textContent = `🎥 ${left} סרטונים`;
     const badge = document.getElementById("videos-pending-badge");
     if (badge && (_videoStatus === "pending" || verdict === "pending")) {

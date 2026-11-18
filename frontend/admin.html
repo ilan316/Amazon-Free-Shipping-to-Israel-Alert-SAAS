@@ -775,6 +775,16 @@
       </div>
 
       <p style="font-size:0.85rem; color:var(--text-muted); margin:0 0 6px;">סרטוני מוצר שהסורק מצא — לסמן מה מתאים לפרסום.</p>
+      <div style="display:flex; align-items:center; gap:8px; margin:10px 0 12px; flex-wrap:wrap;">
+        <label style="font-size:0.82rem; color:var(--text-muted);">טווח מחיר (₪):</label>
+        <input id="videos-price-min" type="number" min="0" placeholder="מ-" value="0"
+          style="width:80px; padding:5px 8px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font-size:0.82rem;">
+        <span style="color:var(--text-muted);">—</span>
+        <input id="videos-price-max" type="number" min="0" placeholder="עד"
+          style="width:80px; padding:5px 8px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font-size:0.82rem;">
+        <button class="btn-sm" onclick="applyVideoPriceFilter()" style="background:#fff;color:var(--brand);border:1px solid var(--brand);padding:5px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.82rem;">סנן</button>
+      </div>
+      <div id="videos-category-filters" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;"></div>
       <div id="videos-status" style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;"></div>
       <div id="videos-list"></div>
     </div>
@@ -836,7 +846,7 @@
   </div>
 
   <script src="/static/app.js?v=14"></script>
-  <script src="/static/admin.js?v=73"></script>
+  <script src="/static/admin.js?v=74"></script>
   <script>
     requireAuth();
     loadAdminData();

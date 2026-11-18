@@ -1018,6 +1018,13 @@ async def list_product_videos(
         .where(Product.videos.isnot(None), Product.videos != "[]")
         .order_by(Product.free_since.desc().nullslast())
     )).scalars().all()
+    unique_cats = {p.amazon_category for p in rows if p.amazon_category}
+    cat_he_map: dict[str, str] = {}
+    if unique_cats:
+        trans_rows = (await db.execute(
+            select(CategoryTranslation).where(CategoryTranslation.english_name.in_(unique_cats))
+        )).scalars().all()
+        cat_he_map = {row.english_name: row.hebrew_name for row in trans_rows}
     out = []
     counts = {"pending": 0, "ok": 0, "bad": 0}
     for p in rows:
@@ -1037,6 +1044,7 @@ async def list_product_videos(
                 "url": p.url, "image_url": p.image_url, "videos": shown,
                 "price_ils": _parse_price(p.last_price),
                 "amazon_category": p.amazon_category or "",
+                "category_he": cat_he_map.get(p.amazon_category, "") if p.amazon_category else "",
                 "last_status": p.last_status or "",
             })
     return {"products": out, "counts": counts}
