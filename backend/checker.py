@@ -12,6 +12,7 @@ Key changes vs desktop:
 
 import asyncio
 import os
+import time
 import random
 import re
 import logging
@@ -54,6 +55,9 @@ _BLOCK_SCRIPT_DOMAINS = {
 logger = logging.getLogger(__name__)
 
 BROWSER_PROFILE_DIR = os.environ.get("BROWSER_PROFILE_DIR", "/app/browser_profile")
+# Close Chromium after this many idle seconds (it holds hundreds of MB while open).
+# 0 = legacy behaviour: launch at startup and keep it open for the server lifetime.
+BROWSER_IDLE_TIMEOUT = int(os.environ.get("BROWSER_IDLE_TIMEOUT", "300"))
 
 # Residential proxy for Playwright browser (SOCKS5 format with sticky session)
 # Format: socks5h://user-SESSION-country-us:pass@gate.decodo.com:7000
@@ -1176,60 +1180,155 @@ async def check_product(page: Page, asin: str, url: str) -> CheckResult:
 # ── BrowserManager singleton ──────────────────────────────────────────────────
 
 class BrowserManager:
-    """Singleton that owns the Playwright browser context for the server lifetime."""
+    """Singleton that owns the Playwright browser context.
+
+    The browser is launched lazily on first use and closed after
+    BROWSER_IDLE_TIMEOUT seconds without use (it is only needed for the
+    httpx->Playwright fallback, mostly during the 04:00 cycle). Every
+    launch / close / page operation happens under self._lock, so the idle
+    watchdog can never close the browser in the middle of a check.
+    """
 
     def __init__(self):
         self._pw = None
         self._context = None
         self._lock = asyncio.Lock()
         self._session_cookies: list = []  # cached after each successful location refresh
+        self._last_used = 0.0
+        self._uses_since_launch = 0
+        self._launch_count = 0
+        self._watchdog_task = None
+
+    # ── browser lifecycle (all callers hold self._lock) ───────────────────────
+
+    def _clear_profile_locks(self):
+        """Remove stale Chromium singleton files left by an unclean close —
+        they make the next launch_persistent_context fail."""
+        for name in ("SingletonLock", "SingletonCookie", "SingletonSocket"):
+            path = os.path.join(BROWSER_PROFILE_DIR, name)
+            try:
+                if os.path.lexists(path):
+                    os.remove(path)
+            except OSError as e:
+                logger.warning(f"Could not remove stale {name}: {e}")
+
+    async def _launch(self):
+        t0 = time.monotonic()
+        self._clear_profile_locks()
+        try:
+            self._pw = await async_playwright().start()
+            # Playwright runs WITHOUT proxy — httpx handles the proxy for location-setting
+            _pw_proxy = _parse_playwright_proxy(_PLAYWRIGHT_PROXY_URL)
+            if _pw_proxy:
+                logger.info(f"Playwright: using residential proxy {_pw_proxy['server']}")
+            self._context = await self._pw.chromium.launch_persistent_context(
+                user_data_dir=BROWSER_PROFILE_DIR,
+                headless=True,
+                slow_mo=80,
+                proxy=_pw_proxy,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                ],
+                ignore_default_args=["--enable-automation"],
+                locale="en-US",
+                timezone_id="America/New_York",
+                viewport={"width": 1280, "height": 800},
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                ),
+            )
+            await self._context.add_init_script(
+                "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
+            )
+
+            # Block images, media, fonts, stylesheets, and third-party scripts.
+            # Amazon's own scripts are kept — they render prices and delivery blocks.
+            async def _block_resources(route, request):
+                if request.resource_type in _BLOCK_RESOURCE_TYPES:
+                    await route.abort()
+                elif request.resource_type == "script" and any(
+                    d in request.url for d in _BLOCK_SCRIPT_DOMAINS
+                ):
+                    await route.abort()
+                else:
+                    await route.continue_()
+
+            await self._context.route("**/*", _block_resources)
+        except BaseException:
+            # Never leave a half-launched browser behind (includes cancellation)
+            await self._close()
+            raise
+        self._launch_count += 1
+        self._uses_since_launch = 0
+        logger.info(
+            f"Browser launched in {time.monotonic() - t0:.1f}s "
+            f"(launch #{self._launch_count} since server start)"
+        )
+
+    async def _close(self):
+        ctx, pw = self._context, self._pw
+        self._context, self._pw = None, None
+        try:
+            if ctx:
+                await asyncio.wait_for(ctx.close(), timeout=30)
+        except Exception as e:
+            logger.warning(f"Browser context close error (ignored): {e!r}")
+        try:
+            if pw:
+                await asyncio.wait_for(pw.stop(), timeout=30)
+        except Exception as e:
+            logger.warning(f"Playwright stop error (ignored): {e!r}")
+
+    async def _new_page(self):
+        """Open a page, launching the browser if needed. If the existing
+        browser has died (Chromium crash), relaunch once and retry."""
+        if self._context is None:
+            await self._launch()
+            return await self._context.new_page()
+        try:
+            return await self._context.new_page()
+        except Exception as e:
+            logger.warning(f"Browser unusable ({e!r}) — relaunching")
+            await self._close()
+            await self._launch()
+            return await self._context.new_page()
+
+    def _mark_used(self):
+        self._last_used = time.monotonic()
+        self._uses_since_launch += 1
+
+    async def _idle_watchdog(self):
+        interval = max(1, min(30, BROWSER_IDLE_TIMEOUT // 4))
+        while True:
+            try:
+                await asyncio.sleep(interval)
+                if self._context is None or self._lock.locked():
+                    continue
+                if time.monotonic() - self._last_used < BROWSER_IDLE_TIMEOUT:
+                    continue
+                async with self._lock:
+                    # Re-check under the lock — a check may have run meanwhile
+                    if self._context is None:
+                        continue
+                    idle = time.monotonic() - self._last_used
+                    if idle < BROWSER_IDLE_TIMEOUT:
+                        continue
+                    uses = self._uses_since_launch
+                    await self._close()
+                    logger.info(f"Browser closed after {idle:.0f}s idle ({uses} uses since launch)")
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.warning(f"Browser idle watchdog error (ignored): {e!r}")
+
+    # ── public API ────────────────────────────────────────────────────────────
 
     async def startup(self):
-        logger.info("Starting Playwright browser...")
-        self._pw = await async_playwright().start()
-        # Playwright runs WITHOUT proxy — httpx handles the proxy for location-setting
-        _pw_proxy = _parse_playwright_proxy(_PLAYWRIGHT_PROXY_URL)
-        if _pw_proxy:
-            logger.info(f"Playwright: using residential proxy {_pw_proxy['server']}")
-        self._context = await self._pw.chromium.launch_persistent_context(
-            user_data_dir=BROWSER_PROFILE_DIR,
-            headless=True,
-            slow_mo=80,
-            proxy=_pw_proxy,
-            args=[
-                "--disable-blink-features=AutomationControlled",
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu",
-            ],
-            ignore_default_args=["--enable-automation"],
-            locale="en-US",
-            timezone_id="America/New_York",
-            viewport={"width": 1280, "height": 800},
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            ),
-        )
-        await self._context.add_init_script(
-            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
-        )
-
-        # Block images, media, fonts, stylesheets, and third-party scripts.
-        # Amazon's own scripts are kept — they render prices and delivery blocks.
-        async def _block_resources(route, request):
-            if request.resource_type in _BLOCK_RESOURCE_TYPES:
-                await route.abort()
-            elif request.resource_type == "script" and any(
-                d in request.url for d in _BLOCK_SCRIPT_DOMAINS
-            ):
-                await route.abort()
-            else:
-                await route.continue_()
-
-        await self._context.route("**/*", _block_resources)
-
         # Load persisted cookies from DB (saved by inject-cookies endpoint)
         try:
             import json
@@ -1260,16 +1359,29 @@ class BrowserManager:
             else:
                 logger.warning("Startup: curl_cffi location failed — will retry on first cycle.")
 
-        logger.info("Browser ready.")
+        if BROWSER_IDLE_TIMEOUT <= 0:
+            logger.info("BROWSER_IDLE_TIMEOUT=0 — launching browser now and keeping it open.")
+            async with self._lock:
+                await self._launch()
+        else:
+            logger.info(f"Browser: lazy launch, closes after {BROWSER_IDLE_TIMEOUT}s idle.")
+            self._watchdog_task = asyncio.create_task(self._idle_watchdog())
+        logger.info("Browser manager ready.")
 
     async def shutdown(self):
+        if self._watchdog_task:
+            self._watchdog_task.cancel()
+            self._watchdog_task = None
         try:
-            if self._context:
-                await self._context.close()
-            if self._pw:
-                await self._pw.stop()
-        except Exception as e:
-            logger.warning(f"Browser shutdown error (ignored): {e}")
+            await asyncio.wait_for(self._lock.acquire(), timeout=10)
+        except asyncio.TimeoutError:
+            # A check is stuck holding the lock — close anyway, we're exiting
+            await self._close()
+            return
+        try:
+            await self._close()
+        finally:
+            self._lock.release()
 
     async def refresh_location(self) -> bool:
         """Re-set delivery location to Israel. Called at the start of each check cycle.
@@ -1317,7 +1429,20 @@ class BrowserManager:
 
     async def _refresh_location_playwright(self) -> bool:
         """Playwright-based location setter. Called only as fallback from refresh_location."""
-        page = await self._context.new_page()
+        async with self._lock:
+            try:
+                page = await self._new_page()
+            except Exception as e:
+                logger.warning(f"Location refresh: browser launch failed: {e!r}")
+                return False
+            try:
+                return await self._refresh_location_on_page(page)
+            finally:
+                await self._safe_close_page(page)
+                self._mark_used()
+
+    async def _refresh_location_on_page(self, page) -> bool:
+        """Location-setting loop. Caller holds self._lock and owns the page."""
         try:
             for attempt in range(3):
                 await page.goto("https://www.amazon.com/dp/B00EDR1X3O?psc=1&th=1",
@@ -1357,8 +1482,6 @@ class BrowserManager:
         except Exception as e:
             logger.warning(f"Location refresh error: {e}")
             return False
-        finally:
-            await page.close()
 
     async def _inject_cookies_to_context(self):
         """Inject current session cookies into the Playwright browser context."""
@@ -1378,27 +1501,44 @@ class BrowserManager:
         except Exception as e:
             logger.warning(f"Failed to inject cookies into Playwright context: {e}")
 
-    async def check(self, asin: str, url: str) -> CheckResult:
-        """Check a single product via Playwright. Serialized via lock to avoid CAPTCHA triggers."""
+    @staticmethod
+    async def _safe_close_page(page):
+        try:
+            await page.close()
+        except Exception:
+            pass
+
+    async def _check_once(self, asin: str, url: str) -> CheckResult:
         async with self._lock:
-            await self._inject_cookies_to_context()
-            page = await self._context.new_page()
             try:
+                page = await self._new_page()
+            except Exception as e:
+                logger.error(f"[{asin}] Browser launch failed: {e!r}")
+                return CheckResult(asin, ShippingStatus.ERROR, error_message=f"Browser launch failed: {e}")
+            try:
+                await self._inject_cookies_to_context()
                 result = await check_product(page, asin, url)
             finally:
-                await page.close()
+                await self._safe_close_page(page)
+                self._mark_used()
+            # Browser died mid-check -> drop it so the next use relaunches cleanly
+            msg = (result.error_message or "").lower()
+            if result.status == ShippingStatus.ERROR and (
+                "target closed" in msg or "has been closed" in msg or "browser closed" in msg
+            ):
+                logger.warning(f"[{asin}] Browser died during check — will relaunch on next use")
+                await self._close()
+            return result
+
+    async def check(self, asin: str, url: str) -> CheckResult:
+        """Check a single product via Playwright. Serialized via lock to avoid CAPTCHA triggers."""
+        result = await self._check_once(asin, url)
 
         # CAPTCHA retry: wait outside the lock, then retry once
-        if result.status == ShippingStatus.ERROR and "CAPTCHA" in result.error_message:
+        if result.status == ShippingStatus.ERROR and "CAPTCHA" in (result.error_message or ""):
             logger.warning(f"[{asin}] Playwright CAPTCHA — waiting 45s before retry...")
             await asyncio.sleep(45)
-            async with self._lock:
-                await self._inject_cookies_to_context()
-                page = await self._context.new_page()
-                try:
-                    result = await check_product(page, asin, url)
-                finally:
-                    await page.close()
+            result = await self._check_once(asin, url)
 
         return result
 
