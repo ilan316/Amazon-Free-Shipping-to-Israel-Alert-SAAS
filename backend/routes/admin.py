@@ -2525,6 +2525,41 @@ async def get_blog_candidates(
             "slug": draft_info["slug"] if draft_info else None,
         })
 
+    # Variant warning: flag candidates whose product line already has a post
+    # (published or draft) or another candidate. Warning only — see blog_similarity.
+    from backend.blog_similarity import find_similar, similar_key
+    pub_rows = (await db.execute(
+        select(BlogPublishedAsin.asin, BlogPublishedAsin.slug, BlogPublishedAsin.title)
+    )).all()
+    covered = {r[0]: {"slug": r[1], "title": r[2] or "", "kind": "published"} for r in pub_rows}
+    for a, info in drafts_map.items():
+        covered.setdefault(a, {"slug": info["slug"], "title": info["title"] or "", "kind": "draft"})
+    name_rows = (await db.execute(
+        select(Product.asin, Product.name).where(Product.asin.in_(list(covered)))
+    )).all() if covered else []
+    en_names = {r[0]: r[1] for r in name_rows}
+    existing = [
+        {"asin": a, **info, "name": en_names.get(a) or info["title"]}
+        for a, info in covered.items()
+    ]
+    for e in existing:
+        e["_key"] = similar_key(e["name"])
+    for c in candidates:
+        c["_key"] = similar_key(c["name"])
+    for c in candidates:
+        own = [e for e in existing if e["asin"] != c["asin"]]
+        m = find_similar(c["name"], own)
+        if not m:
+            m = find_similar(c["name"], [
+                {"asin": o["asin"], "slug": None, "title": o["name"], "kind": "candidate", "_key": o["_key"]}
+                for o in candidates if o["asin"] != c["asin"]
+            ])
+        c["similar_to"] = (
+            {"asin": m["asin"], "slug": m["slug"], "title": m["title"], "kind": m["kind"]} if m else None
+        )
+    for c in candidates:
+        c.pop("_key", None)
+
     candidates.sort(key=lambda x: x["price_ils"], reverse=True)
     return {"candidates": candidates, "published_count": len(published_asins)}
 

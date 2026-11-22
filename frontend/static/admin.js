@@ -2113,6 +2113,7 @@ function renderBlogCandidatesList(candidates) {
             <span dir="ltr">${c.asin}</span> &nbsp;·&nbsp; ₪${Math.round(c.price_ils).toLocaleString()} &nbsp;·&nbsp; ${c.amazon_category}
             <span style="color:var(--success);font-weight:600;">&nbsp;·&nbsp;FREE ✓</span>
           </div>
+          ${similarWarning(c.similar_to)}
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0;" class="blog-card-actions">
           ${c.has_draft
@@ -2143,6 +2144,21 @@ function renderBlogCandidatesList(candidates) {
   }).join("");
 
   updateBatchBar();
+}
+
+// Warning that this candidate looks like a variant of a product line that
+// already has a post — near-duplicate template posts don't get indexed.
+function similarWarning(s) {
+  if (!s) return "";
+  const esc = t => String(t || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+  const style = "font-size:0.78rem;color:#b45309;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+  if (s.kind === "candidate") {
+    return `<div style="${style}" title="${esc(s.title)}">⚠️ דומה למועמד אחר: <span dir="ltr">${esc(s.asin)}</span></div>`;
+  }
+  const label = s.kind === "draft" ? "לדראפט קיים" : "לפוסט קיים";
+  if (!s.slug) return `<div style="${style}">⚠️ דומה ${label}: ${esc(s.title || s.asin)}</div>`;
+  return `<div style="${style}" title="${esc(s.title)}">⚠️ דומה ${label}:
+    <a href="https://www.amzfreeil.com/blog/${encodeURIComponent(s.slug)}.html" target="_blank" rel="noopener" style="color:inherit;">${esc(s.title || s.slug)}</a></div>`;
 }
 
 /* ---------- Batch draft generation ---------- */
